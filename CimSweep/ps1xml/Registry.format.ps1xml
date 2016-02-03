@@ -14,6 +14,9 @@
                     <TableColumnHeader>
                         <Label>SubKey</Label>
                     </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>PSComputerName</Label>
+                    </TableColumnHeader>
                 </TableHeaders>
                 <TableRowEntries>
                     <TableRowEntry>
@@ -23,6 +26,9 @@
                             </TableColumnItem>
                             <TableColumnItem>
                                 <PropertyName>SubKey</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>PSComputerName</PropertyName>
                             </TableColumnItem>
                         </TableColumnItems>
                     </TableRowEntry>
@@ -52,6 +58,9 @@
                             </ListItem>
                             <ListItem>
                                 <PropertyName>Type</PropertyName>
+                            </ListItem>
+                            <ListItem>
+                                <PropertyName>PSComputerName</PropertyName>
                             </ListItem>
                         </ListItems>
                     </ListEntry>

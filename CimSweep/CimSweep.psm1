@@ -61,6 +61,10 @@ PSObject
 
 Accepts output from Get-CSRegistryKey. This enables recursion.
 
+Microsoft.Management.Infrastructure.CimSession
+
+Get-CSRegistryKey accepts established CIM sessions over the pipeline.
+
 .OUTPUTS
 
 PSObject
@@ -91,7 +95,7 @@ It is not recommended to recursively list all registry keys from most parent key
         [Switch]
         $Recurse,
 
-        [Parameter(ValueFromPipelineByPropertyName = $True)]
+        [Parameter(ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
         [Alias('Session')]
         [Microsoft.Management.Infrastructure.CimSession[]]
         $CimSession
@@ -222,6 +226,10 @@ PSObject
 
 Accepts output from Get-CSRegistryKey. This allows you to list all registry value names for all keys contained within a parent key.
 
+Microsoft.Management.Infrastructure.CimSession
+
+Get-CSRegistryValue accepts established CIM sessions over the pipeline.
+
 .OUTPUTS
 
 PSObject
@@ -251,7 +259,7 @@ Outputs a list of custom objects representing registry value names, their respec
         [Switch]
         $ValueNameOnly,
 
-        [Parameter(ValueFromPipelineByPropertyName = $True)]
+        [Parameter(ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
         [Alias('Session')]
         [Microsoft.Management.Infrastructure.CimSession[]]
         $CimSession
@@ -392,7 +400,7 @@ Outputs a list of custom objects representing registry value names, their respec
     }
 }
 
-function Get-HKUSID {
+filter Get-HKUSID {
 <#
 .SYNOPSIS
 
@@ -408,10 +416,10 @@ Get-HKUSID is a helper function that returns user SIDs from the root of the HKU 
 .PARAMETER CimSession
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
-
 #>
 
     param(
+        [Parameter(ValueFromPipeline = $True)]
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
@@ -437,7 +445,7 @@ Specifies the CIM session to use for this cmdlet. Enter a variable that contains
     }
 }
 
-function Get-CSRegistryAutoStart {
+filter Get-CSRegistryAutoStart {
 <#
 .SYNOPSIS
 
@@ -454,10 +462,16 @@ Get-CSRegistryAutoStart lists autorun points present in the registry locally or 
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
 
+.INPUTS
+
+Microsoft.Management.Infrastructure.CimSession
+
+Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
 #>
 
     [OutputType([PSObject])]
     param(
+        [Parameter(ValueFromPipeline = $True)]
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
@@ -488,7 +502,7 @@ Specifies the CIM session to use for this cmdlet. Enter a variable that contains
     }
 }
 
-function Get-CSEventLog {
+filter Get-CSEventLog {
 <#
 .SYNOPSIS
 
@@ -504,9 +518,26 @@ Specifies the CIM session to use for this cmdlet. Enter a variable that contains
 .NOTES
 
 Get-CSEventLog is useful for determining which event log to filter off of in Get-CSEventLogEntry.
+
+.INPUTS
+
+PSObject
+
+Accepts input from Get-CSEventLog.
+
+Microsoft.Management.Infrastructure.CimSession
+
+Get-CSEventLog accepts established CIM sessions over the pipeline.
+
+.OUTPUTS
+
+PSObject
+
+Outptus a custom object that can be piped to Get-CSEventLog entry.
 #>
 
     param(
+        [Parameter(ValueFromPipeline = $True)]
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
@@ -530,7 +561,7 @@ Get-CSEventLog is useful for determining which event log to filter off of in Get
     }
 }
 
-function Get-CSEventLogEntry {
+filter Get-CSEventLogEntry {
 <#
 .SYNOPSIS
 
@@ -603,6 +634,10 @@ PSObject
 
 Accepts input from Get-CSEventLog.
 
+Microsoft.Management.Infrastructure.CimSession
+
+Get-CSEventLogEntry accepts established CIM sessions over the pipeline.
+
 .OUTPUTS
 
 Microsoft.Management.Infrastructure.CimInstance
@@ -643,7 +678,7 @@ Outputs Win32_NtLogEvent instances.
         [ValidateNotNullOrEmpty()]
         $UserName,
 
-        [Parameter(ValueFromPipelineByPropertyName = $True)]
+        [Parameter(ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
@@ -683,7 +718,7 @@ Outputs Win32_NtLogEvent instances.
     Get-CimInstance @CommonArgs @EventLogEntryArgs -ClassName Win32_NTLogEvent
 }
 
-function Get-CSMountedVolumeDriveLetter {
+filter Get-CSMountedVolumeDriveLetter {
 <#
 .SYNOPSIS
 
@@ -696,6 +731,12 @@ License: BSD 3-Clause
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
 
+.INPUTS
+
+Microsoft.Management.Infrastructure.CimSession
+
+Get-CSMountedVolumeDriveLetter accepts established CIM sessions over the pipeline.
+
 .OUTPUTS
 
 PSObject
@@ -704,6 +745,7 @@ Outputs a list of mounted drive letters.
 #>
 
     param(
+        [Parameter(ValueFromPipeline = $True)]
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
@@ -785,6 +827,12 @@ PSObject
 
 Accepts input from Get-CSMountedVolumeDriveLetter and itself (Get-CSDirectoryListing).
 
+.INPUTS
+
+Microsoft.Management.Infrastructure.CimSession
+
+Get-CSDirectoryListing accepts established CIM sessions over the pipeline.
+
 .OUTPUTS
 
 Microsoft.Management.Infrastructure.CimInstance
@@ -795,7 +843,7 @@ Outputs a CIM_DataFile or Win32_Directory instance representing file or director
     [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
     [CmdletBinding(DefaultParameterSetName = 'FileName')]
     param(
-        [Parameter(Position = 0, ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
+        [Parameter(Position = 0, ValueFromPipelineByPropertyName = $True)]
         [Alias('Name')]
         [String]
         [ValidatePattern('^[A-Za-z]?:\\.*$')]
@@ -809,7 +857,7 @@ Outputs a CIM_DataFile or Win32_Directory instance representing file or director
         [Switch]
         $Recurse,
 
-        [Parameter(ValueFromPipelineByPropertyName = $True)]
+        [Parameter(ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
         [Alias('Session')]
         [Microsoft.Management.Infrastructure.CimSession[]]
         $CimSession
@@ -864,7 +912,7 @@ Outputs a CIM_DataFile or Win32_Directory instance representing file or director
     }
 }
 
-function Get-CSService {
+filter Get-CSService {
 <#
 .SYNOPSIS
 
@@ -927,6 +975,12 @@ Get-CSService -ServiceType 'Kernel Driver'
 
 Get-CSService -PathName svchost.exe
 
+.INPUTS
+
+Microsoft.Management.Infrastructure.CimSession
+
+Get-CSService accepts established CIM sessions over the pipeline.
+
 .OUTPUTS
 
 Microsoft.Management.Infrastructure.CimInstance
@@ -964,6 +1018,7 @@ Outputs Win32_Service instances.
         [ValidateNotNullOrEmpty()]
         $Description,
 
+        [Parameter(ValueFromPipeline = $True)]
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
@@ -994,7 +1049,7 @@ Outputs Win32_Service instances.
     Get-CimInstance @CommonArgs @ServiceEntryArgs -ClassName Win32_Service
 }
 
-function Get-CSProcess {
+filter Get-CSProcess {
 <#
 .SYNOPSIS
 
@@ -1043,6 +1098,12 @@ Get-CSProcess -Name chrome
 
 Get-CSProcess -ProcessID 4 -CimSession $CimSession
 
+.INPUTS
+
+Microsoft.Management.Infrastructure.CimSession
+
+Get-CSProcess accepts established CIM sessions over the pipeline.
+
 .OUTPUTS
 
 Microsoft.Management.Infrastructure.CimInstance
@@ -1071,6 +1132,7 @@ Outputs Win32_Process instances.
         [ValidateNotNullOrEmpty()]
         $ExecutablePath,
 
+        [Parameter(ValueFromPipeline = $True)]
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
