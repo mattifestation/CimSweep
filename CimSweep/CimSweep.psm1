@@ -77,6 +77,7 @@ It is not recommended to recursively list all registry keys from most parent key
 
 #>
 
+    [CmdletBinding()]
     param(
         [Parameter(Mandatory = $True, ValueFromPipelineByPropertyName = $True, ParameterSetName = 'ExplicitPath')]
         [String]
@@ -237,7 +238,8 @@ PSObject
 Outputs a list of custom objects representing registry value names, their respective types, and content for a specified key.
 
 #>
-
+    
+    [CmdletBinding()]
     param(
         [Parameter(Mandatory = $True, ValueFromPipelineByPropertyName = $True, ParameterSetName = 'ExplicitPath')]
         [String]
@@ -312,7 +314,9 @@ Outputs a list of custom objects representing registry value names, their respec
     $Result = Invoke-CimMethod @CimMethodArgs
 
     if ($Result.ReturnValue -eq 0) {
+
         $Types = $Result.Types.ForEach({$Type[$_]})
+
         $ValueNames = $Result.sNames
 
         for ($i = 0; $i -lt $Result.Types.Length; $i++) {
@@ -336,7 +340,7 @@ Outputs a list of custom objects representing registry value names, their respec
                     $ReturnProp = 'sValue'
                 }
 
-                'MultiString' {
+                'REG_MULTI_SZ' {
                     $CimMethod2Args['MethodName'] = 'GetMultiStringValue'
                     $ReturnProp = 'sValue'
                 }
@@ -359,6 +363,11 @@ Outputs a list of custom objects representing registry value names, their respec
                 'REG_RESOURCE_REQUIREMENTS_LIST' {
                     $CimMethod2Args['MethodName'] = 'GetBinaryValue'
                     $ReturnProp = 'uValue'
+                }
+
+                default {
+                    Write-Error "$($Result.Types[$i]) is not a supported registry value type!"
+                    continue
                 }
             }
 
@@ -795,6 +804,58 @@ Specifies the directory.
 
 Specifies that information for a specific file should be returned.
 
+.PARAMETER FileSize
+
+Only return files with the specified file sizes.
+
+.PARAMETER Extension
+
+Only return files with the specified file extensions.
+
+.PARAMETER Hidden
+
+Only return hidden files
+
+.PARAMETER LastModified
+
+Specifies that only files modified on specified date should be returned.
+
+.PARAMETER LastModifiedAfter
+
+Specifies that only files modified after the specified date should be returned.
+
+.PARAMETER LastModifiedBefore
+
+Specifies that only files modified before the specified date should be returned.
+
+.PARAMETER LastAccessed
+
+Specifies that only files accessed on specified date should be returned.
+
+.PARAMETER LastAccessedAfter
+
+Specifies that only files accessed after the specified date should be returned.
+
+.PARAMETER LastAccessedBefore
+
+Specifies that only files accessed before the specified date should be returned.
+
+.PARAMETER CreationDate
+
+Specifies that only files created on specified date should be returned.
+
+.PARAMETER CreationDateAfter
+
+Specifies that only files created after the specified date should be returned.
+
+.PARAMETER CreationDateBefore
+
+Specifies that only files created before the specified date should be returned.
+
+.PARAMETER DirectoryOnly
+
+Specifies that only directories should be listed.
+
 .PARAMETER Recurse
 
 Recurse on all child directories.
@@ -821,11 +882,21 @@ Get-CSDirectoryListing -DirectoryPath C:\Windows\System32\ -FileName kernel32.dl
 
 Get-CSDirectoryListing -DirectoryPath C:\Windows\System32\Tasks -Recurse
 
-.INPUTS
+.EXAMPLE
 
-PSObject
+$CimSession, $CimSession2 | Get-CSDirectoryListing -DirectoryPath C:\ -Extension exe, dll, sys -Recurse
 
-Accepts input from Get-CSMountedVolumeDriveLetter and itself (Get-CSDirectoryListing).
+.EXAMPLE
+
+Get-CSDirectoryListing -DirectoryPath C:\Users -DirectoryOnly | Get-CSDirectoryListing -Extension exe, dll -Recurse
+
+Lists all EXE and DLL files present in all user directories.
+
+.EXAMPLE
+
+Get-CSDirectoryListing -DirectoryPath C:\ -DirectoryOnly -Recurse
+
+Lists all directories present in C:\.
 
 .INPUTS
 
@@ -838,22 +909,88 @@ Get-CSDirectoryListing accepts established CIM sessions over the pipeline.
 Microsoft.Management.Infrastructure.CimInstance
 
 Outputs a CIM_DataFile or Win32_Directory instance representing file or directory information.
+
+.NOTES
+
+Filter parameters in Get-CSDirectoryListing only apply to files, not directories.
 #>
 
     [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
-    [CmdletBinding(DefaultParameterSetName = 'FileName')]
+    [CmdletBinding(DefaultParameterSetName = 'DirOnly')]
     param(
-        [Parameter(Position = 0, ValueFromPipelineByPropertyName = $True)]
+        [Parameter(ValueFromPipelineByPropertyName = $True, Mandatory = $True, Position = 0)]
         [Alias('Name')]
         [String]
-        [ValidatePattern('^[A-Za-z]?:\\.*$')]
+        [ValidatePattern('^(?<ValidDriveLetter>[A-Za-z]:)(?<ValidPath>\\.*)$')]
         $DirectoryPath,
 
-        [Parameter(ParameterSetName = 'FileName')]
+        [Parameter(ParameterSetName = 'FileQuery')]
         [ValidateNotNullOrEmpty()]
+        [String[]]
         $FileName,
 
-        [Parameter(ParameterSetName = 'Recurse')]
+        [Parameter(ParameterSetName = 'FileQuery')]
+        [ValidateNotNullOrEmpty()]
+        [UInt64[]]
+        $FileSize,
+
+        [Parameter(ParameterSetName = 'FileQuery')]
+        [ValidateNotNullOrEmpty()]
+        [String[]]
+        $Extension,
+
+        [Switch]
+        $Hidden,
+
+        [Parameter(ParameterSetName = 'FileQuery')]
+        [DateTime]
+        [ValidateNotNullOrEmpty()]
+        $LastModified,
+
+        [Parameter(ParameterSetName = 'FileQuery')]
+        [DateTime]
+        [ValidateNotNullOrEmpty()]
+        $LastModifiedAfter,
+
+        [Parameter(ParameterSetName = 'FileQuery')]
+        [DateTime]
+        [ValidateNotNullOrEmpty()]
+        $LastModifiedBefore,
+
+        [Parameter(ParameterSetName = 'FileQuery')]
+        [DateTime]
+        [ValidateNotNullOrEmpty()]
+        $LastAccessed,
+
+        [Parameter(ParameterSetName = 'FileQuery')]
+        [DateTime]
+        [ValidateNotNullOrEmpty()]
+        $LastAccessedAfter,
+
+        [Parameter(ParameterSetName = 'FileQuery')]
+        [DateTime]
+        [ValidateNotNullOrEmpty()]
+        $LastAccessedBefore,
+
+        [Parameter(ParameterSetName = 'FileQuery')]
+        [DateTime]
+        [ValidateNotNullOrEmpty()]
+        $CreationDate,
+
+        [Parameter(ParameterSetName = 'FileQuery')]
+        [DateTime]
+        [ValidateNotNullOrEmpty()]
+        $CreationDateAfter,
+
+        [Parameter(ParameterSetName = 'FileQuery')]
+        [DateTime]
+        [ValidateNotNullOrEmpty()]
+        $CreationDateBefore,
+
+        [Parameter(ParameterSetName = 'DirOnly')]
+        [Switch]
+        $DirectoryOnly,
+        
         [Switch]
         $Recurse,
 
@@ -867,43 +1004,81 @@ Outputs a CIM_DataFile or Win32_Directory instance representing file or director
 
     if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $CimSession }
 
-    # Perform a directory listing of the root of each mounted drive if no path is provided
-    if (-not $PSBoundParameters['DirectoryPath']) {
-        Get-CSMountedVolumeDriveLetter @CommonArgs | Get-CSDirectoryListing
-    } else {
-        $TrimmedPath = $DirectoryPath.TrimEnd('\')
+    # Normalize the directory path
+    $TrimmedPath = $DirectoryPath.TrimEnd('\')
 
-        # The validation regex guarantees that $Path[0] will contain a drive letter
-        $DriveLetter = $TrimmedPath[0]
-        $NewPath = $TrimmedPath.Substring(2)
+    # The validation regex guarantees that $Path[0] will contain a drive letter
+    $DriveLetter = $TrimmedPath[0]
+    $NewPath = $TrimmedPath.Substring(2)
 
-        $Filter = "Drive = '$($DriveLetter):' AND Path='$($NewPath.Replace('\', '\\'))\\'"
+    # Build targeted Win32_Directory query
+    $Filter = "Drive = `"$($DriveLetter):`" AND Path=`"$($NewPath.Replace('\', '\\'))\\`""
 
-        $Arguments = @{
-            ClassName = 'Win32_Directory'
-            Filter = $Filter
+    $DirArguments = @{
+        ClassName = 'Win32_Directory'
+        Filter = $Filter
+    }
+
+    # Efficiency improvement: since only file objects will be returned,
+    # only request the Name property to save bandwidth
+    if ($PSCmdlet.ParameterSetName -eq 'FileQuery') { $DirArguments['Property'] = 'Name' }
+
+    # Get all directories present in the specified folder
+    Get-CimInstance @CommonArgs @DirArguments | ForEach-Object {
+        $DirObject = $_
+        $DirObject.PSObject.TypeNames.Insert(0, 'CimSweep.LogicalFile')
+
+        # Append the CimSession instance. This enables piping Get-CSDirectoryListing to itself
+        Add-Member -InputObject $DirObject -MemberType NoteProperty -Name CimSession -Value $CimSession
+
+        # Output the directories present if file query arguments are not present
+        if ($PSCmdlet.ParameterSetName -ne 'FileQuery') { $DirObject }
+
+        if ($PSBoundParameters['Recurse']) {
+            $PSBoundParametersCopy = $PSBoundParameters
+
+            # Remove the provided DirectoryPath arg since we're providing the subdirectory
+            $null = $PSBoundParametersCopy.Remove('DirectoryPath')
+
+            Get-CSDirectoryListing @PSBoundParametersCopy -DirectoryPath $DirObject.Name
+        }
+    }
+
+    if (-not $PSBoundParameters['DirectoryOnly']) {
+        $FilterComponents = New-Object 'Collections.ObjectModel.Collection`1[System.String]'
+
+        # To do: to make exact datetime matches more usable, I may need to not account for milliseconds
+        # and scan for a range that matched within the second.
+        $DmtfFormat = 'yyyyMMddHHmmss.ffffff+000'
+
+        if ($PSBoundParameters['FileName']) { $FilterComponents.Add("($(($FileName | % { "Name=``"$($TrimmedPath.Replace('\', '\\'))\\$_``"" }) -join ' OR '))") }
+        if ($PSBoundParameters['FileSize']) { $FilterComponents.Add("($(($FileSize | % { "FileSize = $_" }) -join ' OR '))") }
+        if ($PSBoundParameters['Extension']) { $FilterComponents.Add("($(($Extension | % { "Extension =``"$_``"" }) -join ' OR '))") }
+        if ($PSBoundParameters['LastModified']) { $FilterComponents.Add("LastModified=`"$($LastModified.ToUniversalTime().ToString($DmtfFormat))`"") }
+        if ($PSBoundParameters['LastModifiedBefore']) { $FilterComponents.Add("LastModified<`"$($LastModifiedBefore.ToUniversalTime().ToString($DmtfFormat))`"") }
+        if ($PSBoundParameters['LastModifiedAfter']) { $FilterComponents.Add("LastModified>`"$($LastModifiedAfter.ToUniversalTime().ToString($DmtfFormat))`"") }
+        if ($PSBoundParameters['LastAccessed']) { $FilterComponents.Add("LastAccessed=`"$($LastAccessed.ToUniversalTime().ToString($DmtfFormat))`"") }
+        if ($PSBoundParameters['LastAccessedBefore']) { $FilterComponents.Add("LastAccessed<`"$($LastAccessedBefore.ToUniversalTime().ToString($DmtfFormat))`"") }
+        if ($PSBoundParameters['LastAccessedAfter']) { $FilterComponents.Add("LastAccessed>`"$($LastAccessedAfter.ToUniversalTime().ToString($DmtfFormat))`"") }
+        if ($PSBoundParameters['CreationDate']) { $FilterComponents.Add("CreationDate=`"$($CreationDate.ToUniversalTime().ToString($DmtfFormat))`"") }
+        if ($PSBoundParameters['CreationDateBefore']) { $FilterComponents.Add("CreationDate<`"$($CreationDateBefore.ToUniversalTime().ToString($DmtfFormat))`"") }
+        if ($PSBoundParameters['CreationDateAfter']) { $FilterComponents.Add("CreationDate>`"$($CreationDateAfter.ToUniversalTime().ToString($DmtfFormat))`"") }
+        if ($PSBoundParameters['CreationDateAfter']) { $FilterComponents.Add('Hidden = "True"') }
+
+        $FileFilter = $null
+
+        # Join all the WQL query components
+        if ($FilterComponents.Count) {
+            $FileFilter = ' AND ' + ($FilterComponents -join ' AND ')
         }
 
-        if ($PSBoundParameters['FileName']) {
-            $Arguments['Filter'] += " AND Name='$($TrimmedPath.Replace('\', '\\'))\\$FileName'"
+        $FileArguments = @{
+            ClassName = 'CIM_DataFile'
+            Filter = $DirArguments['Filter'] + $FileFilter
         }
-
-        # Get all directories present in the specified folder
-        Get-CimInstance @CommonArgs @Arguments | ForEach-Object {
-            $Object = $_
-            $Object.PSObject.TypeNames.Insert(0, 'CimSweep.LogicalFile')
-            Add-Member -InputObject $Object -MemberType NoteProperty -Name CimSession -Value $CimSession
-            $Object
-
-            if ($PSBoundParameters['Recurse']) {
-                Get-CSDirectoryListing @CommonArgs -Recurse -DirectoryPath $Object.Name
-            }
-        }
-
-        $Arguments['ClassName'] = 'CIM_DataFile'
 
         # Get all files present in the specified folder
-        Get-CimInstance @CommonArgs @Arguments | ForEach-Object {
+        Get-CimInstance @CommonArgs @FileArguments | ForEach-Object {
             $Object = $_
             $Object.PSObject.TypeNames.Insert(0, 'CimSweep.LogicalFile')
             Add-Member -InputObject $Object -MemberType NoteProperty -Name CimSession -Value $CimSession
