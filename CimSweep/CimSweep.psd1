@@ -17,13 +17,13 @@ PowerShellVersion = '3.0'
 FunctionsToExport = @(
     'Get-CSRegistryKey',
     'Get-CSRegistryValue',
-    'Get-CSRegistryAutoStart',
     'Get-CSMountedVolumeDriveLetter',
     'Get-CSDirectoryListing',
     'Get-CSEventLog',
     'Get-CSEventLogEntry',
     'Get-CSService',
-    'Get-CSProcess'
+    'Get-CSProcess',
+    'Get-CSRegistryAutoStart'
 )
 
 FormatsToProcess = @(
