@@ -23,7 +23,10 @@ FunctionsToExport = @(
     'Get-CSEventLogEntry',
     'Get-CSService',
     'Get-CSProcess',
-    'Get-CSRegistryAutoStart'
+    'Get-CSRegistryAutoStart',
+    'Get-CSScheduledTaskFile',
+    'Get-CSTempPathPEAndScript',
+    'Get-CSLowILPathPEAndScript'
 )
 
 FormatsToProcess = @(
