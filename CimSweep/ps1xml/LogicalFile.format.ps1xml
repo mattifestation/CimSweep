@@ -4,42 +4,30 @@
         <View>
             <Name>LogicalFile</Name>
             <ViewSelectedBy>
-		        <TypeName>CimSweep.LogicalFile</TypeName>
-		    </ViewSelectedBy>
-            <TableControl>
-                <TableHeaders>
-                    <TableColumnHeader>
-                        <Label>Type</Label>
-                    </TableColumnHeader>
-                    <TableColumnHeader>
-                        <Label>Name</Label>
-                    </TableColumnHeader>
-                    <TableColumnHeader>
-                        <Label>FileSize</Label>
-                    </TableColumnHeader>
-                    <TableColumnHeader>
-                        <Label>LastModified</Label>
-                    </TableColumnHeader>
-                </TableHeaders>
-                <TableRowEntries>
-                    <TableRowEntry>
-                        <TableColumnItems>
-                            <TableColumnItem>
+                <TypeName>CimSweep.LogicalFile</TypeName>
+            </ViewSelectedBy>
+            <ListControl>
+                <ListEntries>
+                    <ListEntry>
+                        <ListItems>
+                            <ListItem>
+                                <Label>Type</Label>
                                 <ScriptBlock>$_.CimSystemProperties.ClassName</ScriptBlock>
-                            </TableColumnItem>
-                            <TableColumnItem>
+                            </ListItem>
+                            <ListItem>
                                 <PropertyName>Name</PropertyName>
-                            </TableColumnItem>
-                            <TableColumnItem>
+                            </ListItem>
+                            <ListItem>
+                                <Label>FileSize</Label>
                                 <ScriptBlock>if (($_.CimSystemProperties.ClassName -eq 'Win32_Directory') -and ($_.FileSize -eq 0)) {''} else {$_.FileSize}</ScriptBlock>
-                            </TableColumnItem>
-                            <TableColumnItem>
+                            </ListItem>
+                            <ListItem>
                                 <PropertyName>LastModified</PropertyName>
-                            </TableColumnItem>
-                        </TableColumnItems>
-                    </TableRowEntry>
-                </TableRowEntries>
-            </TableControl>
+                            </ListItem>
+                        </ListItems>
+                    </ListEntry>
+                </ListEntries>
+            </ListControl>
         </View>
         <View>
             <Name>DiskInfo</Name>
