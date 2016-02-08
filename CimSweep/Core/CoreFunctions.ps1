@@ -882,6 +882,7 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
         [String[]]
         $Extension,
 
+        [Parameter(ParameterSetName = 'FileQuery')]
         [Switch]
         $Hidden,
 
