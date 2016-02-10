@@ -27,7 +27,8 @@ FunctionsToExport = @(
     'Get-CSScheduledTaskFile',
     'Get-CSTempPathPEAndScript',
     'Get-CSLowILPathPEAndScript',
-    'Get-CSShellFolderPath'
+    'Get-CSShellFolderPath',
+    'Get-CSStartMenuEntry'
 )
 
 FormatsToProcess = @(

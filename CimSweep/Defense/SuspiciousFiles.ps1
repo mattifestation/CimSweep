@@ -87,7 +87,6 @@ Microsoft.Management.Infrastructure.CimSession
 Get-CSShellFolderPath accepts established CIM sessions over the pipeline.
 #>
 
-    [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
     param(
         [String]
         [ValidateSet(
@@ -156,6 +155,56 @@ Get-CSShellFolderPath accepts established CIM sessions over the pipeline.
     Get-CSRegistryValue -Hive HKLM -SubKey "$ShellFolders" -ValueNameOnly @CommonArgs @RegistryArgs | 
         ? { -not $_.ValueName.StartsWith('!') -and -not $_.ValueName.StartsWith('{') } |
         Get-CSRegistryValue
+}
+
+filter Get-CSStartMenuEntry {
+<#
+.SYNOPSIS
+
+List user and common start menu items.
+
+Author: Matthew Graeber (@mattifestation)
+License: BSD 3-Clause
+
+.PARAMETER CimSession
+
+Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
+
+.INPUTS
+
+Microsoft.Management.Infrastructure.CimSession
+
+Get-CSStartMenuEntry accepts established CIM sessions over the pipeline.
+
+.NOTES
+
+If a shortcut is present in the start menu, an instance of a Win32_ShortcutFile is returned that has a Target property.
+#>
+
+    [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
+    param(
+        [Parameter(ValueFromPipeline = $True)]
+        [Alias('Session')]
+        [ValidateNotNullOrEmpty()]
+        [Microsoft.Management.Infrastructure.CimSession[]]
+        $CimSession
+    )
+
+    $CommonArgs = @{}
+
+    if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $CimSession }
+
+    Get-CSShellFolderPath -FolderName 'Startup' @CommonArgs | ForEach-Object {
+        Get-CSDirectoryListing -DirectoryPath $_.ValueContent @CommonArgs | Where-Object {
+            $_.FileName -ne 'desktop' -and $_.Extension -ne 'ini'
+        }
+    }
+
+    Get-CSShellFolderPath -FolderName 'Common Startup' @CommonArgs | ForEach-Object {
+        Get-CSDirectoryListing -DirectoryPath $_.ValueContent @CommonArgs | Where-Object {
+            $_.FileName -ne 'desktop' -and $_.Extension -ne 'ini'
+        }
+    }
 }
 
 filter Get-CSTempPathPEAndScript {
