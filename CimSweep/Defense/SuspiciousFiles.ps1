@@ -47,6 +47,117 @@ Get-CSScheduledTaskFile accepts established CIM sessions over the pipeline.
     }
 }
 
+filter Get-CSShellFolderPath {
+<#
+.SYNOPSIS
+
+Obtains the full path to special shell folders.
+
+Author: Matthew Graeber (@mattifestation)
+License: BSD 3-Clause
+
+.Description
+
+Get-CSShellFolderPath is primarily a helper function used to correctly obtain the paths to special shell folders versus relying upon common hard-coded paths which can be redirected and cause false negatives.
+
+.PARAMETER FolderName
+
+Specifies the name of the special shell folder to get the path for.
+
+.PARAMETER CimSession
+
+Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
+
+.EXAMPLE
+
+Get-CSShellFolderPath
+
+.EXAMPLE
+
+Get-CSShellFolderPath -FolderName 'Common Start Menu'
+
+.EXAMPLE
+
+Get-CSShellFolderPath -FolderName 'Start Menu' -CimSession $CimSession
+
+.INPUTS
+
+Microsoft.Management.Infrastructure.CimSession
+
+Get-CSShellFolderPath accepts established CIM sessions over the pipeline.
+#>
+
+    [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
+    param(
+        [String]
+        [ValidateSet(
+            'Administrative Tools',
+            'AppData',
+            'Cache',
+            'CD Burning',
+            'Common Administrative Tools',
+            'Common AppData',
+            'Common Desktop',
+            'Common Documents',
+            'Common Programs',
+            'Common Start Menu',
+            'Common Startup',
+            'Common Templates',
+            'CommonMusic',
+            'CommonPictures',
+            'CommonVideo',
+            'Cookies',
+            'Desktop',
+            'Favorites',
+            'Fonts',
+            'History',
+            'Local AppData',
+            'My Music',
+            'My Pictures',
+            'My Video',
+            'NetHood',
+            'OEM Links',
+            'Personal',
+            'PrintHood',
+            'Programs',
+            'Recent',
+            'SendTo',
+            'Start Menu',
+            'Startup',
+            'Templates'
+        )]
+        $FolderName,
+
+        [Parameter(ValueFromPipeline = $True)]
+        [Alias('Session')]
+        [ValidateNotNullOrEmpty()]
+        [Microsoft.Management.Infrastructure.CimSession[]]
+        $CimSession
+    )
+
+    $CommonArgs = @{}
+    $RegistryArgs = @{}
+
+    if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $CimSession }
+    if ($PSBoundParameters['FolderName']) { $RegistryArgs['ValueName'] = $FolderName }
+
+    $ShellFolders = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders'
+
+    # Get the SIDS for each user in the registry
+    $HKUSIDs = Get-HKUSID @CommonArgs
+
+    # Iterate over each local user hive
+    foreach ($SID in $HKUSIDs) {
+        Get-CSRegistryValue -Hive HKU -SubKey "$SID\$ShellFolders" -ValueNameOnly @CommonArgs @RegistryArgs | 
+            ? { -not $_.ValueName.StartsWith('!') -and -not $_.ValueName.StartsWith('{') } |
+            Get-CSRegistryValue
+    }
+
+    Get-CSRegistryValue -Hive HKLM -SubKey "$ShellFolders" -ValueNameOnly @CommonArgs @RegistryArgs | 
+        ? { -not $_.ValueName.StartsWith('!') -and -not $_.ValueName.StartsWith('{') } |
+        Get-CSRegistryValue
+}
+
 filter Get-CSTempPathPEAndScript {
 <#
 .SYNOPSIS
