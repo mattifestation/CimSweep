@@ -91,8 +91,8 @@ Get-CSTempPathPEAndScript accepts established CIM sessions over the pipeline.
         $TargetExtensions = @('exe', 'dll', 'sys', 'ps1', 'bat', 'vbs', 'js')
 
         $RootDir = $OSInfo.SystemDrive
-        $UserRootDir = Join-Path $RootDir 'Users'
-        $UserRootDirClassic = Join-Path $RootDir 'Documents and Settings'
+        $UserRootDir = "$RootDir\Users"
+        $UserRootDirClassic = "$RootDir\Documents and Settings"
 
         # Attempt to get all user directories
         $UserDirectories = Get-CSDirectoryListing -DirectoryPath $UserRootDir -DirectoryOnly @CommonArgs
@@ -106,13 +106,13 @@ Get-CSTempPathPEAndScript accepts established CIM sessions over the pipeline.
 
         if ($UserDirectories) {
             foreach ($UserDir in $UserDirectories) {
-                $UserTempPath = Join-Path $UserDir.Name $UserTempLeafPath
+                $UserTempPath = "$($UserDir.Name)\$UserTempLeafPath"
 
                 Get-CSDirectoryListing -DirectoryPath $UserTempPath -Recurse -Extension $TargetExtensions @CommonArgs
             }
         }
 
-        $SystemTempDir = Join-Path $RootDir 'Windows\Temp'
+        $SystemTempDir = "$RootDir\Windows\Temp"
         Get-CSDirectoryListing -DirectoryPath $SystemTempDir -Recurse -Extension $TargetExtensions @CommonArgs
     } else {
         Write-Error 'Unable to obtain system drive.'
@@ -159,14 +159,14 @@ Get-CSLowILPathPEAndScript accepts established CIM sessions over the pipeline.
         $TargetExtensions = @('exe', 'dll', 'sys', 'ps1', 'bat', 'vbs', 'js')
 
         $RootDir = $OSInfo.SystemDrive
-        $UserRootDir = Join-Path $RootDir 'Users'
+        $UserRootDir = "$RootDir\Users"
 
         # Attempt to get all user directories
         $UserDirectories = Get-CSDirectoryListing -DirectoryPath $UserRootDir -DirectoryOnly @CommonArgs
 
         if ($UserDirectories) {
             foreach ($UserDir in $UserDirectories) {
-                $LowILPath = Join-Path $UserDir.Name 'AppData\LocalLow'
+                $LowILPath = "$($UserDir.Name)\AppData\LocalLow"
 
                 Get-CSDirectoryListing -DirectoryPath $LowILPath -Recurse -Extension $TargetExtensions @CommonArgs
             }
