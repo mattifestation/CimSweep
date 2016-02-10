@@ -255,6 +255,7 @@ Outputs a list of custom objects representing registry value names, their respec
         [ValidatePattern('^(HKLM|HKCU|HKU|HKCR|HKCC):\\.*$')]
         $Path,
 
+        [Parameter(ValueFromPipelineByPropertyName = $True, ParameterSetName = 'ExplicitPath')]
         [String]
         $ValueName,
 
