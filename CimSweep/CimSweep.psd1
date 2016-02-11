@@ -28,7 +28,8 @@ FunctionsToExport = @(
     'Get-CSTempPathPEAndScript',
     'Get-CSLowILPathPEAndScript',
     'Get-CSShellFolderPath',
-    'Get-CSStartMenuEntry'
+    'Get-CSStartMenuEntry',
+    'Get-CSTypedURL'
 )
 
 FormatsToProcess = @(
