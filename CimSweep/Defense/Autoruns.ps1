@@ -103,7 +103,7 @@ Get-CSWMIPersistence accepts established CIM sessions over the pipeline.
 
         $WMIEventSubProperties = [Ordered] @{
             CreatorAccount = $CreatorAccount
-            EventFilter = $Filter
+            Filter = $Filter
             ConsumerClass = $ConsumerClass
             Consumer = $Consumer
             PSComputerName = $_.PSComputerName
