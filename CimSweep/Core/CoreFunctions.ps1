@@ -286,11 +286,14 @@ Outputs a list of custom objects representing registry value names, their respec
     }
 
     $Type = @{
+        0  = 'REG_NONE'
         1  = 'REG_SZ'
         2  = 'REG_EXPAND_SZ'
         3  = 'REG_BINARY'
         4  = 'REG_DWORD'
         7  = 'REG_MULTI_SZ'
+        8  = 'REG_RESOURCE_LIST' # Just treat this as binary
+        9  = 'REG_FULL_RESOURCE_DESCRIPTOR' # Just treat this as binary
         10 = 'REG_RESOURCE_REQUIREMENTS_LIST' # Just treat this as binary
         11 = 'REG_QWORD'
     }
@@ -331,6 +334,11 @@ Outputs a list of custom objects representing registry value names, their respec
             if ($PSBoundParameters['CimSession']) { $CimMethod2Args['CimSession'] = $CimSession }
 
             switch ($Types[$i]) {
+                'REG_NONE' {
+                    $CimMethod2Args['MethodName'] = 'GetBinaryValue'
+                    $ReturnProp = 'uValue'
+                }
+
                 'REG_SZ' {
                     $CimMethod2Args['MethodName'] = 'GetStringValue'
                     $ReturnProp = 'sValue'
@@ -361,13 +369,23 @@ Outputs a list of custom objects representing registry value names, their respec
                     $ReturnProp = 'uValue'
                 }
 
+                'REG_RESOURCE_LIST' {
+                    $CimMethod2Args['MethodName'] = 'GetBinaryValue'
+                    $ReturnProp = 'uValue'
+                }
+
+                'REG_FULL_RESOURCE_DESCRIPTOR' {
+                    $CimMethod2Args['MethodName'] = 'GetBinaryValue'
+                    $ReturnProp = 'uValue'
+                }
+
                 'REG_RESOURCE_REQUIREMENTS_LIST' {
                     $CimMethod2Args['MethodName'] = 'GetBinaryValue'
                     $ReturnProp = 'uValue'
                 }
 
                 default {
-                    Write-Error "$($Result.Types[$i]) is not a supported registry value type!"
+                    Write-Error "$($Result.Types[$i]) is not a supported registry value type! Hive: $Hive. SubKey: $SubKey"
                     continue
                 }
             }
