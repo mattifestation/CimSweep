@@ -385,8 +385,10 @@ Outputs a list of custom objects representing registry value names, their respec
                 }
 
                 default {
-                    Write-Error "$($Result.Types[$i]) is not a supported registry value type! Hive: $Hive. SubKey: $SubKey"
-                    continue
+                    Write-Warning "$($Result.Types[$i]) is not a supported registry value type. Hive: $Hive. SubKey: $SubKey"
+                    
+                    $CimMethod2Args['MethodName'] = 'GetBinaryValue'
+                    $ReturnProp = 'uValue'
                 }
             }
 
