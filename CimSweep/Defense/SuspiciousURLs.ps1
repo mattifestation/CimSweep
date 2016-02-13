@@ -36,7 +36,7 @@ Get-CSTypedURL accepts established CIM sessions over the pipeline.
     $HKUSIDs = Get-HKUSID @CommonArgs
 
     # Iterate over each local user hive
-    foreach ($SID in $HKUSIDs) {
+    foreach ($SID in $HKUSIDs.Keys) {
         Get-CSRegistryValue -Hive HKU -SubKey "$SID\$TypedURLs" @CommonArgs
     }
 }

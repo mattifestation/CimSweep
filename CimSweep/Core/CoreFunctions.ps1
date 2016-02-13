@@ -434,7 +434,7 @@ filter Get-HKUSID {
 <#
 .SYNOPSIS
 
-Returns the user SIDs present in the HKU hive.
+Returns a hashtable mapping SIDs present in the HKU hive to account names.
 
 Author: Matthew Graeber (@mattifestation)
 License: BSD 3-Clause
@@ -448,6 +448,7 @@ Get-HKUSID is a helper function that returns user SIDs from the root of the HKU 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
 #>
 
+    [OutputType([Hashtable])]
     param(
         [Parameter(ValueFromPipeline = $True)]
         [Alias('Session')]
@@ -461,18 +462,20 @@ Specifies the CIM session to use for this cmdlet. Enter a variable that contains
     if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $CimSession }
 
     # Get a SID to username mapping
-    $Accounts = Get-CimInstance @CommonArgs -Query 'SELECT Name, SID FROM Win32_Account'
+    $Accounts = Get-CimInstance -ClassName Win32_Account -Property SID, Name @CommonArgs
 
     # Get all user specific hives
-    $AllUserHives = Get-CSRegistryKey @CommonArgs -Hive HKU | Select-Object -ExpandProperty SubKey
+    $AllUserHives = Get-CSRegistryKey -Hive HKU @CommonArgs
         
-    $UserNameToHiveSid = @{}
+    $UserSidToName = @{}
 
     foreach ($Account in $Accounts) {
-        if ($Account.SID -in $AllUserHives) {
-            $Account.SID
+        if ($Account.SID -in $AllUserHives.SubKey) {
+            $UserSidToName[($Account.SID)] = $Account.Name
         }
     }
+
+    return $UserSidToName
 }
 
 filter Get-CSEventLog {
@@ -751,7 +754,7 @@ filter Get-CSDirectoryListing {
 <#
 .SYNOPSIS
 
-Lists files and directories present the specified directory.
+Lists files and directories present in the specified directory.
 
 Author: Matthew Graeber (@mattifestation)
 License: BSD 3-Clause

@@ -49,13 +49,13 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
         Get-CSRegistryValue @CommonArgs -Hive HKLM -SubKey $AutoStartPath
 
         # Iterate over each local user hive
-        foreach ($SID in $HKUSIDs) {
+        foreach ($SID in $HKUSIDs.Keys) {
             Get-CSRegistryValue @CommonArgs -Hive HKU -SubKey "$SID\$AutoStartPath"
         }
     }
 }
 
-filter Get-CSWMIPersistence {
+filter Get-CSWmiPersistence {
 <#
 .SYNOPSIS
 
