@@ -1303,3 +1303,84 @@ Outputs Win32_Process instances.
 
     Get-CimInstance @CommonArgs @ServiceEntryArgs -ClassName Win32_Process
 }
+
+filter Get-CSEnvironmentVariable {
+<#
+.SYNOPSIS
+
+Lists all system and user-specific environment variables.
+
+Author: Matthew Graeber (@mattifestation)
+License: BSD 3-Clause
+
+.DESCRIPTION
+
+Get-CSEnvironmentVariable returns all system and user environment variables. Get-CSEnvironmentVariable doesn't rely upon the Win32_Environment class as it doesn't return all environment variables.
+
+.PARAMETER CimSession
+
+Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
+
+.INPUTS
+
+Microsoft.Management.Infrastructure.CimSession
+
+Get-CSEnvironmentVariable accepts established CIM sessions over the pipeline.
+#>
+
+    param(
+        [Parameter(ValueFromPipeline = $True)]
+        [Alias('Session')]
+        [ValidateNotNullOrEmpty()]
+        [Microsoft.Management.Infrastructure.CimSession[]]
+        $CimSession
+    )
+
+    $CommonArgs = @{}
+
+    if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $CimSession }
+
+    $SystemEnvPath = 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment'
+
+    Get-CSRegistryValue -Hive HKLM -SubKey $SystemEnvPath @CommonArgs | ForEach-Object {
+        $Properties = [Ordered] @{
+            Name = $_.ValueName
+            UserName = '<SYSTEM>'
+            VariableValue = $_.ValueContent
+        }
+
+        if ($_.PSComputerName) { $Properties['PSComputerName'] = $_.PSComputerName }
+
+        New-Object -TypeName PSObject -Property $Properties
+    }
+
+    # Get the SIDS for each user in the registry
+    $HKUSIDs = Get-HKUSID @CommonArgs
+
+    # Iterate over each local user hive
+    foreach ($SID in $HKUSIDs.Keys) {
+        Get-CSRegistryValue -Hive HKU -SubKey "$SID\Environment" @CommonArgs | ForEach-Object {
+            $Properties = [Ordered] @{
+                Name = $_.ValueName
+                UserName = $HKUSIDs[$SID]
+                VariableValue = $_.ValueContent
+            }
+
+            if ($_.PSComputerName) { $Properties['PSComputerName'] = $_.PSComputerName }
+
+            New-Object -TypeName PSObject -Property $Properties
+        }
+
+        Get-CSRegistryValue -Hive HKU -SubKey "$SID\Volatile Environment" @CommonArgs | ForEach-Object {
+            $Properties = [Ordered] @{
+                Name = $_.ValueName
+                UserName = $HKUSIDs[$SID]
+                VariableValue = $_.ValueContent
+            }
+
+            if ($_.PSComputerName) { $Properties['PSComputerName'] = $_.PSComputerName }
+
+            New-Object -TypeName PSObject -Property $Properties
+        }
+    }
+}
