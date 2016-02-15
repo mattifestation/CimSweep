@@ -23,6 +23,10 @@ Specifies the path that contains the subkeys to be enumerated. The absense of th
 
 Specifies the desired registry hive and path in the standard PSDrive format. e.g. HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion. This parameter enables local tab expansion of key paths. Note: the tab expansion expands based on local registry paths not remote paths.
 
+.PARAMETER IncludeACL
+
+Specifies that the registry key ACL should be included in output.
+
 .PARAMETER Recurse
 
 Gets the registry keys in the specified subkey as well as all child keys.
@@ -94,6 +98,9 @@ It is not recommended to recursively list all registry keys from most parent key
         $Path,
 
         [Switch]
+        $IncludeACL,
+
+        [Switch]
         $Recurse,
 
         [Parameter(ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
@@ -149,6 +156,27 @@ It is not recommended to recursively list all registry keys from most parent key
                 Hive = $Hive
                 SubKey = "$TrimmedKey\$KeyName".Trim('\')
                 CimSession = $CimSession
+            }
+
+            if ($PSBoundParameters['IncludeACL']) {
+                $GetSDResult = Invoke-CimMethod -Namespace root/default -ClassName StdRegProv -MethodName GetSecurityDescriptor -Arguments @{
+                    hDefKey = $HiveVal
+                    sSubKeyName = $ObjectProperties['SubKey']
+                } @CommonArgs
+
+                if ($GetSDResult.ReturnValue -eq 0) {
+                    # Note: this WMI method need only be executed locally.
+                    $BinarySDResult = Invoke-CimMethod -ClassName Win32_SecurityDescriptorHelper -MethodName Win32SDToBinarySD -Arguments @{
+                        Descriptor = $GetSDResult.Descriptor
+                    }
+
+                    if ($BinarySDResult.ReturnValue -eq 0) {
+                        $RegistrySecurity = New-Object Security.AccessControl.RegistrySecurity
+                        $RegistrySecurity.SetSecurityDescriptorBinaryForm($BinarySDResult.BinarySD, [Security.AccessControl.AccessControlSections]::All)
+                    }
+
+                    $ObjectProperties['ACL'] = $RegistrySecurity
+                }
             }
 
             $KeyObject = New-Object -TypeName PSObject -Property $ObjectProperties
@@ -823,6 +851,10 @@ Specifies that only files created before the specified date should be returned.
 
 Specifies that only directories should be listed.
 
+.PARAMETER IncludeACL
+
+Specifies that the registry key ACL should be included in output.
+
 .PARAMETER Recurse
 
 Recurse on all child directories.
@@ -960,6 +992,9 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
         $DirectoryOnly,
         
         [Switch]
+        $IncludeACL,
+
+        [Switch]
         $Recurse,
 
         [Parameter(ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
@@ -995,6 +1030,25 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
     Get-CimInstance @CommonArgs @DirArguments | ForEach-Object {
         $DirObject = $_
         $DirObject.PSObject.TypeNames.Insert(0, 'CimSweep.LogicalFile')
+
+        if ($PSBoundParameters['IncludeACL']) {
+            $SDResult = Get-CimAssociatedInstance -InputObject $DirObject -Association Win32_SecuritySettingOfLogicalFile |
+                Invoke-CimMethod -MethodName GetSecurityDescriptor
+            
+            if ($SDResult.ReturnValue -eq 0) {
+                # Note: this WMI method need only be executed locally.
+                $BinarySDResult = Invoke-CimMethod -ClassName Win32_SecurityDescriptorHelper -MethodName Win32SDToBinarySD -Arguments @{
+                    Descriptor = $SDResult.Descriptor
+                }
+
+                if ($BinarySDResult.ReturnValue -eq 0) {
+                    $DirectorySecurity = New-Object Security.AccessControl.DirectorySecurity
+                    $DirectorySecurity.SetSecurityDescriptorBinaryForm($BinarySDResult.BinarySD, [Security.AccessControl.AccessControlSections]::All)
+
+                    Add-Member -InputObject $DirObject -MemberType NoteProperty -Name ACL -Value $DirectorySecurity
+                }
+            }
+        }
 
         # Append the CimSession instance. This enables piping Get-CSDirectoryListing to itself
         Add-Member -InputObject $DirObject -MemberType NoteProperty -Name CimSession -Value $CimSession
@@ -1049,6 +1103,26 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
         Get-CimInstance @CommonArgs @FileArguments | ForEach-Object {
             $Object = $_
             $Object.PSObject.TypeNames.Insert(0, 'CimSweep.LogicalFile')
+
+            if ($PSBoundParameters['IncludeACL']) {
+                $SDResult = Get-CimAssociatedInstance -InputObject $Object -Association Win32_SecuritySettingOfLogicalFile |
+                    Invoke-CimMethod -MethodName GetSecurityDescriptor
+            
+                if ($SDResult.ReturnValue -eq 0) {
+                    # Note: this WMI method need only be executed locally.
+                    $BinarySDResult = Invoke-CimMethod -ClassName Win32_SecurityDescriptorHelper -MethodName Win32SDToBinarySD -Arguments @{
+                        Descriptor = $SDResult.Descriptor
+                    }
+
+                    if ($BinarySDResult.ReturnValue -eq 0) {
+                        $FileSecurity = New-Object Security.AccessControl.FileSecurity
+                        $FileSecurity.SetSecurityDescriptorBinaryForm($BinarySDResult.BinarySD, [Security.AccessControl.AccessControlSections]::All)
+
+                        Add-Member -InputObject $Object -MemberType NoteProperty -Name ACL -Value $FileSecurity
+                    }
+                }
+            }
+
             Add-Member -InputObject $Object -MemberType NoteProperty -Name CimSession -Value $CimSession
             $Object
         }
