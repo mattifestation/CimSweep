@@ -400,7 +400,7 @@ Outputs a list of custom objects representing registry value names, their respec
 
             $CimMethod2Args['Arguments'] = $RegistryMethod2Args
 
-            if (($PSBoundParameters['ValueName'] -and ($ValueName -eq $ValueNames[$i])) -or (-not $PSBoundParameters['ValueName'])) {
+            if (($PSBoundParameters.ContainsKey('ValueName') -and ($ValueName -eq $ValueNames[$i])) -or (-not $PSBoundParameters.ContainsKey('ValueName'))) {
                 $ValueContent = $null
 
                 if (-not $PSBoundParameters['ValueNameOnly']) {
