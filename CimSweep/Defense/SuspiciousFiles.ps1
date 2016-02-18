@@ -40,7 +40,7 @@ Get-CSScheduledTaskFile accepts established CIM sessions over the pipeline.
     if ($OSInfo.SystemDirectory) {
         $TaskDir = $OSInfo.SystemDirectory + '\Tasks'
 
-        Get-CSDirectoryListing -DirectoryPath $TaskDir -Recurse @CommonArgs |
+        Get-CSDirectoryListing -Path $TaskDir -Recurse @CommonArgs |
             Where-Object { $_.CimClass.CimClassName -ne 'Win32_Directory' }
     } else {
         Write-Error 'Unable to obtain system directory.'
@@ -148,12 +148,12 @@ Get-CSShellFolderPath accepts established CIM sessions over the pipeline.
     # Iterate over each local user hive
     foreach ($SID in $HKUSIDs.Keys) {
         Get-CSRegistryValue -Hive HKU -SubKey "$SID\$ShellFolders" -ValueNameOnly @CommonArgs @RegistryArgs | 
-            ? { -not $_.ValueName.StartsWith('!') -and -not $_.ValueName.StartsWith('{') } |
+            Where-Object { -not $_.ValueName.StartsWith('!') -and -not $_.ValueName.StartsWith('{') } |
             Get-CSRegistryValue
     }
 
     Get-CSRegistryValue -Hive HKLM -SubKey "$ShellFolders" -ValueNameOnly @CommonArgs @RegistryArgs | 
-        ? { -not $_.ValueName.StartsWith('!') -and -not $_.ValueName.StartsWith('{') } |
+        Where-Object { -not $_.ValueName.StartsWith('!') -and -not $_.ValueName.StartsWith('{') } |
         Get-CSRegistryValue
 }
 
@@ -195,13 +195,13 @@ If a shortcut is present in the start menu, an instance of a Win32_ShortcutFile 
     if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $CimSession }
 
     Get-CSShellFolderPath -FolderName 'Startup' @CommonArgs | ForEach-Object {
-        Get-CSDirectoryListing -DirectoryPath $_.ValueContent @CommonArgs | Where-Object {
+        Get-CSDirectoryListing -Path $_.ValueContent @CommonArgs | Where-Object {
             $_.FileName -ne 'desktop' -and $_.Extension -ne 'ini'
         }
     }
 
     Get-CSShellFolderPath -FolderName 'Common Startup' @CommonArgs | ForEach-Object {
-        Get-CSDirectoryListing -DirectoryPath $_.ValueContent @CommonArgs | Where-Object {
+        Get-CSDirectoryListing -Path $_.ValueContent @CommonArgs | Where-Object {
             $_.FileName -ne 'desktop' -and $_.Extension -ne 'ini'
         }
     }
@@ -255,12 +255,12 @@ Get-CSTempPathPEAndScript accepts established CIM sessions over the pipeline.
         $UserRootDirClassic = "$RootDir\Documents and Settings"
 
         # Attempt to get all user directories
-        $UserDirectories = Get-CSDirectoryListing -DirectoryPath $UserRootDir -DirectoryOnly @CommonArgs
+        $UserDirectories = Get-CSDirectoryListing -Path $UserRootDir -Directory @CommonArgs
         $UserTempLeafPath = 'AppData\Local\Temp'
 
         # Try to use the WinXP default temp path
         if (-not $UserDirectories) {
-            $UserDirectories = Get-CSDirectoryListing -DirectoryPath $UserRootDirClassic -DirectoryOnly @CommonArgs
+            $UserDirectories = Get-CSDirectoryListing -Path $UserRootDirClassic -Directory @CommonArgs
             $UserTempLeafPath = 'Local Settings\Temp'
         }
 
@@ -268,12 +268,12 @@ Get-CSTempPathPEAndScript accepts established CIM sessions over the pipeline.
             foreach ($UserDir in $UserDirectories) {
                 $UserTempPath = "$($UserDir.Name)\$UserTempLeafPath"
 
-                Get-CSDirectoryListing -DirectoryPath $UserTempPath -Recurse -Extension $TargetExtensions @CommonArgs
+                Get-CSDirectoryListing -Path $UserTempPath -Recurse -Extension $TargetExtensions @CommonArgs
             }
         }
 
         $SystemTempDir = "$RootDir\Windows\Temp"
-        Get-CSDirectoryListing -DirectoryPath $SystemTempDir -Recurse -Extension $TargetExtensions @CommonArgs
+        Get-CSDirectoryListing -Path $SystemTempDir -Recurse -Extension $TargetExtensions @CommonArgs
     } else {
         Write-Error 'Unable to obtain system drive.'
     }
@@ -322,13 +322,13 @@ Get-CSLowILPathPEAndScript accepts established CIM sessions over the pipeline.
         $UserRootDir = "$RootDir\Users"
 
         # Attempt to get all user directories
-        $UserDirectories = Get-CSDirectoryListing -DirectoryPath $UserRootDir -DirectoryOnly @CommonArgs
+        $UserDirectories = Get-CSDirectoryListing -Path $UserRootDir -Directory @CommonArgs
 
         if ($UserDirectories) {
             foreach ($UserDir in $UserDirectories) {
                 $LowILPath = "$($UserDir.Name)\AppData\LocalLow"
 
-                Get-CSDirectoryListing -DirectoryPath $LowILPath -Recurse -Extension $TargetExtensions @CommonArgs
+                Get-CSDirectoryListing -Path $LowILPath -Recurse -Extension $TargetExtensions @CommonArgs
             }
         }
     } else {

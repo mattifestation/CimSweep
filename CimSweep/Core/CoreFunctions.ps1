@@ -738,7 +738,7 @@ Outputs a list of mounted drive letters.
         if ($Volume.DeviceID) {
             $Properties = [Ordered] @{
                 DriveLetter = $Volume.DeviceID[0]
-                DirectoryPath = "$($Volume.DeviceID)\"
+                Path = "$($Volume.DeviceID)\"
                 PSComputerName = $Volume.PSComputerName
                 CimSession = $CimSession
             }
@@ -763,9 +763,9 @@ License: BSD 3-Clause
 
 Get-CSDirectoryListing performs a WMI/CIM-based file/directory listing of the specified directory.
 
-.PARAMETER DirectoryPath
+.PARAMETER Path
 
-Specifies the directory.
+Specifies the directory. Do not include the file name. If a specific file name is desired, specify the file name with the FileName parameter.
 
 .PARAMETER FileName
 
@@ -819,7 +819,7 @@ Specifies that only files created after the specified date should be returned.
 
 Specifies that only files created before the specified date should be returned.
 
-.PARAMETER DirectoryOnly
+.PARAMETER Directory
 
 Specifies that only directories should be listed.
 
@@ -843,29 +843,29 @@ Directory listing for the root of each mounted drive.
 
 .EXAMPLE
 
-Get-CSDirectoryListing -DirectoryPath C:\Windows\System32\ -CimSession $CimSession
+Get-CSDirectoryListing -Path C:\Windows\System32\ -CimSession $CimSession
 
 .EXAMPLE
 
-Get-CSDirectoryListing -DirectoryPath C:\Windows\System32\ -FileName kernel32.dll
+Get-CSDirectoryListing -Path C:\Windows\System32\ -FileName kernel32.dll
 
 .EXAMPLE
 
-Get-CSDirectoryListing -DirectoryPath C:\Windows\System32\Tasks -Recurse
+Get-CSDirectoryListing -Path C:\Windows\System32\Tasks -Recurse
 
 .EXAMPLE
 
-$CimSession, $CimSession2 | Get-CSDirectoryListing -DirectoryPath C:\ -Extension exe, dll, sys -Recurse
+$CimSession, $CimSession2 | Get-CSDirectoryListing -Path C:\ -Extension exe, dll, sys -Recurse
 
 .EXAMPLE
 
-Get-CSDirectoryListing -DirectoryPath C:\Users -DirectoryOnly | Get-CSDirectoryListing -Extension exe, dll -Recurse
+Get-CSDirectoryListing -Path C:\Users -Directory | Get-CSDirectoryListing -Extension exe, dll -Recurse
 
 Lists all EXE and DLL files present in all user directories.
 
 .EXAMPLE
 
-Get-CSDirectoryListing -DirectoryPath C:\ -DirectoryOnly -Recurse
+Get-CSDirectoryListing -Path C:\ -Directory -Recurse
 
 Lists all directories present in C:\.
 
@@ -893,7 +893,7 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
         [Alias('Name')]
         [String]
         [ValidatePattern('^(?<ValidDriveLetter>[A-Za-z]:)(?<ValidPath>\\.*)$')]
-        $DirectoryPath,
+        $Path,
 
         [Parameter(ParameterSetName = 'FileQuery')]
         [ValidateNotNullOrEmpty()]
@@ -961,7 +961,7 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
 
         [Parameter(ParameterSetName = 'DirOnly')]
         [Switch]
-        $DirectoryOnly,
+        $Directory,
 
         [Switch]
         $DoNotDetectRecursiveDirs,
@@ -980,7 +980,7 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
     if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $CimSession }
 
     # Normalize the directory path
-    $TrimmedPath = $DirectoryPath.TrimEnd('\')
+    $TrimmedPath = $Path.TrimEnd('\')
 
     # The validation regex guarantees that $Path[0] will contain a drive letter
     $DriveLetter = $TrimmedPath[0]
@@ -1012,8 +1012,8 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
         if ($PSBoundParameters['Recurse']) {
             $PSBoundParametersCopy = $PSBoundParameters
 
-            # Remove the provided DirectoryPath arg since we're providing the subdirectory
-            $null = $PSBoundParametersCopy.Remove('DirectoryPath')
+            # Remove the provided Path arg since we're providing the subdirectory
+            $null = $PSBoundParametersCopy.Remove('Path')
 
             # 1) Match on directories that have three subdirectories of the same name
             # 2) Match on two sets of identical subdirectories to a parent directory.
@@ -1022,21 +1022,21 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
             if ((-not $PSBoundParameters['DoNotDetectRecursiveDirs']) -and (($DirObject.Name -match '^.*(\\[^\\]+)\1\1\1$') -or ($DirObject.Name -match '\\([^\\]+)\\([^\\]+)\\(.*\\\1\\\2){2}$'))) {
                 Write-Warning "Possible self-referential directory detected! Directory path: $($DirObject.Name)"
             } else {
-                Get-CSDirectoryListing @PSBoundParametersCopy -DirectoryPath $DirObject.Name
+                Get-CSDirectoryListing @PSBoundParametersCopy -Path $DirObject.Name
             }
         }
     }
 
-    if (-not $PSBoundParameters['DirectoryOnly']) {
+    if (-not $PSBoundParameters['Directory']) {
         $FilterComponents = New-Object 'Collections.ObjectModel.Collection`1[System.String]'
 
         # To do: to make exact datetime matches more usable, I may need to not account for milliseconds
         # and scan for a range that matched within the second.
         $DmtfFormat = 'yyyyMMddHHmmss.ffffff+000'
 
-        if ($PSBoundParameters['FileName']) { $FilterComponents.Add("($(($FileName | % { "Name=``"$($TrimmedPath.Replace('\', '\\'))\\$_``"" }) -join ' OR '))") }
-        if ($PSBoundParameters['FileSize']) { $FilterComponents.Add("($(($FileSize | % { "FileSize = $_" }) -join ' OR '))") }
-        if ($PSBoundParameters['Extension']) { $FilterComponents.Add("($(($Extension | % { "Extension =``"$_``"" }) -join ' OR '))") }
+        if ($PSBoundParameters['FileName']) { $FilterComponents.Add("($(($FileName | ForEach-Object { "Name=``"$($TrimmedPath.Replace('\', '\\'))\\$_``"" }) -join ' OR '))") }
+        if ($PSBoundParameters['FileSize']) { $FilterComponents.Add("($(($FileSize | ForEach-Object { "FileSize = $_" }) -join ' OR '))") }
+        if ($PSBoundParameters['Extension']) { $FilterComponents.Add("($(($Extension | ForEach-Object { "Extension =``"$_``"" }) -join ' OR '))") }
         if ($PSBoundParameters['LastModified']) { $FilterComponents.Add("LastModified=`"$($LastModified.ToUniversalTime().ToString($DmtfFormat))`"") }
         if ($PSBoundParameters['LastModifiedBefore']) { $FilterComponents.Add("LastModified<`"$($LastModifiedBefore.ToUniversalTime().ToString($DmtfFormat))`"") }
         if ($PSBoundParameters['LastModifiedAfter']) { $FilterComponents.Add("LastModified>`"$($LastModifiedAfter.ToUniversalTime().ToString($DmtfFormat))`"") }
