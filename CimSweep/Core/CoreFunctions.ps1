@@ -823,6 +823,10 @@ Specifies that only files created before the specified date should be returned.
 
 Specifies that only directories should be listed.
 
+.PARAMETER DoNotDetectRecursiveDirs
+
+Do not perform checks on self-referential directories when performing recursion. Many tools allow you to not follow path pointed to by symlinks. Unfortunately, Win32_Directory doesn't reflect whether or not a directory is a symlink. By default, Get-CSDirectoryListing will attempt to check if it's recursing through a self-referential directory. There is a possibility that this could lead to false negatives though. This option specifies that this check should not be performed.
+
 .PARAMETER Recurse
 
 Recurse on all child directories.
@@ -958,6 +962,9 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
         [Parameter(ParameterSetName = 'DirOnly')]
         [Switch]
         $DirectoryOnly,
+
+        [Switch]
+        $DoNotDetectRecursiveDirs,
         
         [Switch]
         $Recurse,
@@ -1008,7 +1015,15 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
             # Remove the provided DirectoryPath arg since we're providing the subdirectory
             $null = $PSBoundParametersCopy.Remove('DirectoryPath')
 
-            Get-CSDirectoryListing @PSBoundParametersCopy -DirectoryPath $DirObject.Name
+            # 1) Match on directories that have three subdirectories of the same name
+            # 2) Match on two sets of identical subdirectories to a parent directory.
+            # Thanks to Lee Holmes for the suggestions!
+            # Since Win32_Directory doesn't capture if a directory is a symlink, 
+            if ((-not $PSBoundParameters['DoNotDetectRecursiveDirs']) -and (($DirObject.Name -match '^.*(\\[^\\]+)\1\1\1$') -or ($DirObject.Name -match '\\([^\\]+)\\([^\\]+)\\(.*\\\1\\\2){2}$'))) {
+                Write-Warning "Possible self-referential directory detected! Directory path: $($DirObject.Name)"
+            } else {
+                Get-CSDirectoryListing @PSBoundParametersCopy -DirectoryPath $DirObject.Name
+            }
         }
     }
 
