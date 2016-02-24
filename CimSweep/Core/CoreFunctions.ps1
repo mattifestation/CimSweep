@@ -193,6 +193,10 @@ Specifies the desired registry hive and path in the standard PSDrive format. e.g
 
 Specifies the registry value name.
 
+.PARAMETER ValueType
+
+Specifies the registry value type. This parameter is only necessary when retrieving the default value for a key when no other values are present. By default, Get-CSRegistryValue does not require you to specify the type since it first obtains the type by calling EnumValues. EnumValues will not return the default value type though if it is the only value present in a key.
+
 .PARAMETER ValueNameOnly
 
 Specifies that the content of the registry value should not be received. This switch can be used to speed up Get-CSRegistryValue and reduce network bandwidth when the content is not desired.
@@ -256,8 +260,13 @@ Outputs a list of custom objects representing registry value names, their respec
         $Path,
 
         [Parameter(ValueFromPipelineByPropertyName = $True, ParameterSetName = 'ExplicitPath')]
+        [Parameter(ParameterSetName = 'PSDrivePath')]
         [String]
         $ValueName,
+
+        [String]
+        [ValidateSet('REG_NONE', 'REG_SZ', 'REG_EXPAND_SZ', 'REG_BINARY', 'REG_DWORD', 'REG_QWORD', 'REG_MULTI_SZ', 'REG_RESOURCE_LIST', 'REG_FULL_RESOURCE_DESCRIPTOR', 'REG_RESOURCE_REQUIREMENTS_LIST')]
+        $ValueType,
 
         [Switch]
         $ValueNameOnly,
@@ -300,131 +309,217 @@ Outputs a list of custom objects representing registry value names, their respec
 
     $TrimmedKey = $SubKey.Trim('\')
 
+    if ($PSBoundParameters['CimSession']) { $CimMethodArgs['CimSession'] = $CimSession }
+
     $CimMethodArgs = @{
         ClassName = 'StdRegProv'
         Namespace = 'root/default'
-        MethodName = 'EnumValues'
     }
 
-    if ($PSBoundParameters['CimSession']) { $CimMethodArgs['CimSession'] = $CimSession }
-
-    $RegistryMethodArgs = @{
-        hDefKey = $HiveVal
-        sSubKeyName = $TrimmedKey
-    }
-
-    $CimMethodArgs['Arguments'] = $RegistryMethodArgs
-
-    $Result = Invoke-CimMethod @CimMethodArgs
-
-    if ($Result.ReturnValue -eq 0) {
-
-        $Types = $Result.Types.ForEach({$Type[$_]})
-
-        $ValueNames = $Result.sNames
-
-        for ($i = 0; $i -lt $Result.Types.Length; $i++) {
-            $ValueContent = $null
-
-            $CimMethod2Args = @{
-                ClassName = 'StdRegProv'
-                Namespace = 'root/default'
+    if ($PSBoundParameters['ValueType']) {
+        switch ($ValueType) {
+            'REG_NONE' {
+                $CimMethodArgs['MethodName'] = 'GetBinaryValue'
+                $ReturnProp = 'uValue'
             }
 
-            if ($PSBoundParameters['CimSession']) { $CimMethod2Args['CimSession'] = $CimSession }
-
-            switch ($Types[$i]) {
-                'REG_NONE' {
-                    $CimMethod2Args['MethodName'] = 'GetBinaryValue'
-                    $ReturnProp = 'uValue'
-                }
-
-                'REG_SZ' {
-                    $CimMethod2Args['MethodName'] = 'GetStringValue'
-                    $ReturnProp = 'sValue'
-                }
-
-                'REG_EXPAND_SZ' {
-                    $CimMethod2Args['MethodName'] = 'GetExpandedStringValue'
-                    $ReturnProp = 'sValue'
-                }
-
-                'REG_MULTI_SZ' {
-                    $CimMethod2Args['MethodName'] = 'GetMultiStringValue'
-                    $ReturnProp = 'sValue'
-                }
-
-                'REG_DWORD' {
-                    $CimMethod2Args['MethodName'] = 'GetDWORDValue'
-                    $ReturnProp = 'uValue'
-                }
-
-                'REG_QWORD' {
-                    $CimMethod2Args['MethodName'] = 'GetQWORDValue'
-                    $ReturnProp = 'uValue'
-                }
-
-                'REG_BINARY' {
-                    $CimMethod2Args['MethodName'] = 'GetBinaryValue'
-                    $ReturnProp = 'uValue'
-                }
-
-                'REG_RESOURCE_LIST' {
-                    $CimMethod2Args['MethodName'] = 'GetBinaryValue'
-                    $ReturnProp = 'uValue'
-                }
-
-                'REG_FULL_RESOURCE_DESCRIPTOR' {
-                    $CimMethod2Args['MethodName'] = 'GetBinaryValue'
-                    $ReturnProp = 'uValue'
-                }
-
-                'REG_RESOURCE_REQUIREMENTS_LIST' {
-                    $CimMethod2Args['MethodName'] = 'GetBinaryValue'
-                    $ReturnProp = 'uValue'
-                }
-
-                default {
-                    Write-Warning "$($Result.Types[$i]) is not a supported registry value type. Hive: $Hive. SubKey: $SubKey"
-                    
-                    $CimMethod2Args['MethodName'] = 'GetBinaryValue'
-                    $ReturnProp = 'uValue'
-                }
+            'REG_SZ' {
+                $CimMethodArgs['MethodName'] = 'GetStringValue'
+                $ReturnProp = 'sValue'
             }
 
-            $RegistryMethod2Args = @{
-                hDefKey = $HiveVal
-                sSubKeyName = $TrimmedKey
-                sValueName = $ValueNames[$i]
+            'REG_EXPAND_SZ' {
+                $CimMethodArgs['MethodName'] = 'GetExpandedStringValue'
+                $ReturnProp = 'sValue'
             }
 
-            $CimMethod2Args['Arguments'] = $RegistryMethod2Args
+            'REG_MULTI_SZ' {
+                $CimMethodArgs['MethodName'] = 'GetMultiStringValue'
+                $ReturnProp = 'sValue'
+            }
 
-            if (($PSBoundParameters.ContainsKey('ValueName') -and ($ValueName -eq $ValueNames[$i])) -or (-not $PSBoundParameters.ContainsKey('ValueName'))) {
+            'REG_DWORD' {
+                $CimMethodArgs['MethodName'] = 'GetDWORDValue'
+                $ReturnProp = 'uValue'
+            }
+
+            'REG_QWORD' {
+                $CimMethodArgs['MethodName'] = 'GetQWORDValue'
+                $ReturnProp = 'uValue'
+            }
+
+            'REG_BINARY' {
+                $CimMethodArgs['MethodName'] = 'GetBinaryValue'
+                $ReturnProp = 'uValue'
+            }
+
+            'REG_RESOURCE_LIST' {
+                $CimMethodArgs['MethodName'] = 'GetBinaryValue'
+                $ReturnProp = 'uValue'
+            }
+
+            'REG_FULL_RESOURCE_DESCRIPTOR' {
+                $CimMethodArgs['MethodName'] = 'GetBinaryValue'
+                $ReturnProp = 'uValue'
+            }
+
+            'REG_RESOURCE_REQUIREMENTS_LIST' {
+                $CimMethodArgs['MethodName'] = 'GetBinaryValue'
+                $ReturnProp = 'uValue'
+            }
+        }
+
+        $RegistryMethodArgs = @{
+            hDefKey = $HiveVal
+            sSubKeyName = $TrimmedKey
+            sValueName = $ValueName
+        }
+
+        $CimMethodArgs['Arguments'] = $RegistryMethodArgs
+
+        $ValueContent = $null
+
+        if (-not $PSBoundParameters['ValueNameOnly']) {
+            $Result = Invoke-CimMethod @CimMethodArgs
+
+            if ($Result.ReturnValue -eq 0) {
+                $ValueContent = $Result."$ReturnProp"
+            }
+        }
+
+        $ValueObject = [PSCustomObject] @{
+            Hive = $Hive
+            SubKey = $TrimmedKey
+            ValueName = if ($ValueName) { $ValueName } else { '(Default)' }
+            Type = $ValueType
+            ValueContent = $ValueContent
+            PSComputerName = $Result.PSComputerName
+            CimSession = $CimSession
+        }
+
+        $ValueObject.PSObject.TypeNames.Insert(0, 'CimSweep.RegistryValue')
+
+        $ValueObject
+    } else {
+        $CimMethodArgs['MethodName'] = 'EnumValues'
+
+        $RegistryMethodArgs = @{
+            hDefKey = $HiveVal
+            sSubKeyName = $TrimmedKey
+        }
+
+        $CimMethodArgs['Arguments'] = $RegistryMethodArgs
+
+        $Result = Invoke-CimMethod @CimMethodArgs
+
+        # Only progress if EnumValues returns actual value and type data
+        if ($Result.Types.Length) {
+            $Types = $Result.Types.ForEach({$Type[$_]})
+
+            $ValueNames = $Result.sNames
+
+            for ($i = 0; $i -lt $Result.Types.Length; $i++) {
                 $ValueContent = $null
 
-                if (-not $PSBoundParameters['ValueNameOnly']) {
-                    $Result2 = Invoke-CimMethod @CimMethod2Args
+                $CimMethod2Args = @{
+                    ClassName = 'StdRegProv'
+                    Namespace = 'root/default'
+                }
 
-                    if ($Result2.ReturnValue -eq 0) {
-                        $ValueContent = $Result2."$ReturnProp"
+                if ($PSBoundParameters['CimSession']) { $CimMethod2Args['CimSession'] = $CimSession }
+
+                switch ($Types[$i]) {
+                    'REG_NONE' {
+                        $CimMethod2Args['MethodName'] = 'GetBinaryValue'
+                        $ReturnProp = 'uValue'
+                    }
+
+                    'REG_SZ' {
+                        $CimMethod2Args['MethodName'] = 'GetStringValue'
+                        $ReturnProp = 'sValue'
+                    }
+
+                    'REG_EXPAND_SZ' {
+                        $CimMethod2Args['MethodName'] = 'GetExpandedStringValue'
+                        $ReturnProp = 'sValue'
+                    }
+
+                    'REG_MULTI_SZ' {
+                        $CimMethod2Args['MethodName'] = 'GetMultiStringValue'
+                        $ReturnProp = 'sValue'
+                    }
+
+                    'REG_DWORD' {
+                        $CimMethod2Args['MethodName'] = 'GetDWORDValue'
+                        $ReturnProp = 'uValue'
+                    }
+
+                    'REG_QWORD' {
+                        $CimMethod2Args['MethodName'] = 'GetQWORDValue'
+                        $ReturnProp = 'uValue'
+                    }
+
+                    'REG_BINARY' {
+                        $CimMethod2Args['MethodName'] = 'GetBinaryValue'
+                        $ReturnProp = 'uValue'
+                    }
+
+                    'REG_RESOURCE_LIST' {
+                        $CimMethod2Args['MethodName'] = 'GetBinaryValue'
+                        $ReturnProp = 'uValue'
+                    }
+
+                    'REG_FULL_RESOURCE_DESCRIPTOR' {
+                        $CimMethod2Args['MethodName'] = 'GetBinaryValue'
+                        $ReturnProp = 'uValue'
+                    }
+
+                    'REG_RESOURCE_REQUIREMENTS_LIST' {
+                        $CimMethod2Args['MethodName'] = 'GetBinaryValue'
+                        $ReturnProp = 'uValue'
+                    }
+
+                    default {
+                        Write-Warning "$($Result.Types[$i]) is not a supported registry value type. Hive: $Hive. SubKey: $SubKey"
+                    
+                        $CimMethod2Args['MethodName'] = 'GetBinaryValue'
+                        $ReturnProp = 'uValue'
                     }
                 }
 
-                $ObjectProperties = [Ordered] @{
-                    Hive = $Hive
-                    SubKey = $TrimmedKey
-                    ValueName = if ($ValueNames[$i]) { $ValueNames[$i] } else { '' }
-                    Type = $Types[$i]
-                    ValueContent = $ValueContent
-                    PSComputerName = $Result.PSComputerName
-                    CimSession = $CimSession
+                $RegistryMethod2Args = @{
+                    hDefKey = $HiveVal
+                    sSubKeyName = $TrimmedKey
+                    sValueName = $ValueNames[$i]
                 }
 
-                $ValueObject = New-Object -TypeName PSObject -Property $ObjectProperties
-                $ValueObject.PSObject.TypeNames.Insert(0, 'CimSweep.RegistryValue')
+                $CimMethod2Args['Arguments'] = $RegistryMethod2Args
 
-                $ValueObject
+                if (($PSBoundParameters.ContainsKey('ValueName') -and ($ValueName -eq $ValueNames[$i])) -or (-not $PSBoundParameters.ContainsKey('ValueName'))) {
+                    $ValueContent = $null
+
+                    if (-not $PSBoundParameters['ValueNameOnly']) {
+                        $Result2 = Invoke-CimMethod @CimMethod2Args
+
+                        if ($Result2.ReturnValue -eq 0) {
+                            $ValueContent = $Result2."$ReturnProp"
+                        }
+                    }
+
+                    $ValueObject = [PSCustomObject] @{
+                        Hive = $Hive
+                        SubKey = $TrimmedKey
+                        ValueName = if ($ValueNames[$i]) { $ValueNames[$i] } else { '(Default)' }
+                        Type = $Types[$i]
+                        ValueContent = $ValueContent
+                        PSComputerName = $Result.PSComputerName
+                        CimSession = $CimSession
+                    }
+
+                    $ValueObject.PSObject.TypeNames.Insert(0, 'CimSweep.RegistryValue')
+
+                    $ValueObject
+                }
             }
         }
     }
@@ -462,7 +557,7 @@ Specifies the CIM session to use for this cmdlet. Enter a variable that contains
     if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $CimSession }
 
     # Get a SID to username mapping
-    $Accounts = Get-CimInstance -ClassName Win32_Account -Property SID, Name @CommonArgs
+    $Accounts = Get-CimInstance -ClassName Win32_Account -Filter 'LocalAccount = "True"' -Property SID, Name @CommonArgs
 
     # Get all user specific hives
     $AllUserHives = Get-CSRegistryKey -Hive HKU @CommonArgs
