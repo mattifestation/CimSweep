@@ -48,6 +48,26 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
         [Switch]
         $Winlogon,
 
+        [Parameter(ParameterSetName = 'SpecificCheck')]
+        [Switch]
+        $Services,
+
+        [Parameter(ParameterSetName = 'SpecificCheck')]
+        [Switch]
+        $Drivers,
+
+        [Parameter(ParameterSetName = 'SpecificCheck')]
+        [Switch]
+        $PrintMonitors,
+
+        [Parameter(ParameterSetName = 'SpecificCheck')]
+        [Switch]
+        $NetworkProviders,
+
+        [Parameter(ParameterSetName = 'SpecificCheck')]
+        [Switch]
+        $BootExecute,
+
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
@@ -118,6 +138,30 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['Logon']) {
                 $Category = 'Logon'
 
+                Get-CSRegistryValue -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\Wds\rdpwd' -ValueName StartupPrograms @CommonArgs |
+                    New-AutoRunsEntry -Category $Category
+
+                Get-CSRegistryValue -Hive HKLM -SubKey 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon' -ValueNameOnly @CommonArgs |
+                    Where-Object { ('VmApplet', 'Userinit', 'Shell', 'TaskMan', 'AppSetup') -contains $_.ValueName } | ForEach-Object {
+                        $_ | Get-CSRegistryValue | New-AutoRunsEntry -Category $Category
+                    }
+
+                # Todo: implement on domain-joined system
+                <#
+                'Startup', 'Shutdown', 'Logon', 'Logoff' | ForEach-Object {
+                    Get-CSRegistryKey -Hive HKLM -SubKey 'SOFTWARE\Policies\Microsoft\Windows\System\Scripts'
+                }
+                #>
+
+                $GPExtensionKey = 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\GPExtensions'
+                Get-CSRegistryKey -Hive HKLM -SubKey $GPExtensionKey @CommonArgs |
+                    Get-CSRegistryValue -ValueName DllName |
+                        ForEach-Object { $_ | New-AutoRunsEntry -SubKey $GPExtensionKey -AutoRunEntry $_.Subkey.Split('\')[-1] -Category $Category }
+
+                $AlternateShell = Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\SafeBoot' -ValueName AlternateShell @CommonArgs
+
+                if ($AlternateShell) { $AlternateShell | New-AutoRunsEntry -AutoRunEntry $AlternateShell.ValueContent -Category $Category }
+
                 $AutoStartPaths = @(
                     'SOFTWARE\Microsoft\Windows\CurrentVersion\Run'
                     'SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce'
@@ -135,6 +179,94 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
                             New-AutoRunsEntry -Category $Category
                     }
                 }
+
+                $null, 'Wow6432Node\' | ForEach-Object {
+                    $InstalledComponents = "SOFTWARE\$($_)Microsoft\Active Setup\Installed Components"
+                    Get-CSRegistryKey -Hive HKLM -SubKey $InstalledComponents @CommonArgs
+                } | Get-CSRegistryValue -ValueName StubPath | ForEach-Object {
+                    $AutoRunEntry = $_ | Get-CSRegistryValue -ValueName '' -ValueType REG_SZ
+
+                    if ($AutoRunEntry.ValueContent) { $AutoRunEntryName = $AutoRunEntry.ValueContent } else { $AutoRunEntryName = 'n/a' }
+
+                    $_ | New-AutoRunsEntry -SubKey $InstalledComponents -AutoRunEntry $AutoRunEntryName -Category $Category
+                }
+
+                $IconLib = Get-CSRegistryValue -Hive HKLM -SubKey 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\Windows' -ValueName IconServiceLib @CommonArgs
+
+                if ($IconLib) { $IconLib | New-AutoRunsEntry -SubKey "$($IconLib.SubKey)\$($IconLib.ValueName)" -AutoRunEntry $IconLib.ValueContent -Category $Category }
+            }
+
+            if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['BootExecute']) {
+                $Category = 'BootExecute'
+
+                Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\Session Manager' -ValueNameOnly @CommonArgs |
+                    Where-Object { ('BootExecute','SetupExecute','Execute','S0InitialCommand') -contains $_.ValueName } | ForEach-Object {
+                        $_ | Get-CSRegistryValue | Where-Object { $_.ValueContent.Count } |
+                            ForEach-Object { $_ | New-AutoRunsEntry -ImagePath "$($_.ValueContent)" -Category $Category }
+                    }
+
+                Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control' -ValueName ServiceControlManagerExtension @CommonArgs |
+                    New-AutoRunsEntry -AutoRunEntry ServiceControlManagerExtension -Category $Category
+            }
+
+            if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['PrintMonitors']) {
+                $Category = 'PrintMonitors'
+
+                Get-CSRegistryKey -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\Print\Monitors' @CommonArgs | Get-CSRegistryValue -ValueName Driver | ForEach-Object {
+                    $_ | New-AutoRunsEntry -SubKey 'SYSTEM\CurrentControlSet\Control\Print\Monitors' -AutoRunEntry $_.SubKey.Split('\')[-1] -Category $Category
+                }
+            }
+
+            if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['NetworkProviders']) {
+                $Category = 'NetworkProviders'
+
+                $NetworkOrder = Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\NetworkProvider\Order' -ValueName ProviderOrder @CommonArgs
+
+                if ($NetworkOrder.ValueContent) {
+                    $NetworkOrder.ValueContent.Split(',') | ForEach-Object {
+                        $NetworkOrder | New-AutoRunsEntry -AutoRunEntry $_ -ImagePath $_ -Category $Category
+                    }
+                }
+            }
+
+            if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['Services'] -or $PSBoundParameters['Drivers']) {
+                $ServiceKeys = Get-CSRegistryKey -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Services' @CommonArgs
+
+                $ServiceKeys | Get-CSRegistryValue -ValueName 'Type' @CommonArgs | ForEach {
+                    $SERVICE_KERNEL_DRIVER = 1
+                    $SERVICE_FILE_SYSTEM_DRIVER = 2
+                    $SERVICE_WIN32_OWN_PROCESS = 0x10
+                    $SERVICE_WIN32_SHARE_PROCESS = 0x20
+
+                    $ServiceShortName = $_.SubKey.Split('\')[-1]
+
+                    if ($PSBoundParameters['Drivers'] -and ($_.ValueContent -eq $SERVICE_KERNEL_DRIVER -or $_.ValueContent -eq $SERVICE_FILE_SYSTEM_DRIVER)) {
+                        $Category = 'Drivers'
+
+                        $ImagePath = ($_ | Get-CSRegistryValue -ValueName ImagePath @CommonArgs).ValueContent
+
+                        New-AutoRunsEntry HKLM 'SYSTEM\CurrentControlSet\Services' $ServiceShortName $ImagePath $Category $_.PSComputerName
+                    }
+
+                    if ($PSBoundParameters['Services']) {
+                        $Category = 'Services'
+
+                        if ($_.ValueContent -eq $SERVICE_WIN32_OWN_PROCESS) {
+                            $ImagePath = ($_ | Get-CSRegistryValue -ValueName ImagePath @CommonArgs).ValueContent
+
+                            New-AutoRunsEntry HKLM 'SYSTEM\CurrentControlSet\Services' $ServiceShortName $ImagePath $Category $_.PSComputerName
+                        }
+
+                        if ($_.ValueContent -eq $SERVICE_WIN32_SHARE_PROCESS) {
+                            $SubKey = "$($_.SubKey)\Parameters"
+
+                            $ImagePath = ($_ | Get-CSRegistryValue -SubKey $SubKey -ValueName ServiceDll @CommonArgs).ValueContent
+
+                            New-AutoRunsEntry HKLM 'SYSTEM\CurrentControlSet\Services' $ServiceShortName $ImagePath $Category $_.PSComputerName
+                        }
+                    }
+                }
+
             }
 
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['LSAProviders']) {
@@ -179,7 +311,7 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
                 Get-CSRegistryValue -Hive HKLM -SubKey SOFTWARE\Classes\exefile\shell\open\command -ValueName 'IsolatedCommand' @CommonArgs |
                     New-AutoRunsEntry -Category $Category
 
-                $null,'Wow6432Node\' | ForEach-Object {
+                $null, 'Wow6432Node\' | ForEach-Object {
                     Get-CSRegistryKey -Hive HKLM -SubKey "SOFTWARE\$($_)Microsoft\Windows NT\CurrentVersion\Image File Execution Options" |
                         Get-CSRegistryValue -ValueName Debugger @CommonArgs | ForEach-Object {
                             $_ | New-AutoRunsEntry -AutoRunEntry $_.SubKey.Substring($_.SubKey.LastIndexOf('\') + 1) -Category $Category
