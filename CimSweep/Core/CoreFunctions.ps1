@@ -722,7 +722,7 @@ Outputs Win32_NtLogEvent instances.
         [String]
         $LogName,
 
-        [UInt32]
+        [UInt32[]]
         $EventIdentifier,
 
         [String]
@@ -773,7 +773,7 @@ Outputs Win32_NtLogEvent instances.
     }
 
     if ($PSBoundParameters['LogName']) { $FilterComponents.Add("LogFile='$LogName'") }
-    if ($PSBoundParameters['EventIdentifier']) { $FilterComponents.Add("EventIdentifier=$EventIdentifier") }
+    if ($PSBoundParameters['EventIdentifier']) { $FilterComponents.Add("($(($EventIdentifier | ForEach-Object { "EventIdentifier = $_" }) -join ' OR '))") }
     if ($PSBoundParameters['EntryType']) { $FilterComponents.Add("EventType=$($TypeMapping[$EntryType])") }
     if ($PSBoundParameters['Before']) { $FilterComponents.Add("TimeGenerated<'$($Before.ToUniversalTime().ToString('yyyyMMddHHmmss.ffffff+000'))'") }
     if ($PSBoundParameters['After']) { $FilterComponents.Add("TimeGenerated>'$($After.ToUniversalTime().ToString('yyyyMMddHHmmss.ffffff+000'))'") }
@@ -1299,7 +1299,7 @@ Outputs Win32_Service instances.
         $ServiceEntryArgs['Filter'] = $Filter
     }
 
-    Get-CimInstance @CommonArgs @ServiceEntryArgs -ClassName Win32_Service
+    Get-CimInstance @CommonArgs @ServiceEntryArgs -ClassName Win32_BaseService
 }
 
 filter Get-CSProcess {
