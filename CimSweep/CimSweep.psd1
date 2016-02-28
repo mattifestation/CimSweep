@@ -1,7 +1,7 @@
 ﻿@{
 RootModule = 'CimSweep.psm1'
 
-ModuleVersion = '0.1.0.0'
+ModuleVersion = '0.3.0.0'
 
 GUID = 'f347ef1c-d752-4d07-bf68-3197c0aa661a'
 
@@ -26,8 +26,8 @@ FunctionsToExport = @(
     'Get-CSEnvironmentVariable'
     'Get-CSRegistryAutoStart',
     'Get-CSScheduledTaskFile',
-    'Get-CSTempPathPEAndScript',
-    'Get-CSLowILPathPEAndScript',
+    'Get-CSTempFile',
+    'Get-CSLowILPathFile',
     'Get-CSShellFolderPath',
     'Get-CSStartMenuEntry',
     'Get-CSTypedURL',

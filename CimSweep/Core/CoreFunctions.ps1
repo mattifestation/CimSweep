@@ -1,4 +1,4 @@
-﻿filter Get-CSRegistryKey {
+﻿function Get-CSRegistryKey {
 <#
 .SYNOPSIS
 
@@ -61,10 +61,6 @@ PSObject
 
 Accepts output from Get-CSRegistryKey. This enables recursion.
 
-Microsoft.Management.Infrastructure.CimSession
-
-Get-CSRegistryKey accepts established CIM sessions over the pipeline.
-
 .OUTPUTS
 
 PSObject
@@ -96,75 +92,82 @@ It is not recommended to recursively list all registry keys from most parent key
         [Switch]
         $Recurse,
 
-        [Parameter(ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
+        [Parameter(ValueFromPipelineByPropertyName = $True)]
         [Alias('Session')]
         [Microsoft.Management.Infrastructure.CimSession[]]
         $CimSession
     )
 
-    # Note: -Path is not guaranteed to expand if the PSDrive doesn't exist. e.g. HKCR doesn't exist by default.
-    # The point of -Path is to speed up your workflow.
-    if ($PSBoundParameters['Path']) {
-        $Result = $Path -match '^(?<Hive>HKLM|HKCU|HKU|HKCR|HKCC):\\(?<SubKey>.*)$'
-
-        $Hive = $Matches.Hive
-        $SubKey = $Matches.SubKey
+    BEGIN {
+        # If a CIM session is not provided, trick the function into thinking there is one.
+        if (-not $PSBoundParameters['CimSession']) {
+            $CimSession = ''
+        }
     }
 
-    $TrimmedKey = $SubKey.Trim('\')
+    PROCESS {
+        foreach ($Session in $CimSession) {
+            # Note: -Path is not guaranteed to expand if the PSDrive doesn't exist. e.g. HKCR doesn't exist by default.
+            # The point of -Path is to speed up your workflow.
+            if ($PSBoundParameters['Path']) {
+                $Result = $Path -match '^(?<Hive>HKLM|HKCU|HKU|HKCR|HKCC):\\(?<SubKey>.*)$'
 
-    switch ($Hive) {
-        'HKLM' { $HiveVal = [UInt32] 2147483650 }
-        'HKCU' { $HiveVal = [UInt32] 2147483649 }
-        'HKU'  { $HiveVal = [UInt32] 2147483651 }
-        'HKCR' { $HiveVal = [UInt32] 2147483648 }
-        'HKCC' { $HiveVal = [UInt32] 2147483653 }
-    }
-
-    $CimMethodArgs = @{
-        ClassName = 'StdRegProv'
-        Namespace = 'root/default'
-        MethodName = 'EnumKey'
-    }
-
-    $CommonArgs = @{}
-
-    if ($PSBoundParameters['CimSession']) {
-        $CimMethodArgs['CimSession'] = $CimSession
-        $CommonArgs['CimSession'] = $CimSession
-    }
-
-    $RegistryMethodArgs = @{
-        hDefKey = $HiveVal
-        sSubKeyName = $TrimmedKey
-    }
-
-    $CimMethodArgs['Arguments'] = $RegistryMethodArgs
-
-    $Result = Invoke-CimMethod @CimMethodArgs
-    
-    if ($Result.sNames) {
-        foreach ($KeyName in $Result.sNames) {
-            $ObjectProperties = [Ordered] @{
-                Hive = $Hive
-                SubKey = "$TrimmedKey\$KeyName".Trim('\')
-                CimSession = $CimSession
+                $Hive = $Matches.Hive
+                $SubKey = $Matches.SubKey
             }
 
-            $KeyObject = New-Object -TypeName PSObject -Property $ObjectProperties
-            Add-Member -InputObject $KeyObject -MemberType NoteProperty -Name PSComputerName -Value $Result.PSComputerName
-            $KeyObject.PSObject.TypeNames.Insert(0, 'CimSweep.RegistryKey')
+            switch ($Hive) {
+                'HKLM' { $HiveVal = [UInt32] 2147483650 }
+                'HKCU' { $HiveVal = [UInt32] 2147483649 }
+                'HKU'  { $HiveVal = [UInt32] 2147483651 }
+                'HKCR' { $HiveVal = [UInt32] 2147483648 }
+                'HKCC' { $HiveVal = [UInt32] 2147483653 }
+            }
 
-            $KeyObject
+            $TrimmedKey = $SubKey.Trim('\')
 
-            if ($PSBoundParameters['Recurse']) {
-                Get-CSRegistryKey -Recurse @ObjectProperties
+            $CimMethodArgs = @{
+                ClassName = 'StdRegProv'
+                Namespace = 'root/default'
+                MethodName = 'EnumKey'
+            }
+
+            if ($PSBoundParameters['CimSession']) { $CimMethodArgs['CimSession'] = $Session }
+
+            $RegistryMethodArgs = @{
+                hDefKey = $HiveVal
+                sSubKeyName = $TrimmedKey
+            }
+
+            $CimMethodArgs['Arguments'] = $RegistryMethodArgs
+
+            $Result = Invoke-CimMethod @CimMethodArgs
+
+            if ($Result.sNames) {
+                foreach ($KeyName in $Result.sNames) {
+                    $ObjectProperties = [Ordered] @{
+                        Hive = $Hive
+                        SubKey = "$TrimmedKey\$KeyName".Trim('\')
+                    }
+
+                    if ($PSBoundParameters['CimSession']) { $ObjectProperties['CimSession'] = $Session }
+
+                    $KeyObject = New-Object -TypeName PSObject -Property $ObjectProperties
+                    Add-Member -InputObject $KeyObject -MemberType NoteProperty -Name PSComputerName -Value $Result.PSComputerName
+                    $KeyObject.PSObject.TypeNames.Insert(0, 'CimSweep.RegistryKey')
+
+                    $KeyObject
+
+                    if ($PSBoundParameters['Recurse']) {
+                        Get-CSRegistryKey -Recurse @ObjectProperties
+                    }
+                }
             }
         }
     }
 }
 
-filter Get-CSRegistryValue {
+function Get-CSRegistryValue {
 <#
 .SYNOPSIS
 
@@ -231,10 +234,6 @@ PSObject
 
 Accepts output from Get-CSRegistryKey. This allows you to list all registry value names for all keys contained within a parent key.
 
-Microsoft.Management.Infrastructure.CimSession
-
-Get-CSRegistryValue accepts established CIM sessions over the pipeline.
-
 .OUTPUTS
 
 PSObject
@@ -265,267 +264,292 @@ Outputs a list of custom objects representing registry value names, their respec
         $ValueName,
 
         [String]
-        [ValidateSet('REG_NONE', 'REG_SZ', 'REG_EXPAND_SZ', 'REG_BINARY', 'REG_DWORD', 'REG_QWORD', 'REG_MULTI_SZ', 'REG_RESOURCE_LIST', 'REG_FULL_RESOURCE_DESCRIPTOR', 'REG_RESOURCE_REQUIREMENTS_LIST')]
+        [ValidateSet(
+            'REG_NONE',
+            'REG_SZ',
+            'REG_EXPAND_SZ',
+            'REG_BINARY',
+            'REG_DWORD',
+            'REG_QWORD',
+            'REG_MULTI_SZ',
+            'REG_RESOURCE_LIST',
+            'REG_FULL_RESOURCE_DESCRIPTOR',
+            'REG_RESOURCE_REQUIREMENTS_LIST'
+        )]
         $ValueType,
 
         [Switch]
         $ValueNameOnly,
 
-        [Parameter(ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
+        [Parameter(ValueFromPipelineByPropertyName = $True)]
         [Alias('Session')]
         [Microsoft.Management.Infrastructure.CimSession[]]
         $CimSession
     )
 
-    # Note: -Path is not guaranteed to expand if the PSDrive doesn't exist. e.g. HKCR doesn't exist by default.
-    # The point of -Path is to speed up your workflow.
-    if ($PSBoundParameters['Path']) {
-        $Result = $Path -match '^(?<Hive>HKLM|HKCU|HKU|HKCR|HKCC):\\(?<SubKey>.*)$'
+    BEGIN {
+        # If a CIM session is not provided, trick the function into thinking there is one.
+        if (-not $PSBoundParameters['CimSession']) {
+            $CimSession = ''
+        }
 
-        $Hive = $Matches.Hive
-        $SubKey = $Matches.SubKey
+        $Type = @{
+            0  = 'REG_NONE'
+            1  = 'REG_SZ'
+            2  = 'REG_EXPAND_SZ'
+            3  = 'REG_BINARY'
+            4  = 'REG_DWORD'
+            7  = 'REG_MULTI_SZ'
+            8  = 'REG_RESOURCE_LIST' # Just treat this as binary
+            9  = 'REG_FULL_RESOURCE_DESCRIPTOR' # Just treat this as binary
+            10 = 'REG_RESOURCE_REQUIREMENTS_LIST' # Just treat this as binary
+            11 = 'REG_QWORD'
+        }
     }
 
-    switch ($Hive) {
-        'HKLM' { $HiveVal = [UInt32] 2147483650 }
-        'HKCU' { $HiveVal = [UInt32] 2147483649 }
-        'HKU'  { $HiveVal = [UInt32] 2147483651 }
-        'HKCR' { $HiveVal = [UInt32] 2147483648 }
-        'HKCC' { $HiveVal = [UInt32] 2147483653 }
-    }
+    PROCESS {
+        foreach ($Session in $CimSession) {
+            $ComputerName = $Session.ComputerName
+            if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
 
-    $Type = @{
-        0  = 'REG_NONE'
-        1  = 'REG_SZ'
-        2  = 'REG_EXPAND_SZ'
-        3  = 'REG_BINARY'
-        4  = 'REG_DWORD'
-        7  = 'REG_MULTI_SZ'
-        8  = 'REG_RESOURCE_LIST' # Just treat this as binary
-        9  = 'REG_FULL_RESOURCE_DESCRIPTOR' # Just treat this as binary
-        10 = 'REG_RESOURCE_REQUIREMENTS_LIST' # Just treat this as binary
-        11 = 'REG_QWORD'
-    }
+            # Note: -Path is not guaranteed to expand if the PSDrive doesn't exist. e.g. HKCR doesn't exist by default.
+            # The point of -Path is to speed up your workflow.
+            if ($PSBoundParameters['Path']) {
+                $Result = $Path -match '^(?<Hive>HKLM|HKCU|HKU|HKCR|HKCC):\\(?<SubKey>.*)$'
 
-    $TrimmedKey = $SubKey.Trim('\')
-
-    if ($PSBoundParameters['CimSession']) { $CimMethodArgs['CimSession'] = $CimSession }
-
-    $CimMethodArgs = @{
-        ClassName = 'StdRegProv'
-        Namespace = 'root/default'
-    }
-
-    if ($PSBoundParameters['ValueType']) {
-        switch ($ValueType) {
-            'REG_NONE' {
-                $CimMethodArgs['MethodName'] = 'GetBinaryValue'
-                $ReturnProp = 'uValue'
+                $Hive = $Matches.Hive
+                $SubKey = $Matches.SubKey
             }
 
-            'REG_SZ' {
-                $CimMethodArgs['MethodName'] = 'GetStringValue'
-                $ReturnProp = 'sValue'
+            switch ($Hive) {
+                'HKLM' { $HiveVal = [UInt32] 2147483650 }
+                'HKCU' { $HiveVal = [UInt32] 2147483649 }
+                'HKU'  { $HiveVal = [UInt32] 2147483651 }
+                'HKCR' { $HiveVal = [UInt32] 2147483648 }
+                'HKCC' { $HiveVal = [UInt32] 2147483653 }
             }
 
-            'REG_EXPAND_SZ' {
-                $CimMethodArgs['MethodName'] = 'GetExpandedStringValue'
-                $ReturnProp = 'sValue'
+            $TrimmedKey = $SubKey.Trim('\')
+
+            $CimMethodArgs = @{
+                ClassName = 'StdRegProv'
+                Namespace = 'root/default'
             }
 
-            'REG_MULTI_SZ' {
-                $CimMethodArgs['MethodName'] = 'GetMultiStringValue'
-                $ReturnProp = 'sValue'
-            }
+            if ($PSBoundParameters['CimSession']) { $CimMethodArgs['CimSession'] = $Session }
 
-            'REG_DWORD' {
-                $CimMethodArgs['MethodName'] = 'GetDWORDValue'
-                $ReturnProp = 'uValue'
-            }
-
-            'REG_QWORD' {
-                $CimMethodArgs['MethodName'] = 'GetQWORDValue'
-                $ReturnProp = 'uValue'
-            }
-
-            'REG_BINARY' {
-                $CimMethodArgs['MethodName'] = 'GetBinaryValue'
-                $ReturnProp = 'uValue'
-            }
-
-            'REG_RESOURCE_LIST' {
-                $CimMethodArgs['MethodName'] = 'GetBinaryValue'
-                $ReturnProp = 'uValue'
-            }
-
-            'REG_FULL_RESOURCE_DESCRIPTOR' {
-                $CimMethodArgs['MethodName'] = 'GetBinaryValue'
-                $ReturnProp = 'uValue'
-            }
-
-            'REG_RESOURCE_REQUIREMENTS_LIST' {
-                $CimMethodArgs['MethodName'] = 'GetBinaryValue'
-                $ReturnProp = 'uValue'
-            }
-        }
-
-        $RegistryMethodArgs = @{
-            hDefKey = $HiveVal
-            sSubKeyName = $TrimmedKey
-            sValueName = $ValueName
-        }
-
-        $CimMethodArgs['Arguments'] = $RegistryMethodArgs
-
-        $ValueContent = $null
-
-        if (-not $PSBoundParameters['ValueNameOnly']) {
-            $Result = Invoke-CimMethod @CimMethodArgs
-
-            if ($Result.ReturnValue -eq 0) {
-                $ValueContent = $Result."$ReturnProp"
-            }
-        }
-
-        $ValueObject = [PSCustomObject] @{
-            Hive = $Hive
-            SubKey = $TrimmedKey
-            ValueName = if ($ValueName) { $ValueName } else { '(Default)' }
-            Type = $ValueType
-            ValueContent = $ValueContent
-            PSComputerName = $Result.PSComputerName
-            CimSession = $CimSession
-        }
-
-        $ValueObject.PSObject.TypeNames.Insert(0, 'CimSweep.RegistryValue')
-
-        $ValueObject
-    } else {
-        $CimMethodArgs['MethodName'] = 'EnumValues'
-
-        $RegistryMethodArgs = @{
-            hDefKey = $HiveVal
-            sSubKeyName = $TrimmedKey
-        }
-
-        $CimMethodArgs['Arguments'] = $RegistryMethodArgs
-
-        $Result = Invoke-CimMethod @CimMethodArgs
-
-        # Only progress if EnumValues returns actual value and type data
-        if ($Result.Types.Length) {
-            $Types = $Result.Types.ForEach({$Type[$_]})
-
-            $ValueNames = $Result.sNames
-
-            for ($i = 0; $i -lt $Result.Types.Length; $i++) {
-                $ValueContent = $null
-
-                $CimMethod2Args = @{
-                    ClassName = 'StdRegProv'
-                    Namespace = 'root/default'
-                }
-
-                if ($PSBoundParameters['CimSession']) { $CimMethod2Args['CimSession'] = $CimSession }
-
-                switch ($Types[$i]) {
+            if ($PSBoundParameters['ValueType']) {
+                switch ($ValueType) {
                     'REG_NONE' {
-                        $CimMethod2Args['MethodName'] = 'GetBinaryValue'
+                        $CimMethodArgs['MethodName'] = 'GetBinaryValue'
                         $ReturnProp = 'uValue'
                     }
 
                     'REG_SZ' {
-                        $CimMethod2Args['MethodName'] = 'GetStringValue'
+                        $CimMethodArgs['MethodName'] = 'GetStringValue'
                         $ReturnProp = 'sValue'
                     }
 
                     'REG_EXPAND_SZ' {
-                        $CimMethod2Args['MethodName'] = 'GetExpandedStringValue'
+                        $CimMethodArgs['MethodName'] = 'GetExpandedStringValue'
                         $ReturnProp = 'sValue'
                     }
 
                     'REG_MULTI_SZ' {
-                        $CimMethod2Args['MethodName'] = 'GetMultiStringValue'
+                        $CimMethodArgs['MethodName'] = 'GetMultiStringValue'
                         $ReturnProp = 'sValue'
                     }
 
                     'REG_DWORD' {
-                        $CimMethod2Args['MethodName'] = 'GetDWORDValue'
+                        $CimMethodArgs['MethodName'] = 'GetDWORDValue'
                         $ReturnProp = 'uValue'
                     }
 
                     'REG_QWORD' {
-                        $CimMethod2Args['MethodName'] = 'GetQWORDValue'
+                        $CimMethodArgs['MethodName'] = 'GetQWORDValue'
                         $ReturnProp = 'uValue'
                     }
 
                     'REG_BINARY' {
-                        $CimMethod2Args['MethodName'] = 'GetBinaryValue'
+                        $CimMethodArgs['MethodName'] = 'GetBinaryValue'
                         $ReturnProp = 'uValue'
                     }
 
                     'REG_RESOURCE_LIST' {
-                        $CimMethod2Args['MethodName'] = 'GetBinaryValue'
+                        $CimMethodArgs['MethodName'] = 'GetBinaryValue'
                         $ReturnProp = 'uValue'
                     }
 
                     'REG_FULL_RESOURCE_DESCRIPTOR' {
-                        $CimMethod2Args['MethodName'] = 'GetBinaryValue'
+                        $CimMethodArgs['MethodName'] = 'GetBinaryValue'
                         $ReturnProp = 'uValue'
                     }
 
                     'REG_RESOURCE_REQUIREMENTS_LIST' {
-                        $CimMethod2Args['MethodName'] = 'GetBinaryValue'
-                        $ReturnProp = 'uValue'
-                    }
-
-                    default {
-                        Write-Warning "$($Result.Types[$i]) is not a supported registry value type. Hive: $Hive. SubKey: $SubKey"
-                    
-                        $CimMethod2Args['MethodName'] = 'GetBinaryValue'
+                        $CimMethodArgs['MethodName'] = 'GetBinaryValue'
                         $ReturnProp = 'uValue'
                     }
                 }
 
-                $RegistryMethod2Args = @{
+                $RegistryMethodArgs = @{
                     hDefKey = $HiveVal
                     sSubKeyName = $TrimmedKey
-                    sValueName = $ValueNames[$i]
+                    sValueName = $ValueName
                 }
 
-                $CimMethod2Args['Arguments'] = $RegistryMethod2Args
+                $CimMethodArgs['Arguments'] = $RegistryMethodArgs
 
-                if (($PSBoundParameters.ContainsKey('ValueName') -and ($ValueName -eq $ValueNames[$i])) -or (-not $PSBoundParameters.ContainsKey('ValueName'))) {
-                    $ValueContent = $null
+                $ValueContent = $null
 
-                    if (-not $PSBoundParameters['ValueNameOnly']) {
-                        $Result2 = Invoke-CimMethod @CimMethod2Args
+                if (-not $PSBoundParameters['ValueNameOnly']) {
+                    $Result = Invoke-CimMethod @CimMethodArgs
 
-                        if ($Result2.ReturnValue -eq 0) {
-                            $ValueContent = $Result2."$ReturnProp"
+                    if ($Result.ReturnValue -eq 0) {
+                        $ValueContent = $Result."$ReturnProp"
+                    }
+                }
+
+                $ValueObject = [PSCustomObject] @{
+                    Hive = $Hive
+                    SubKey = $TrimmedKey
+                    ValueName = if ($ValueName) { $ValueName } else { '(Default)' }
+                    Type = $ValueType
+                    ValueContent = $ValueContent
+                    PSComputerName = $Result.PSComputerName
+                    CimSession = $Session
+                }
+
+                $ValueObject.PSObject.TypeNames.Insert(0, 'CimSweep.RegistryValue')
+
+                $ValueObject
+            } else {
+                $CimMethodArgs['MethodName'] = 'EnumValues'
+
+                $RegistryMethodArgs = @{
+                    hDefKey = $HiveVal
+                    sSubKeyName = $TrimmedKey
+                }
+
+                $CimMethodArgs['Arguments'] = $RegistryMethodArgs
+
+                $Result = Invoke-CimMethod @CimMethodArgs
+
+                # Only progress if EnumValues returns actual value and type data
+                if ($Result.Types.Length) {
+                    $Types = $Result.Types.ForEach({$Type[$_]})
+
+                    $ValueNames = $Result.sNames
+
+                    for ($i = 0; $i -lt $Result.Types.Length; $i++) {
+                        $ValueContent = $null
+
+                        $CimMethod2Args = @{
+                            ClassName = 'StdRegProv'
+                            Namespace = 'root/default'
+                        }
+
+                        if ($PSBoundParameters['CimSession']) { $CimMethod2Args['CimSession'] = $Session }
+
+                        switch ($Types[$i]) {
+                            'REG_NONE' {
+                                $CimMethod2Args['MethodName'] = 'GetBinaryValue'
+                                $ReturnProp = 'uValue'
+                            }
+
+                            'REG_SZ' {
+                                $CimMethod2Args['MethodName'] = 'GetStringValue'
+                                $ReturnProp = 'sValue'
+                            }
+
+                            'REG_EXPAND_SZ' {
+                                $CimMethod2Args['MethodName'] = 'GetExpandedStringValue'
+                                $ReturnProp = 'sValue'
+                            }
+
+                            'REG_MULTI_SZ' {
+                                $CimMethod2Args['MethodName'] = 'GetMultiStringValue'
+                                $ReturnProp = 'sValue'
+                            }
+
+                            'REG_DWORD' {
+                                $CimMethod2Args['MethodName'] = 'GetDWORDValue'
+                                $ReturnProp = 'uValue'
+                            }
+
+                            'REG_QWORD' {
+                                $CimMethod2Args['MethodName'] = 'GetQWORDValue'
+                                $ReturnProp = 'uValue'
+                            }
+
+                            'REG_BINARY' {
+                                $CimMethod2Args['MethodName'] = 'GetBinaryValue'
+                                $ReturnProp = 'uValue'
+                            }
+
+                            'REG_RESOURCE_LIST' {
+                                $CimMethod2Args['MethodName'] = 'GetBinaryValue'
+                                $ReturnProp = 'uValue'
+                            }
+
+                            'REG_FULL_RESOURCE_DESCRIPTOR' {
+                                $CimMethod2Args['MethodName'] = 'GetBinaryValue'
+                                $ReturnProp = 'uValue'
+                            }
+
+                            'REG_RESOURCE_REQUIREMENTS_LIST' {
+                                $CimMethod2Args['MethodName'] = 'GetBinaryValue'
+                                $ReturnProp = 'uValue'
+                            }
+
+                            default {
+                                Write-Warning "[$ComputerName] $($Result.Types[$i]) is not a supported registry value type. Hive: $Hive. SubKey: $SubKey"
+                    
+                                $CimMethod2Args['MethodName'] = 'GetBinaryValue'
+                                $ReturnProp = 'uValue'
+                            }
+                        }
+
+                        $RegistryMethod2Args = @{
+                            hDefKey = $HiveVal
+                            sSubKeyName = $TrimmedKey
+                            sValueName = $ValueNames[$i]
+                        }
+
+                        $CimMethod2Args['Arguments'] = $RegistryMethod2Args
+
+                        if (($PSBoundParameters.ContainsKey('ValueName') -and ($ValueName -eq $ValueNames[$i])) -or (-not $PSBoundParameters.ContainsKey('ValueName'))) {
+                            $ValueContent = $null
+
+                            if (-not $PSBoundParameters['ValueNameOnly']) {
+                                $Result2 = Invoke-CimMethod @CimMethod2Args
+
+                                if ($Result2.ReturnValue -eq 0) {
+                                    $ValueContent = $Result2."$ReturnProp"
+                                }
+                            }
+
+                            $ValueObject = [PSCustomObject] @{
+                                Hive = $Hive
+                                SubKey = $TrimmedKey
+                                ValueName = if ($ValueNames[$i]) { $ValueNames[$i] } else { '(Default)' }
+                                Type = $Types[$i]
+                                ValueContent = $ValueContent
+                                PSComputerName = $Result.PSComputerName
+                                CimSession = $Session
+                            }
+
+                            $ValueObject.PSObject.TypeNames.Insert(0, 'CimSweep.RegistryValue')
+
+                            $ValueObject
                         }
                     }
-
-                    $ValueObject = [PSCustomObject] @{
-                        Hive = $Hive
-                        SubKey = $TrimmedKey
-                        ValueName = if ($ValueNames[$i]) { $ValueNames[$i] } else { '(Default)' }
-                        Type = $Types[$i]
-                        ValueContent = $ValueContent
-                        PSComputerName = $Result.PSComputerName
-                        CimSession = $CimSession
-                    }
-
-                    $ValueObject.PSObject.TypeNames.Insert(0, 'CimSweep.RegistryValue')
-
-                    $ValueObject
                 }
             }
         }
     }
 }
 
-filter Get-HKUSID {
+function Get-HKUSID {
 <#
 .SYNOPSIS
 
@@ -543,12 +567,10 @@ Get-HKUSID is a helper function that returns user SIDs from the root of the HKU 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
 #>
 
-    [OutputType([Hashtable])]
     param(
-        [Parameter(ValueFromPipeline = $True)]
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
-        [Microsoft.Management.Infrastructure.CimSession[]]
+        [Microsoft.Management.Infrastructure.CimSession]
         $CimSession
     )
 
@@ -556,24 +578,15 @@ Specifies the CIM session to use for this cmdlet. Enter a variable that contains
 
     if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $CimSession }
 
-    # Get a SID to username mapping
-    $Accounts = Get-CimInstance -ClassName Win32_Account -Filter 'LocalAccount = "True"' -Property SID, Name @CommonArgs
-
-    # Get all user specific hives
-    $AllUserHives = Get-CSRegistryKey -Hive HKU @CommonArgs
-        
-    $UserSidToName = @{}
-
-    foreach ($Account in $Accounts) {
-        if ($Account.SID -in $AllUserHives.SubKey) {
-            $UserSidToName[($Account.SID)] = $Account.Name
+    Get-CSRegistryKey -Hive HKU @CommonArgs | ForEach-Object {
+        # S-1-5-18 is equivalent to HKLM
+        if (($_.SubKey -ne '.DEFAULT') -and ($_.SubKey -ne 'S-1-5-18') -and (-not $_.SubKey.EndsWith('_Classes'))) {
+            $_.SubKey
         }
     }
-
-    return $UserSidToName
 }
 
-filter Get-CSEventLog {
+function Get-CSEventLog {
 <#
 .SYNOPSIS
 
@@ -581,6 +594,10 @@ Gets a list of event logs on the computer.
 
 Author: Matthew Graeber (@mattifestation)
 License: BSD 3-Clause
+
+.PARAMETER NoProgressBar
+
+Do not display a progress bar. This parameter is designed to be used with wrapper functions.
 
 .PARAMETER CimSession
 
@@ -596,10 +613,6 @@ PSObject
 
 Accepts input from Get-CSEventLog.
 
-Microsoft.Management.Infrastructure.CimSession
-
-Get-CSEventLog accepts established CIM sessions over the pipeline.
-
 .OUTPUTS
 
 PSObject
@@ -608,31 +621,57 @@ Outptus a custom object that can be piped to Get-CSEventLog entry.
 #>
 
     param(
-        [Parameter(ValueFromPipeline = $True)]
+        [Switch]
+        $NoProgressBar,
+
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
         $CimSession
     )
 
-    $CommonArgs = @{}
-
-    if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $CimSession }
-
-    Get-CimInstance @CommonArgs -Query 'SELECT LogfileName FROM Win32_NTEventlogFile' | ForEach-Object {
-        $Properties = [Ordered] @{
-            LogName = $_.LogfileName
-            PSComputerName = $_.PSComputerName
-            CimSession = $CimSession
+    BEGIN {
+        # If a CIM session is not provided, trick the function into thinking there is one.
+        if (-not $PSBoundParameters['CimSession']) {
+            $CimSession = ''
+            $CIMSessionCount = 1
+        } else {
+            $CIMSessionCount = $CimSession.Count
         }
 
-        $EventLog = New-Object -TypeName PSObject -Property $Properties
-        $EventLog.PSObject.TypeNames.Insert(0, 'CimSweep.EventLog')
-        $EventLog
+        $CurrentCIMSession = 0
+    }
+
+    PROCESS {
+        foreach ($Session in $CimSession) {
+            $ComputerName = $Session.ComputerName
+            if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
+
+            if (-not $PSBoundParameters['NoProgressBar']) {
+                # Display a progress activity for each CIM session
+                Write-Progress -Id 1 -Activity 'CimSweep - Event log sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+                $CurrentCIMSession++
+            }
+
+            $CommonArgs = @{}
+
+            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
+
+            Get-CimInstance -ClassName Win32_NTEventlogFile -Property LogfileName @CommonArgs | ForEach-Object {
+                $EventLog = [PSCustomObject] @{
+                    LogName = $_.LogfileName
+                    PSComputerName = $_.PSComputerName
+                    CimSession = $CimSession
+                }
+
+                $EventLog.PSObject.TypeNames.Insert(0, 'CimSweep.EventLog')
+                $EventLog
+            }
+        }
     }
 }
 
-filter Get-CSEventLogEntry {
+function Get-CSEventLogEntry {
 <#
 .SYNOPSIS
 
@@ -705,10 +744,6 @@ PSObject
 
 Accepts input from Get-CSEventLog.
 
-Microsoft.Management.Infrastructure.CimSession
-
-Get-CSEventLogEntry accepts established CIM sessions over the pipeline.
-
 .OUTPUTS
 
 Microsoft.Management.Infrastructure.CimInstance
@@ -749,47 +784,75 @@ Outputs Win32_NtLogEvent instances.
         [ValidateNotNullOrEmpty()]
         $UserName,
 
-        [Parameter(ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
+        [Switch]
+        $NoProgressBar,
+
+        [Parameter(ValueFromPipelineByPropertyName = $True)]
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
         $CimSession
     )
 
-    $CommonArgs = @{}
+    BEGIN {
+        # If a CIM session is not provided, trick the function into thinking there is one.
+        if (-not $PSBoundParameters['CimSession']) {
+            $CimSession = ''
+            $CIMSessionCount = 1
+        } else {
+            $CIMSessionCount = $CimSession.Count
+        }
 
-    if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $CimSession }
-
-    $EventLogEntryArgs = @{}
-
-    $FilterComponents = New-Object 'Collections.ObjectModel.Collection`1[System.String]'
-
-    $TypeMapping = @{
-        Error =        [Byte] 1
-        Warning =      [Byte] 2
-        Information =  [Byte] 3
-        SuccessAudit = [Byte] 4
-        FailureAudit = [Byte] 5
+        $CurrentCIMSession = 0
     }
 
-    if ($PSBoundParameters['LogName']) { $FilterComponents.Add("LogFile='$LogName'") }
-    if ($PSBoundParameters['EventIdentifier']) { $FilterComponents.Add("($(($EventIdentifier | ForEach-Object { "EventIdentifier = $_" }) -join ' OR '))") }
-    if ($PSBoundParameters['EntryType']) { $FilterComponents.Add("EventType=$($TypeMapping[$EntryType])") }
-    if ($PSBoundParameters['Before']) { $FilterComponents.Add("TimeGenerated<'$($Before.ToUniversalTime().ToString('yyyyMMddHHmmss.ffffff+000'))'") }
-    if ($PSBoundParameters['After']) { $FilterComponents.Add("TimeGenerated>'$($After.ToUniversalTime().ToString('yyyyMMddHHmmss.ffffff+000'))'") }
-    if ($PSBoundParameters['Message']) { $FilterComponents.Add("Message LIKE '%$($Message)%'") }
-    if ($PSBoundParameters['Source']) { $FilterComponents.Add("SourceName LIKE '%$Source%'") }
-    if ($PSBoundParameters['UserName']) { $FilterComponents.Add("User LIKE '%$UserName%'") }
+    PROCESS {
+        foreach ($Session in $CimSession) {
+            $ComputerName = $Session.ComputerName
+            if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
 
-    if ($FilterComponents.Count) {
-        $Filter = $FilterComponents -join ' AND '
-        $EventLogEntryArgs['Filter'] = $Filter
+            if (-not $PSBoundParameters['NoProgressBar']) {
+                # Display a progress activity for each CIM session
+                Write-Progress -Id 1 -Activity 'CimSweep - Event log entry sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+                $CurrentCIMSession++
+            }
+
+            $CommonArgs = @{}
+
+            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
+
+            $EventLogEntryArgs = @{}
+
+            $FilterComponents = New-Object 'Collections.ObjectModel.Collection`1[System.String]'
+
+            $TypeMapping = @{
+                Error =        [Byte] 1
+                Warning =      [Byte] 2
+                Information =  [Byte] 3
+                SuccessAudit = [Byte] 4
+                FailureAudit = [Byte] 5
+            }
+
+            if ($PSBoundParameters['LogName']) { $FilterComponents.Add("LogFile='$LogName'") }
+            if ($PSBoundParameters['EventIdentifier']) { $FilterComponents.Add("($(($EventIdentifier | ForEach-Object { "EventIdentifier = $_" }) -join ' OR '))") }
+            if ($PSBoundParameters['EntryType']) { $FilterComponents.Add("EventType=$($TypeMapping[$EntryType])") }
+            if ($PSBoundParameters['Before']) { $FilterComponents.Add("TimeGenerated<'$($Before.ToUniversalTime().ToString('yyyyMMddHHmmss.ffffff+000'))'") }
+            if ($PSBoundParameters['After']) { $FilterComponents.Add("TimeGenerated>'$($After.ToUniversalTime().ToString('yyyyMMddHHmmss.ffffff+000'))'") }
+            if ($PSBoundParameters['Message']) { $FilterComponents.Add("Message LIKE '%$($Message)%'") }
+            if ($PSBoundParameters['Source']) { $FilterComponents.Add("SourceName LIKE '%$Source%'") }
+            if ($PSBoundParameters['UserName']) { $FilterComponents.Add("User LIKE '%$UserName%'") }
+
+            if ($FilterComponents.Count) {
+                $Filter = $FilterComponents -join ' AND '
+                $EventLogEntryArgs['Filter'] = $Filter
+            }
+
+            Get-CimInstance -ClassName Win32_NTLogEvent @CommonArgs @EventLogEntryArgs
+        }
     }
-
-    Get-CimInstance @CommonArgs @EventLogEntryArgs -ClassName Win32_NTLogEvent
 }
 
-filter Get-CSMountedVolumeDriveLetter {
+function Get-CSMountedVolumeDriveLetter {
 <#
 .SYNOPSIS
 
@@ -802,12 +865,6 @@ License: BSD 3-Clause
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
 
-.INPUTS
-
-Microsoft.Management.Infrastructure.CimSession
-
-Get-CSMountedVolumeDriveLetter accepts established CIM sessions over the pipeline.
-
 .OUTPUTS
 
 PSObject
@@ -816,36 +873,48 @@ Outputs a list of mounted drive letters.
 #>
 
     param(
-        [Parameter(ValueFromPipeline = $True)]
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
         $CimSession
     )
 
-    $CommonArgs = @{}
+    BEGIN {
+        # If a CIM session is not provided, trick the function into thinking there is one.
+        if (-not $PSBoundParameters['CimSession']) {
+            $CimSession = ''
+        }
+    }
 
-    if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $CimSession }
+    PROCESS {
+        foreach ($Session in $CimSession) {
+            $ComputerName = $Session.ComputerName
+            if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
 
-    $Result = Get-CimInstance @CommonArgs -Query 'SELECT DeviceID FROM Win32_LogicalDisk'
+            $CommonArgs = @{}
 
-    foreach ($Volume in $Result) {
-        if ($Volume.DeviceID) {
-            $Properties = [Ordered] @{
-                DriveLetter = $Volume.DeviceID[0]
-                Path = "$($Volume.DeviceID)\"
-                PSComputerName = $Volume.PSComputerName
-                CimSession = $CimSession
+            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
+
+            $Result = Get-CimInstance -ClassName Win32_LogicalDisk -Property DeviceID @CommonArgs
+
+            foreach ($Volume in $Result) {
+                if ($Volume.DeviceID) {
+                    $DiskInfo = [PSCustomObject] @{
+                        DriveLetter = $Volume.DeviceID[0]
+                        Path = "$($Volume.DeviceID)\"
+                        PSComputerName = $Volume.PSComputerName
+                        CimSession = $CimSession
+                    }
+
+                    $DiskInfo.PSObject.TypeNames.Insert(0, 'CimSweep.DiskInfo')
+                    $DiskInfo
+                }
             }
-
-            $DiskInfo = New-Object -TypeName PSObject -Property $Properties
-            $DiskInfo.PSObject.TypeNames.Insert(0, 'CimSweep.DiskInfo')
-            $DiskInfo
         }
     }
 }
 
-filter Get-CSDirectoryListing {
+function Get-CSDirectoryListing {
 <#
 .SYNOPSIS
 
@@ -858,7 +927,7 @@ License: BSD 3-Clause
 
 Get-CSDirectoryListing performs a WMI/CIM-based file/directory listing of the specified directory.
 
-.PARAMETER Path
+.PARAMETER DirectoryPath
 
 Specifies the directory. Do not include the file name. If a specific file name is desired, specify the file name with the FileName parameter.
 
@@ -914,6 +983,10 @@ Specifies that only files created after the specified date should be returned.
 
 Specifies that only files created before the specified date should be returned.
 
+.PARAMETER File
+
+Specifies that only files should be returned for the specified directory. This is to be used as a performance enhancement for wrapper functions.
+
 .PARAMETER Directory
 
 Specifies that only directories should be listed.
@@ -938,37 +1011,37 @@ Directory listing for the root of each mounted drive.
 
 .EXAMPLE
 
-Get-CSDirectoryListing -Path C:\Windows\System32\ -CimSession $CimSession
+Get-CSDirectoryListing -DirectoryPath C:\Windows\System32\ -CimSession $CimSession
 
 .EXAMPLE
 
-Get-CSDirectoryListing -Path C:\Windows\System32\ -FileName kernel32.dll
+Get-CSDirectoryListing -DirectoryPath C:\Windows\System32\ -FileName kernel32.dll
 
 .EXAMPLE
 
-Get-CSDirectoryListing -Path C:\Windows\System32\Tasks -Recurse
+Get-CSDirectoryListing -DirectoryPath C:\Windows\System32\Tasks -Recurse
 
 .EXAMPLE
 
-$CimSession, $CimSession2 | Get-CSDirectoryListing -Path C:\ -Extension exe, dll, sys -Recurse
+Get-CSDirectoryListing -DirectoryPath C:\ -Extension exe, dll, sys -Recurse -CimSession $CimSession, $CimSession2
 
 .EXAMPLE
 
-Get-CSDirectoryListing -Path C:\Users -Directory | Get-CSDirectoryListing -Extension exe, dll -Recurse
+Get-CSDirectoryListing -DirectoryPath C:\Users -Directory | Get-CSDirectoryListing -Extension exe, dll -Recurse
 
 Lists all EXE and DLL files present in all user directories.
 
 .EXAMPLE
 
-Get-CSDirectoryListing -Path C:\ -Directory -Recurse
+Get-CSDirectoryListing -DirectoryPath C:\ -Directory -Recurse
 
 Lists all directories present in C:\.
 
-.INPUTS
+.EXAMPLE
 
-Microsoft.Management.Infrastructure.CimSession
+Get-CSDirectoryListing 'c:\$recycle.bin' -Recurse
 
-Get-CSDirectoryListing accepts established CIM sessions over the pipeline.
+List all files and directories present in c:\$recycle.bin. Note: single quotes are necessary since PowerShell will attempt to expand "$recycle" by default.
 
 .OUTPUTS
 
@@ -988,7 +1061,7 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
         [Alias('Name')]
         [String]
         [ValidatePattern('^(?<ValidDriveLetter>[A-Za-z]:)(?<ValidPath>\\.*)$')]
-        $Path,
+        $DirectoryPath,
 
         [Parameter(ParameterSetName = 'FileQuery')]
         [ValidateNotNullOrEmpty()]
@@ -1054,6 +1127,10 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
         [ValidateNotNullOrEmpty()]
         $CreationDateBefore,
 
+        [Parameter(ParameterSetName = 'FileQuery')]
+        [Switch]
+        $File,
+
         [Parameter(ParameterSetName = 'DirOnly')]
         [Switch]
         $Directory,
@@ -1064,108 +1141,125 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
         [Switch]
         $Recurse,
 
-        [Parameter(ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
+        [Parameter(ValueFromPipelineByPropertyName = $True)]
         [Alias('Session')]
         [Microsoft.Management.Infrastructure.CimSession[]]
         $CimSession
     )
 
-    $CommonArgs = @{}
-
-    if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $CimSession }
-
-    # Normalize the directory path
-    $TrimmedPath = $Path.TrimEnd('\')
-
-    # The validation regex guarantees that $Path[0] will contain a drive letter
-    $DriveLetter = $TrimmedPath[0]
-    $NewPath = $TrimmedPath.Substring(2)
-
-    # Build targeted Win32_Directory query
-    $Filter = "Drive = `"$($DriveLetter):`" AND Path=`"$($NewPath.Replace('\', '\\'))\\`""
-
-    $DirArguments = @{
-        ClassName = 'Win32_Directory'
-        Filter = $Filter
+    BEGIN {
+        # If a CIM session is not provided, trick the function into thinking there is one.
+        if (-not $PSBoundParameters['CimSession']) {
+            $CimSession = ''
+        }
     }
 
-    # Efficiency improvement: since only file objects will be returned,
-    # only request the Name property to save bandwidth
-    if ($PSCmdlet.ParameterSetName -eq 'FileQuery') { $DirArguments['Property'] = 'Name' }
+    PROCESS {
+        foreach ($Session in $CimSession) {
+            $ComputerName = $Session.ComputerName
+            if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
 
-    # Get all directories present in the specified folder
-    Get-CimInstance @CommonArgs @DirArguments | ForEach-Object {
-        $DirObject = $_
-        $DirObject.PSObject.TypeNames.Insert(0, 'CimSweep.LogicalFile')
+            $CommonArgs = @{}
 
-        # Append the CimSession instance. This enables piping Get-CSDirectoryListing to itself
-        Add-Member -InputObject $DirObject -MemberType NoteProperty -Name CimSession -Value $CimSession
+            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
 
-        # Output the directories present if file query arguments are not present
-        if ($PSCmdlet.ParameterSetName -ne 'FileQuery') { $DirObject }
+            # Normalize the directory path
+            $TrimmedPath = $DirectoryPath.TrimEnd('\')
 
-        if ($PSBoundParameters['Recurse']) {
-            $PSBoundParametersCopy = $PSBoundParameters
+            # The validation regex guarantees that $DirectoryPath[0] will contain a drive letter
+            $DriveLetter = $TrimmedPath[0]
+            $NewPath = $TrimmedPath.Substring(2)
 
-            # Remove the provided Path arg since we're providing the subdirectory
-            $null = $PSBoundParametersCopy.Remove('Path')
+            # Build targeted Win32_Directory query
+            $Filter = "Drive = `"$($DriveLetter):`" AND Path=`"$($NewPath.Replace('\', '\\'))\\`""
 
-            # 1) Match on directories that have three subdirectories of the same name
-            # 2) Match on two sets of identical subdirectories to a parent directory.
-            # Thanks to Lee Holmes for the suggestions!
-            # Since Win32_Directory doesn't capture if a directory is a symlink, 
-            if ((-not $PSBoundParameters['DoNotDetectRecursiveDirs']) -and (($DirObject.Name -match '^.*(\\[^\\]+)\1\1\1$') -or ($DirObject.Name -match '\\([^\\]+)\\([^\\]+)\\(.*\\\1\\\2){2}$'))) {
-                Write-Warning "Possible self-referential directory detected! Directory path: $($DirObject.Name)"
-            } else {
-                Get-CSDirectoryListing @PSBoundParametersCopy -Path $DirObject.Name
+            $DirArguments = @{
+                ClassName = 'Win32_Directory'
+                Filter = $Filter
             }
-        }
-    }
 
-    if (-not $PSBoundParameters['Directory']) {
-        $FilterComponents = New-Object 'Collections.ObjectModel.Collection`1[System.String]'
+            # Efficiency improvement: since only file objects will be returned,
+            # only request the Name property to save bandwidth
+            if ($PSCmdlet.ParameterSetName -eq 'FileQuery') { $DirArguments['Property'] = 'Name' }
 
-        # To do: to make exact datetime matches more usable, I may need to not account for milliseconds
-        # and scan for a range that matched within the second.
-        $DmtfFormat = 'yyyyMMddHHmmss.ffffff+000'
+            # Only obtain directory information if -File was not specified
+            if (-not $PSBoundParameters['File']) {
+                # Get all directories present in the specified folder
+                Get-CimInstance @CommonArgs @DirArguments | ForEach-Object {
+                    $DirObject = $_
+                    $DirObject.PSObject.TypeNames.Insert(0, 'CimSweep.LogicalFile')
 
-        if ($PSBoundParameters['FileName']) { $FilterComponents.Add("($(($FileName | ForEach-Object { "Name=``"$($TrimmedPath.Replace('\', '\\'))\\$_``"" }) -join ' OR '))") }
-        if ($PSBoundParameters['FileSize']) { $FilterComponents.Add("($(($FileSize | ForEach-Object { "FileSize = $_" }) -join ' OR '))") }
-        if ($PSBoundParameters['Extension']) { $FilterComponents.Add("($(($Extension | ForEach-Object { "Extension =``"$_``"" }) -join ' OR '))") }
-        if ($PSBoundParameters['LastModified']) { $FilterComponents.Add("LastModified=`"$($LastModified.ToUniversalTime().ToString($DmtfFormat))`"") }
-        if ($PSBoundParameters['LastModifiedBefore']) { $FilterComponents.Add("LastModified<`"$($LastModifiedBefore.ToUniversalTime().ToString($DmtfFormat))`"") }
-        if ($PSBoundParameters['LastModifiedAfter']) { $FilterComponents.Add("LastModified>`"$($LastModifiedAfter.ToUniversalTime().ToString($DmtfFormat))`"") }
-        if ($PSBoundParameters['LastAccessed']) { $FilterComponents.Add("LastAccessed=`"$($LastAccessed.ToUniversalTime().ToString($DmtfFormat))`"") }
-        if ($PSBoundParameters['LastAccessedBefore']) { $FilterComponents.Add("LastAccessed<`"$($LastAccessedBefore.ToUniversalTime().ToString($DmtfFormat))`"") }
-        if ($PSBoundParameters['LastAccessedAfter']) { $FilterComponents.Add("LastAccessed>`"$($LastAccessedAfter.ToUniversalTime().ToString($DmtfFormat))`"") }
-        if ($PSBoundParameters['CreationDate']) { $FilterComponents.Add("CreationDate=`"$($CreationDate.ToUniversalTime().ToString($DmtfFormat))`"") }
-        if ($PSBoundParameters['CreationDateBefore']) { $FilterComponents.Add("CreationDate<`"$($CreationDateBefore.ToUniversalTime().ToString($DmtfFormat))`"") }
-        if ($PSBoundParameters['CreationDateAfter']) { $FilterComponents.Add("CreationDate>`"$($CreationDateAfter.ToUniversalTime().ToString($DmtfFormat))`"") }
-        if ($PSBoundParameters['CreationDateAfter']) { $FilterComponents.Add('Hidden = "True"') }
+                    # Append the CimSession instance. This enables piping Get-CSDirectoryListing to itself
+                    Add-Member -InputObject $DirObject -MemberType NoteProperty -Name CimSession -Value $CimSession
 
-        $FileFilter = $null
+                    # Output the directories present if file query arguments are not present
+                    if ($PSCmdlet.ParameterSetName -ne 'FileQuery') { $DirObject }
 
-        # Join all the WQL query components
-        if ($FilterComponents.Count) {
-            $FileFilter = ' AND ' + ($FilterComponents -join ' AND ')
-        }
+                    if ($PSBoundParameters['Recurse']) {
+                        $PSBoundParametersCopy = $PSBoundParameters
 
-        $FileArguments = @{
-            ClassName = 'CIM_DataFile'
-            Filter = $DirArguments['Filter'] + $FileFilter
-        }
+                        # Remove the provided Path arg since we're providing the subdirectory
+                        $null = $PSBoundParametersCopy.Remove('DirectoryPath')
 
-        # Get all files present in the specified folder
-        Get-CimInstance @CommonArgs @FileArguments | ForEach-Object {
-            $Object = $_
-            $Object.PSObject.TypeNames.Insert(0, 'CimSweep.LogicalFile')
-            Add-Member -InputObject $Object -MemberType NoteProperty -Name CimSession -Value $CimSession
-            $Object
+                        # 1) Match on directories that have three subdirectories of the same name
+                        # 2) Match on two sets of identical subdirectories to a parent directory.
+                        # Thanks to Lee Holmes for the suggestions!
+                        # Since Win32_Directory doesn't capture if a directory is a symlink, 
+                        if ((-not $PSBoundParameters['DoNotDetectRecursiveDirs']) -and (($DirObject.Name -match '^.*(\\[^\\]+)\1\1\1$') -or ($DirObject.Name -match '\\([^\\]+)\\([^\\]+)\\(.*\\\1\\\2){2}$'))) {
+                            Write-Warning "[$ComputerName] Possible self-referential directory detected! Directory path: $($DirObject.Name)"
+                        } else {
+                            Get-CSDirectoryListing @PSBoundParametersCopy -DirectoryPath $DirObject.Name
+                        }
+                    }
+                }
+            }
+
+            if (-not $PSBoundParameters['Directory']) {
+                $FilterComponents = New-Object 'Collections.ObjectModel.Collection`1[System.String]'
+
+                # To do: to make exact datetime matches more usable, I may need to not account for milliseconds
+                # and scan for a range that matched within the second.
+                $DmtfFormat = 'yyyyMMddHHmmss.ffffff+000'
+
+                if ($PSBoundParameters['FileName']) { $FilterComponents.Add("($(($FileName | ForEach-Object { "Name=``"$($TrimmedPath.Replace('\', '\\'))\\$_``"" }) -join ' OR '))") }
+                if ($PSBoundParameters['FileSize']) { $FilterComponents.Add("($(($FileSize | ForEach-Object { "FileSize = $_" }) -join ' OR '))") }
+                if ($PSBoundParameters['Extension']) { $FilterComponents.Add("($(($Extension | ForEach-Object { "Extension =``"$_``"" }) -join ' OR '))") }
+                if ($PSBoundParameters['LastModified']) { $FilterComponents.Add("LastModified=`"$($LastModified.ToUniversalTime().ToString($DmtfFormat))`"") }
+                if ($PSBoundParameters['LastModifiedBefore']) { $FilterComponents.Add("LastModified<`"$($LastModifiedBefore.ToUniversalTime().ToString($DmtfFormat))`"") }
+                if ($PSBoundParameters['LastModifiedAfter']) { $FilterComponents.Add("LastModified>`"$($LastModifiedAfter.ToUniversalTime().ToString($DmtfFormat))`"") }
+                if ($PSBoundParameters['LastAccessed']) { $FilterComponents.Add("LastAccessed=`"$($LastAccessed.ToUniversalTime().ToString($DmtfFormat))`"") }
+                if ($PSBoundParameters['LastAccessedBefore']) { $FilterComponents.Add("LastAccessed<`"$($LastAccessedBefore.ToUniversalTime().ToString($DmtfFormat))`"") }
+                if ($PSBoundParameters['LastAccessedAfter']) { $FilterComponents.Add("LastAccessed>`"$($LastAccessedAfter.ToUniversalTime().ToString($DmtfFormat))`"") }
+                if ($PSBoundParameters['CreationDate']) { $FilterComponents.Add("CreationDate=`"$($CreationDate.ToUniversalTime().ToString($DmtfFormat))`"") }
+                if ($PSBoundParameters['CreationDateBefore']) { $FilterComponents.Add("CreationDate<`"$($CreationDateBefore.ToUniversalTime().ToString($DmtfFormat))`"") }
+                if ($PSBoundParameters['CreationDateAfter']) { $FilterComponents.Add("CreationDate>`"$($CreationDateAfter.ToUniversalTime().ToString($DmtfFormat))`"") }
+                if ($PSBoundParameters['CreationDateAfter']) { $FilterComponents.Add('Hidden = "True"') }
+
+                $FileFilter = $null
+
+                # Join all the WQL query components
+                if ($FilterComponents.Count) {
+                    $FileFilter = ' AND ' + ($FilterComponents -join ' AND ')
+                }
+
+                $FileArguments = @{
+                    ClassName = 'CIM_DataFile'
+                    Filter = $DirArguments['Filter'] + $FileFilter
+                }
+
+                # Get all files present in the specified folder
+                Get-CimInstance @CommonArgs @FileArguments | ForEach-Object {
+                    $Object = $_
+                    $Object.PSObject.TypeNames.Insert(0, 'CimSweep.LogicalFile')
+                    Add-Member -InputObject $Object -MemberType NoteProperty -Name CimSession -Value $CimSession
+                    $Object
+                }
+            }
         }
     }
 }
 
-filter Get-CSService {
+function Get-CSService {
 <#
 .SYNOPSIS
 
@@ -1206,6 +1300,10 @@ Specifies the full path or a portion of the path to the service binary file that
 
 Specifies the service description.
 
+.PARAMETER NoProgressBar
+
+Do not display a progress bar. This parameter is designed to be used with wrapper functions.
+
 .PARAMETER CimSession
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
@@ -1228,17 +1326,11 @@ Get-CSService -ServiceType 'Kernel Driver'
 
 Get-CSService -PathName svchost.exe
 
-.INPUTS
-
-Microsoft.Management.Infrastructure.CimSession
-
-Get-CSService accepts established CIM sessions over the pipeline.
-
 .OUTPUTS
 
 Microsoft.Management.Infrastructure.CimInstance
 
-Outputs Win32_Service instances.
+Outputs Win32_Service or Win32_SystemDriver instances both of which derive from Win32_BaseService.
 #>
 
     [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
@@ -1271,38 +1363,65 @@ Outputs Win32_Service instances.
         [ValidateNotNullOrEmpty()]
         $Description,
 
-        [Parameter(ValueFromPipeline = $True)]
+        [Switch]
+        $NoProgressBar,
+
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
         $CimSession
     )
 
-    $CommonArgs = @{}
+    BEGIN {
+        # If a CIM session is not provided, trick the function into thinking there is one.
+        if (-not $PSBoundParameters['CimSession']) {
+            $CimSession = ''
+            $CIMSessionCount = 1
+        } else {
+            $CIMSessionCount = $CimSession.Count
+        }
 
-    if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $CimSession }
-
-    $FilterComponents = New-Object 'Collections.ObjectModel.Collection`1[System.String]'
-
-    $ServiceEntryArgs = @{}
-
-    if ($PSBoundParameters['Name']) { $FilterComponents.Add("Name LIKE '%$Name%'") }
-    if ($PSBoundParameters['DisplayName']) { $FilterComponents.Add("DisplayName LIKE '%$DisplayName%'") }
-    if ($PSBoundParameters['State']) { $FilterComponents.Add("State = '$State'") }
-    if ($PSBoundParameters['StartMode']) { $FilterComponents.Add("StartMode = '$StartMode'") }
-    if ($PSBoundParameters['ServiceType']) { $FilterComponents.Add("ServiceType = '$ServiceType'") }
-    if ($PSBoundParameters['PathName']) { $FilterComponents.Add("PathName LIKE '%$PathName%'") }
-    if ($PSBoundParameters['Description']) { $FilterComponents.Add("Description LIKE '%$Description%'") }
-
-    if ($FilterComponents.Count) {
-        $Filter = $FilterComponents -join ' AND '
-        $ServiceEntryArgs['Filter'] = $Filter
+        $CurrentCIMSession = 0
     }
 
-    Get-CimInstance @CommonArgs @ServiceEntryArgs -ClassName Win32_BaseService
+    PROCESS {
+        foreach ($Session in $CimSession) {
+            $ComputerName = $Session.ComputerName
+            if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
+
+            if (-not $PSBoundParameters['NoProgressBar']) {
+                # Display a progress activity for each CIM session
+                Write-Progress -Id 1 -Activity 'CimSweep - Service sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+                $CurrentCIMSession++
+            }
+
+            $CommonArgs = @{}
+
+            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
+
+            $FilterComponents = New-Object 'Collections.ObjectModel.Collection`1[System.String]'
+
+            $ServiceEntryArgs = @{}
+
+            if ($PSBoundParameters['Name']) { $FilterComponents.Add("Name LIKE '%$Name%'") }
+            if ($PSBoundParameters['DisplayName']) { $FilterComponents.Add("DisplayName LIKE '%$DisplayName%'") }
+            if ($PSBoundParameters['State']) { $FilterComponents.Add("State = '$State'") }
+            if ($PSBoundParameters['StartMode']) { $FilterComponents.Add("StartMode = '$StartMode'") }
+            if ($PSBoundParameters['ServiceType']) { $FilterComponents.Add("ServiceType = '$ServiceType'") }
+            if ($PSBoundParameters['PathName']) { $FilterComponents.Add("PathName LIKE '%$PathName%'") }
+            if ($PSBoundParameters['Description']) { $FilterComponents.Add("Description LIKE '%$Description%'") }
+
+            if ($FilterComponents.Count) {
+                $Filter = $FilterComponents -join ' AND '
+                $ServiceEntryArgs['Filter'] = $Filter
+            }
+
+            Get-CimInstance -ClassName Win32_BaseService @CommonArgs @ServiceEntryArgs
+        }
+    }
 }
 
-filter Get-CSProcess {
+function Get-CSProcess {
 <#
 .SYNOPSIS
 
@@ -1335,6 +1454,10 @@ Specifies the command line used to start a specific process, if applicable.
 
 Specifies the path to the executable file of the process.
 
+.PARAMETER NoProgressBar
+
+Do not display a progress bar. This parameter is designed to be used with wrapper functions.
+
 .PARAMETER CimSession
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
@@ -1350,12 +1473,6 @@ Get-CSProcess -Name chrome
 .EXAMPLE
 
 Get-CSProcess -ProcessID 4 -CimSession $CimSession
-
-.INPUTS
-
-Microsoft.Management.Infrastructure.CimSession
-
-Get-CSProcess accepts established CIM sessions over the pipeline.
 
 .OUTPUTS
 
@@ -1385,6 +1502,9 @@ Outputs Win32_Process instances.
         [ValidateNotNullOrEmpty()]
         $ExecutablePath,
 
+        [Switch]
+        $NoProgressBar,
+
         [Parameter(ValueFromPipeline = $True)]
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
@@ -1392,29 +1512,54 @@ Outputs Win32_Process instances.
         $CimSession
     )
 
-    $CommonArgs = @{}
+    BEGIN {
+        # If a CIM session is not provided, trick the function into thinking there is one.
+        if (-not $PSBoundParameters['CimSession']) {
+            $CimSession = ''
+            $CIMSessionCount = 1
+        } else {
+            $CIMSessionCount = $CimSession.Count
+        }
 
-    if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $CimSession }
-
-    $FilterComponents = New-Object 'Collections.ObjectModel.Collection`1[System.String]'
-
-    $ServiceEntryArgs = @{}
-
-    if ($PSBoundParameters['Name']) { $FilterComponents.Add("Name LIKE '%$Name%'") }
-    if ($PSBoundParameters['ProcessID']) { $FilterComponents.Add("ProcessID = $ProcessID") }
-    if ($PSBoundParameters['ParentProcessID']) { $FilterComponents.Add("ParentProcessID = $ParentProcessID") }
-    if ($PSBoundParameters['CommandLine']) { $FilterComponents.Add("CommandLine LIKE '%$CommandLine%'") }
-    if ($PSBoundParameters['ExecutablePath']) { $FilterComponents.Add("ExecutablePath LIKE '%$ExecutablePath%'") }
-
-    if ($FilterComponents.Count) {
-        $Filter = $FilterComponents -join ' AND '
-        $ServiceEntryArgs['Filter'] = $Filter
+        $CurrentCIMSession = 0
     }
 
-    Get-CimInstance @CommonArgs @ServiceEntryArgs -ClassName Win32_Process
+    PROCESS {
+        foreach ($Session in $CimSession) {
+            $ComputerName = $Session.ComputerName
+            if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
+
+            if (-not $PSBoundParameters['NoProgressBar']) {
+                # Display a progress activity for each CIM session
+                Write-Progress -Id 1 -Activity 'CimSweep - Process sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+                $CurrentCIMSession++
+            }
+
+            $CommonArgs = @{}
+
+            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
+
+            $FilterComponents = New-Object 'Collections.ObjectModel.Collection`1[System.String]'
+
+            $ProcessEntryArgs = @{}
+
+            if ($PSBoundParameters['Name']) { $FilterComponents.Add("Name LIKE '%$Name%'") }
+            if ($PSBoundParameters['ProcessID']) { $FilterComponents.Add("ProcessID = $ProcessID") }
+            if ($PSBoundParameters['ParentProcessID']) { $FilterComponents.Add("ParentProcessID = $ParentProcessID") }
+            if ($PSBoundParameters['CommandLine']) { $FilterComponents.Add("CommandLine LIKE '%$CommandLine%'") }
+            if ($PSBoundParameters['ExecutablePath']) { $FilterComponents.Add("ExecutablePath LIKE '%$ExecutablePath%'") }
+
+            if ($FilterComponents.Count) {
+                $Filter = $FilterComponents -join ' AND '
+                $ProcessEntryArgs['Filter'] = $Filter
+            }
+
+            Get-CimInstance -ClassName Win32_Process @CommonArgs @ProcessEntryArgs
+        }
+    }
 }
 
-filter Get-CSEnvironmentVariable {
+function Get-CSEnvironmentVariable {
 <#
 .SYNOPSIS
 
@@ -1427,70 +1572,186 @@ License: BSD 3-Clause
 
 Get-CSEnvironmentVariable returns all system and user environment variables. Get-CSEnvironmentVariable doesn't rely upon the Win32_Environment class as it doesn't return all environment variables.
 
+.PARAMETER VariableName
+
+Specifies a specific environment variable name. If no environment variable name is specified, all variables are returned.
+
+.PARAMETER SystemVariable
+
+Specifies that only system-scope environment variables should be returned.
+
+.PARAMETER UserVariable
+
+Specifies that only user-scope environment variables should be returned.
+
+.PARAMETER NoProgressBar
+
+Do not display a progress bar. This parameter is designed to be used with wrapper functions.
+
 .PARAMETER CimSession
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
 
-.INPUTS
-
-Microsoft.Management.Infrastructure.CimSession
-
-Get-CSEnvironmentVariable accepts established CIM sessions over the pipeline.
 #>
 
+    [CmdletBinding(DefaultParameterSetName = 'Default')]
     param(
-        [Parameter(ValueFromPipeline = $True)]
+        [Parameter(ParameterSetName = 'Default')]
+        [Parameter(ParameterSetName = 'System')]
+        [Parameter(ParameterSetName = 'User')]
+        [String]
+        [ValidateNotNullOrEmpty()]
+        $VariableName,
+
+        [Parameter(Mandatory = $True, ParameterSetName = 'System')]
+        [Switch]
+        $SystemVariable,
+
+        [Parameter(Mandatory = $True, ParameterSetName = 'User')]
+        [Switch]
+        $UserVariable,
+
+        [Switch]
+        $NoProgressBar,
+
+        [Parameter(ParameterSetName = 'Default')]
+        [Parameter(ParameterSetName = 'System')]
+        [Parameter(ParameterSetName = 'User')]
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
         $CimSession
     )
 
-    $CommonArgs = @{}
-
-    if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $CimSession }
-
-    $SystemEnvPath = 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment'
-
-    Get-CSRegistryValue -Hive HKLM -SubKey $SystemEnvPath @CommonArgs | ForEach-Object {
-        $Properties = [Ordered] @{
-            Name = $_.ValueName
-            UserName = '<SYSTEM>'
-            VariableValue = $_.ValueContent
+    BEGIN {
+        # If a CIM session is not provided, trick the function into thinking there is one.
+        if (-not $PSBoundParameters['CimSession']) {
+            $CimSession = ''
+            $CIMSessionCount = 1
+        } else {
+            $CIMSessionCount = $CimSession.Count
         }
 
-        if ($_.PSComputerName) { $Properties['PSComputerName'] = $_.PSComputerName }
+        $CurrentCIMSession = 0
 
-        New-Object -TypeName PSObject -Property $Properties
+        $SystemEnvPath = 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment'
     }
 
-    # Get the SIDS for each user in the registry
-    $HKUSIDs = Get-HKUSID @CommonArgs
+    PROCESS {
+        foreach ($Session in $CimSession) {
+            $ComputerName = $Session.ComputerName
+            if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
 
-    # Iterate over each local user hive
-    foreach ($SID in $HKUSIDs.Keys) {
-        Get-CSRegistryValue -Hive HKU -SubKey "$SID\Environment" @CommonArgs | ForEach-Object {
-            $Properties = [Ordered] @{
-                Name = $_.ValueName
-                UserName = $HKUSIDs[$SID]
-                VariableValue = $_.ValueContent
+            if (-not $PSBoundParameters['NoProgressBar']) {
+                # Display a progress activity for each CIM session
+                Write-Progress -Id 1 -Activity 'CimSweep - environment variable sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+                $CurrentCIMSession++
             }
 
-            if ($_.PSComputerName) { $Properties['PSComputerName'] = $_.PSComputerName }
+            $CommonArgs = @{}
 
-            New-Object -TypeName PSObject -Property $Properties
-        }
+            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
 
-        Get-CSRegistryValue -Hive HKU -SubKey "$SID\Volatile Environment" @CommonArgs | ForEach-Object {
-            $Properties = [Ordered] @{
-                Name = $_.ValueName
-                UserName = $HKUSIDs[$SID]
-                VariableValue = $_.ValueContent
+            # Performance enhancements are realized when specifying a specific environment variable name.
+            if ($PSBoundParameters['VariableName']) {
+                if (($PSCmdlet.ParameterSetName -eq 'System') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
+                    $Result = Get-CSRegistryValue -Hive HKLM -SubKey $SystemEnvPath -ValueName $VariableName -ValueType REG_SZ @CommonArgs
+
+                    if ($Result.ValueContent) {
+                        $EnvVarInfo = [PSCustomObject] @{
+                            Name = $Result.ValueName
+                            User = '<SYSTEM>'
+                            VariableValue = $Result.ValueContent
+                            PSComputerName = $null
+                        }
+
+                        if ($Result.PSComputerName) { $EnvVarInfo.PSComputerName = $Result.PSComputerName }
+                        $EnvVarInfo
+                    }
+                }
+
+                if (($PSCmdlet.ParameterSetName -eq 'User') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
+                    # Get the SIDS for each user in the registry
+                    $HKUSIDs = Get-HKUSID @CommonArgs
+
+                    # Iterate over each local user hive
+                    foreach ($SID in $HKUSIDs) {
+                        $Result = Get-CSRegistryValue -Hive HKU -SubKey "$SID\Volatile Environment" -ValueName $VariableName -ValueType REG_SZ @CommonArgs
+
+                        if ($Result.ValueContent) {
+                            $EnvVarInfo = [PSCustomObject] @{
+                                Name = $Result.ValueName
+                                User = $SID
+                                VariableValue = $Result.ValueContent
+                                PSComputerName = $null
+                            }
+
+                            if ($Result.PSComputerName) { $EnvVarInfo.PSComputerName = $Result.PSComputerName }
+                            $EnvVarInfo
+                        } else {
+                            $Result = Get-CSRegistryValue -Hive HKU -SubKey "$SID\Environment" -ValueName $VariableName -ValueType REG_SZ @CommonArgs
+
+                            if ($Result.ValueContent) {
+                                $EnvVarInfo = [PSCustomObject] @{
+                                    Name = $Result.ValueName
+                                    User = $SID
+                                    VariableValue = $Result.ValueContent
+                                    PSComputerName = $null
+                                }
+
+                                if ($Result.PSComputerName) { $EnvVarInfo.PSComputerName = $Result.PSComputerName }
+                                $EnvVarInfo
+                            }
+                        }
+                    }
+                }
+            } else { # Retrieve all environment variables
+                if (($PSCmdlet.ParameterSetName -eq 'System') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
+                    Get-CSRegistryValue -Hive HKLM -SubKey $SystemEnvPath @CommonArgs | ForEach-Object {
+                        $EnvVarInfo = [PSCustomObject] @{
+                            Name = $_.ValueName
+                            User = '<SYSTEM>'
+                            VariableValue = $_.ValueContent
+                            PSComputerName = $null
+                        }
+
+                        if ($_.PSComputerName) { $EnvVarInfo.PSComputerName = $_.PSComputerName }
+                        $EnvVarInfo
+                    }
+                }
+
+                if (($PSCmdlet.ParameterSetName -eq 'User') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
+                    # Get the SIDS for each user in the registry
+                    $HKUSIDs = Get-HKUSID @CommonArgs
+
+                    # Iterate over each local user hive
+                    foreach ($SID in $HKUSIDs) {
+                        Get-CSRegistryValue -Hive HKU -SubKey "$SID\Volatile Environment" @CommonArgs | ForEach-Object {
+                            $EnvVarInfo = [PSCustomObject] @{
+                                Name = $_.ValueName
+                                User = $SID
+                                VariableValue = $_.ValueContent
+                                PSComputerName = $null
+                            }
+
+                            if ($_.PSComputerName) { $EnvVarInfo.PSComputerName = $_.PSComputerName }
+                            $EnvVarInfo
+                        }
+
+                        Get-CSRegistryValue -Hive HKU -SubKey "$SID\Environment" @CommonArgs | ForEach-Object {
+                            $EnvVarInfo = [PSCustomObject] @{
+                                Name = $_.ValueName
+                                User = $SID
+                                VariableValue = $_.ValueContent
+                                PSComputerName = $null
+                            }
+
+                            if ($_.PSComputerName) { $EnvVarInfo.PSComputerName = $_.PSComputerName }
+                            $EnvVarInfo
+                        }
+                    }
+                }
             }
-
-            if ($_.PSComputerName) { $Properties['PSComputerName'] = $_.PSComputerName }
-
-            New-Object -TypeName PSObject -Property $Properties
         }
     }
 }

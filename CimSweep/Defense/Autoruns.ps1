@@ -11,6 +11,58 @@ License: BSD 3-Clause
 
 Get-CSRegistryAutoStart lists autorun points present in the registry locally or remotely.
 
+Get-CSRegistryAutoStart was heavily influenced by the great PowerShell autoruns function written by Emin Atac (@p0w3rsh3ll) - https://github.com/p0w3rsh3ll/AutoRuns. Emin's version is ideal for use locally and when PowerShell remoting is enabled. Get-CSRegistryAutoStart can retrieve autoruns information remotely from systems regardless of the presense of PowerShell.
+
+Each switch argument in Get-CSRegistryAutoStart represents the corresponding tab in autoruns.exe.
+
+.PARAMETER Logon
+
+Retrieve logon artifacts
+
+.PARAMETER LSAProviders
+
+Retrieve LSA provider artifacts
+
+.PARAMETER ImageHijacks
+
+Retrieve image hijack artifacts
+
+.PARAMETER AppInit
+
+Retrieve appinit artifacts
+
+.PARAMETER KnownDLLs
+
+Retrieve KnownDLL artifacts
+
+.PARAMETER Winlogon
+
+Retrieve winlogon artifacts
+
+.PARAMETER Services
+
+Retrieve service artifacts. Get-CSService is a more efficient means of retrieving service information.
+
+.PARAMETER Drivers
+
+Retrieve service driver artifacts. Get-CSService is a more efficient means of retrieving service information.
+
+.PARAMETER PrintMonitors
+
+Retrieve print monitor artifacts
+
+.PARAMETER NetworkProviders
+
+Retrieve network provider artifacts
+
+.PARAMETER BootExecute
+
+Retrieve boot execute artifacts
+
+.PARAMETER NoProgressBar
+
+Do not display a progress bar. This parameter is designed to be used with wrapper functions.
+
 .PARAMETER CimSession
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
@@ -68,6 +120,9 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
         [Switch]
         $BootExecute,
 
+        [Switch]
+        $NoProgressBar,
+
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
@@ -75,15 +130,28 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
     )
 
     BEGIN {
+        # If a CIM session is not provided, trick the function into thinking there is one.
         if (-not $PSBoundParameters['CimSession']) {
             $CimSession = ''
-            $SessionCount = 1
+            $CIMSessionCount = 1
         } else {
-            $SessionCount = $CimSession.Count
+            $CIMSessionCount = $CimSession.Count
         }
 
-        $Current = 0
+        $CurrentCIMSession = 0
 
+        $ParamCopy = $PSBoundParameters
+        $null = $ParamCopy.Remove('CimSession')
+        $null = $ParamCopy.Remove('NoProgressBar')
+
+        # Count the number of options provided for use of displaying a progress bar
+        $AutoRunOptionCount = $ParamCopy.Keys.Count
+
+        # All checks want to be performed.
+        # There is likely a better way of obtaining the number of params in the 'SpecificCheck' param set
+        if (-not $AutoRunOptionCount) { $AutoRunOptionCount = 11 }
+
+        # Helper function that maps a registry autorun artifact roughly to that of autoruns.exe output.
         filter New-AutoRunsEntry {
             Param (
                 [Parameter(Position = 0, ValueFromPipelineByPropertyName = $True)]
@@ -125,8 +193,16 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
 
     PROCESS {
         foreach ($Session in $CimSession) {
-            Write-Progress -Activity 'CimSweep - Registry autoruns sweep' -Status "($($Current+1)/$($SessionCount)) Current computer: $($Session.ComputerName)" -PercentComplete (($Current / $SessionCount) * 100)
-            $Current++
+            $CurrentAutorunCount = 0
+
+            $ComputerName = $Session.ComputerName
+            if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
+
+            if (-not $PSBoundParameters['NoProgressBar']) {
+                # Display a progress activity for each CIM session
+                Write-Progress -Id 1 -Activity 'CimSweep - Registry autoruns sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+                $CurrentCIMSession++
+            }
 
             $CommonArgs = @{}
 
@@ -137,6 +213,11 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
 
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['Logon']) {
                 $Category = 'Logon'
+
+                if (-not $PSBoundParameters['NoProgressBar']) {
+                    Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
+                    $CurrentAutorunCount++
+                }
 
                 Get-CSRegistryValue -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\Wds\rdpwd' -ValueName StartupPrograms @CommonArgs |
                     New-AutoRunsEntry -Category $Category
@@ -174,7 +255,7 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
                         New-AutoRunsEntry -Category $Category
 
                     # Iterate over each local user hive
-                    foreach ($SID in $HKUSIDs.Keys) {
+                    foreach ($SID in $HKUSIDs) {
                         Get-CSRegistryValue -Hive HKU -SubKey "$SID\$AutoStartPath" @CommonArgs |
                             New-AutoRunsEntry -Category $Category
                     }
@@ -199,6 +280,11 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['BootExecute']) {
                 $Category = 'BootExecute'
 
+                if (-not $PSBoundParameters['NoProgressBar']) {
+                    Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
+                    $CurrentAutorunCount++
+                }
+
                 Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\Session Manager' -ValueNameOnly @CommonArgs |
                     Where-Object { ('BootExecute','SetupExecute','Execute','S0InitialCommand') -contains $_.ValueName } | ForEach-Object {
                         $_ | Get-CSRegistryValue | Where-Object { $_.ValueContent.Count } |
@@ -212,6 +298,11 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['PrintMonitors']) {
                 $Category = 'PrintMonitors'
 
+                if (-not $PSBoundParameters['NoProgressBar']) {
+                    Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
+                    $CurrentAutorunCount++
+                }
+
                 Get-CSRegistryKey -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\Print\Monitors' @CommonArgs | Get-CSRegistryValue -ValueName Driver | ForEach-Object {
                     $_ | New-AutoRunsEntry -SubKey 'SYSTEM\CurrentControlSet\Control\Print\Monitors' -AutoRunEntry $_.SubKey.Split('\')[-1] -Category $Category
                 }
@@ -219,6 +310,11 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
 
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['NetworkProviders']) {
                 $Category = 'NetworkProviders'
+
+                if (-not $PSBoundParameters['NoProgressBar']) {
+                    Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
+                    $CurrentAutorunCount++
+                }
 
                 $NetworkOrder = Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\NetworkProvider\Order' -ValueName ProviderOrder @CommonArgs
 
@@ -232,7 +328,7 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['Services'] -or $PSBoundParameters['Drivers']) {
                 $ServiceKeys = Get-CSRegistryKey -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Services' @CommonArgs
 
-                $ServiceKeys | Get-CSRegistryValue -ValueName 'Type' @CommonArgs | ForEach {
+                $ServiceKeys | Get-CSRegistryValue -ValueName 'Type' @CommonArgs | ForEach-Object {
                     $SERVICE_KERNEL_DRIVER = 1
                     $SERVICE_FILE_SYSTEM_DRIVER = 2
                     $SERVICE_WIN32_OWN_PROCESS = 0x10
@@ -243,6 +339,11 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
                     if ($PSBoundParameters['Drivers'] -and ($_.ValueContent -eq $SERVICE_KERNEL_DRIVER -or $_.ValueContent -eq $SERVICE_FILE_SYSTEM_DRIVER)) {
                         $Category = 'Drivers'
 
+                        if (-not $PSBoundParameters['NoProgressBar']) {
+                            Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
+                            $CurrentAutorunCount++
+                        }
+
                         $ImagePath = ($_ | Get-CSRegistryValue -ValueName ImagePath @CommonArgs).ValueContent
 
                         New-AutoRunsEntry HKLM 'SYSTEM\CurrentControlSet\Services' $ServiceShortName $ImagePath $Category $_.PSComputerName
@@ -250,6 +351,11 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
 
                     if ($PSBoundParameters['Services']) {
                         $Category = 'Services'
+
+                        if (-not $PSBoundParameters['NoProgressBar']) {
+                            Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
+                            $CurrentAutorunCount++
+                        }
 
                         if ($_.ValueContent -eq $SERVICE_WIN32_OWN_PROCESS) {
                             $ImagePath = ($_ | Get-CSRegistryValue -ValueName ImagePath @CommonArgs).ValueContent
@@ -272,6 +378,11 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['LSAProviders']) {
                 $Category = 'LSAProviders'
 
+                if (-not $PSBoundParameters['NoProgressBar']) {
+                    Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
+                    $CurrentAutorunCount++
+                }
+
                 $SecProviders = Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\SecurityProviders' @CommonArgs
                 $SecProviders | New-AutoRunsEntry -ImagePath "$($SecProviders.ValueContent)" -Category $Category
 
@@ -288,6 +399,11 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['ImageHijacks']) {
                 $Category = 'ImageHijacks'
 
+                if (-not $PSBoundParameters['NoProgressBar']) {
+                    Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
+                    $CurrentAutorunCount++
+                }
+
                 $CommonKeys = @(
                     'SOFTWARE\Classes\htmlfile\shell\open\command',
                     'SOFTWARE\Classes\htafile\shell\open\command',
@@ -302,7 +418,7 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
                         New-AutoRunsEntry -AutoRunEntry $CommonKey.Split('\')[2] -Category $Category
 
                     # Iterate over each local user hive
-                    foreach ($SID in $HKUSIDs.Keys) {
+                    foreach ($SID in $HKUSIDs) {
                         Get-CSRegistryValue -Hive HKU -SubKey "$SID\$CommonKey" -ValueName '' @CommonArgs |
                             New-AutoRunsEntry -AutoRunEntry $CommonKey.Split('\')[2] -Category $Category
                     }
@@ -312,8 +428,8 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
                     New-AutoRunsEntry -Category $Category
 
                 $null, 'Wow6432Node\' | ForEach-Object {
-                    Get-CSRegistryKey -Hive HKLM -SubKey "SOFTWARE\$($_)Microsoft\Windows NT\CurrentVersion\Image File Execution Options" |
-                        Get-CSRegistryValue -ValueName Debugger @CommonArgs | ForEach-Object {
+                    Get-CSRegistryKey -Hive HKLM -SubKey "SOFTWARE\$($_)Microsoft\Windows NT\CurrentVersion\Image File Execution Options" @CommonArgs |
+                        Get-CSRegistryValue -ValueName Debugger | ForEach-Object {
                             $_ | New-AutoRunsEntry -AutoRunEntry $_.SubKey.Substring($_.SubKey.LastIndexOf('\') + 1) -Category $Category
                         }
 
@@ -341,7 +457,7 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
                     }
                 }
 
-                foreach ($SID in $HKUSIDs.Keys) {
+                foreach ($SID in $HKUSIDs) {
                     Get-CSRegistryValue -Hive HKU -SubKey "$SID\SOFTWARE\Microsoft\Command Processor" -ValueName 'Autorun' @CommonArgs |
                         New-AutoRunsEntry -Category $Category
 
@@ -370,6 +486,11 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['AppInit']) {
                 $Category = 'AppInit'
 
+                if (-not $PSBoundParameters['NoProgressBar']) {
+                    Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
+                    $CurrentAutorunCount++
+                }
+
                 $null,'Wow6432Node\' | ForEach-Object {
                     Get-CSRegistryValue -Hive HKLM -SubKey "SOFTWARE\$($_)Microsoft\Windows NT\CurrentVersion\Windows" -ValueName 'AppInit_DLLs' @CommonArgs |
                         New-AutoRunsEntry -Category $Category
@@ -384,12 +505,22 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['KnownDLLs']) {
                 $Category = 'KnownDLLs'
 
+                if (-not $PSBoundParameters['NoProgressBar']) {
+                    Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
+                    $CurrentAutorunCount++
+                }
+
                 Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\Session Manager\KnownDLLs' @CommonArgs |
                     New-AutoRunsEntry -Category $Category
             }
 
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['Winlogon']) {
                 $Category = 'Winlogon'
+
+                if (-not $PSBoundParameters['NoProgressBar']) {
+                    Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
+                    $CurrentAutorunCount++
+                }
 
                 $CmdLine = Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\Setup' -ValueName 'CmdLine' @CommonArgs
 
@@ -417,12 +548,93 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
                     $BootVer | New-AutoRunsEntry -Hive $BootVer.Hive -SubKey "$($BootVer.SubKey)\ImagePath"
                 }
 
-                foreach ($SID in $HKUSIDs.Keys) {
+                foreach ($SID in $HKUSIDs) {
                     $Scrnsave = Get-CSRegistryValue -Hive HKU -SubKey "$SID\SOFTWARE\Policies\Microsoft\Windows\Control Panel\Desktop" -ValueName 'Scrnsave.exe' @CommonArgs
                     if ($Scrnsave) { $Scrnsave | New-AutoRunsEntry }
 
                     $Scrnsave = Get-CSRegistryValue -Hive HKU -SubKey "$SID\Control Panel\Desktop" -ValueName 'Scrnsave.exe' @CommonArgs
                     if ($Scrnsave) { $Scrnsave | New-AutoRunsEntry }
+                }
+            }
+        }
+    }
+}
+
+function Get-CSStartMenuEntry {
+<#
+.SYNOPSIS
+
+List user and common start menu items.
+
+Author: Matthew Graeber (@mattifestation)
+License: BSD 3-Clause
+
+.PARAMETER NoProgressBar
+
+Do not display a progress bar. This parameter is designed to be used with wrapper functions.
+
+.PARAMETER CimSession
+
+Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
+
+.INPUTS
+
+Microsoft.Management.Infrastructure.CimSession
+
+Get-CSStartMenuEntry accepts established CIM sessions over the pipeline.
+
+.NOTES
+
+If a shortcut is present in the start menu, an instance of a Win32_ShortcutFile is returned that has a Target property.
+#>
+
+    [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
+    param(
+        [Switch]
+        $NoProgressBar,
+        
+        [Alias('Session')]
+        [ValidateNotNullOrEmpty()]
+        [Microsoft.Management.Infrastructure.CimSession[]]
+        $CimSession
+    )
+
+    BEGIN {
+        # If a CIM session is not provided, trick the function into thinking there is one.
+        if (-not $PSBoundParameters['CimSession']) {
+            $CimSession = ''
+            $CIMSessionCount = 1
+        } else {
+            $CIMSessionCount = $CimSession.Count
+        }
+
+        $CurrentCIMSession = 0
+    }
+
+    PROCESS {
+        foreach ($Session in $CimSession) {
+            $ComputerName = $Session.ComputerName
+            if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
+
+            if (-not $PSBoundParameters['NoProgressBar']) {
+                # Display a progress activity for each CIM session
+                Write-Progress -Id 1 -Activity 'CimSweep - Temp directory sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+                $CurrentCIMSession++
+            }
+
+            $CommonArgs = @{}
+
+            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
+
+            Get-CSShellFolderPath -SystemFolder -FolderName 'Common Startup' -NoProgressBar @CommonArgs | ForEach-Object {
+                Get-CSDirectoryListing -DirectoryPath $_.ValueContent -File | Where-Object {
+                    $_.FileName -ne 'desktop' -and $_.Extension -ne 'ini'
+                }
+            }
+
+            Get-CSShellFolderPath -UserFolder -FolderName 'Startup' -NoProgressBar @CommonArgs | ForEach-Object {
+                Get-CSDirectoryListing -DirectoryPath $_.ValueContent -File | Where-Object {
+                    $_.FileName -ne 'desktop' -and $_.Extension -ne 'ini'
                 }
             }
         }

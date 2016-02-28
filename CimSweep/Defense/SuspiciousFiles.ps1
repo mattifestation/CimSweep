@@ -1,4 +1,4 @@
-﻿filter Get-CSScheduledTaskFile {
+﻿function Get-CSScheduledTaskFile {
 <#
 .SYNOPSIS
 
@@ -10,6 +10,10 @@ License: BSD 3-Clause
 .DESCRIPTION
 
 The ability to remotely query scheduled tasks was not introduced until Windows 8. Get-CSScheduledTaskFile offers the next best thing by simply scanning %SystemRoot%\Windows\Tasks.
+
+.PARAMETER NoProgressBar
+
+Do not display a progress bar. This parameter is designed to be used with wrapper functions.
 
 .PARAMETER CimSession
 
@@ -24,30 +28,72 @@ Get-CSScheduledTaskFile accepts established CIM sessions over the pipeline.
 
     [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
     param(
-        [Parameter(ValueFromPipeline = $True)]
+        [Switch]
+        $NoProgressBar,
+
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
         $CimSession
     )
 
-    $CommonArgs = @{}
+    BEGIN {
+        # If a CIM session is not provided, trick the function into thinking there is one.
+        if (-not $PSBoundParameters['CimSession']) {
+            $CimSession = ''
+            $CIMSessionCount = 1
+        } else {
+            $CIMSessionCount = $CimSession.Count
+        }
 
-    if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $CimSession }
+        $CurrentCIMSession = 0
+    }
 
-    $OSInfo = Get-CimInstance -ClassName Win32_OperatingSystem -Property SystemDirectory @CommonArgs
+    PROCESS {
+        foreach ($Session in $CimSession) {
+            $ComputerName = $Session.ComputerName
+            if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
 
-    if ($OSInfo.SystemDirectory) {
-        $TaskDir = $OSInfo.SystemDirectory + '\Tasks'
+            if (-not $PSBoundParameters['NoProgressBar']) {
+                # Display a progress activity for each CIM session
+                Write-Progress -Id 1 -Activity 'CimSweep - Scheduled task file sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+                $CurrentCIMSession++
+            }
 
-        Get-CSDirectoryListing -Path $TaskDir -Recurse @CommonArgs |
-            Where-Object { $_.CimClass.CimClassName -ne 'Win32_Directory' }
-    } else {
-        Write-Error 'Unable to obtain system directory.'
+            $CommonArgs = @{}
+
+            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
+
+            $OSInfo = Get-CimInstance -ClassName Win32_OperatingSystem -Property SystemDirectory @CommonArgs
+
+            if ($OSInfo.SystemDirectory) {
+                # Root task directory: %SystemRoot%\System32\Tasks
+                $TaskDir = $OSInfo.SystemDirectory + '\Tasks'
+
+                if (-not $PSBoundParameters['NoProgressBar']) {
+                    Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status $TaskDir
+                }
+
+                # List tasks in root directory
+                Get-CSDirectoryListing -DirectoryPath $TaskDir -File @CommonArgs
+
+                # Start by only retrieving directory info recursively. This is a performance enhancement
+                Get-CSDirectoryListing -DirectoryPath $TaskDir -Recurse -Directory -DoNotDetectRecursiveDirs @CommonArgs | ForEach-Object {
+                    if (-not $PSBoundParameters['NoProgressBar']) {
+                        Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status ($_.Name)
+                    }
+
+                    # Get task file information for each subdirectory
+                    $_ | Get-CSDirectoryListing -File @CommonArgs
+                }
+            } else {
+                Write-Error "[$ComputerName] Unable to obtain scheduled task information because the system directory could not be retrieved."
+            }
+        }
     }
 }
 
-filter Get-CSShellFolderPath {
+function Get-CSShellFolderPath {
 <#
 .SYNOPSIS
 
@@ -63,6 +109,18 @@ Get-CSShellFolderPath is primarily a helper function used to correctly obtain th
 .PARAMETER FolderName
 
 Specifies the name of the special shell folder to get the path for.
+
+.PARAMETER SystemFolder
+
+Specifies that only system-level shell folders should be retrieved.
+
+.PARAMETER UserFolder
+
+Specifies that only user-specific shell folders should be retrieved.
+
+.PARAMETER NoProgressBar
+
+Do not display a progress bar. This parameter is designed to be used with wrapper functions.
 
 .PARAMETER CimSession
 
@@ -87,7 +145,11 @@ Microsoft.Management.Infrastructure.CimSession
 Get-CSShellFolderPath accepts established CIM sessions over the pipeline.
 #>
 
+    [CmdletBinding(DefaultParameterSetName = 'Default')]
     param(
+        [Parameter(ParameterSetName = 'Default')]
+        [Parameter(ParameterSetName = 'System')]
+        [Parameter(ParameterSetName = 'User')]
         [String]
         [ValidateSet(
             'Administrative Tools',
@@ -105,6 +167,7 @@ Get-CSShellFolderPath accepts established CIM sessions over the pipeline.
             'CommonMusic',
             'CommonPictures',
             'CommonVideo',
+            'OEM Links',
             'Cookies',
             'Desktop',
             'Favorites',
@@ -115,7 +178,6 @@ Get-CSShellFolderPath accepts established CIM sessions over the pipeline.
             'My Pictures',
             'My Video',
             'NetHood',
-            'OEM Links',
             'Personal',
             'PrintHood',
             'Programs',
@@ -127,166 +189,123 @@ Get-CSShellFolderPath accepts established CIM sessions over the pipeline.
         )]
         $FolderName,
 
-        [Parameter(ValueFromPipeline = $True)]
+        [Parameter(Mandatory = $True, ParameterSetName = 'System')]
+        [Switch]
+        $SystemFolder,
+
+        [Parameter(Mandatory = $True, ParameterSetName = 'User')]
+        [Switch]
+        $UserFolder,
+
+        [Switch]
+        $NoProgressBar,
+
+        [Parameter(ParameterSetName = 'Default')]
+        [Parameter(ParameterSetName = 'System')]
+        [Parameter(ParameterSetName = 'User')]
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
         $CimSession
     )
 
-    $CommonArgs = @{}
-    $RegistryArgs = @{}
-
-    if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $CimSession }
-    if ($PSBoundParameters['FolderName']) { $RegistryArgs['ValueName'] = $FolderName }
-
-    $ShellFolders = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders'
-
-    # Get the SIDS for each user in the registry
-    $HKUSIDs = Get-HKUSID @CommonArgs
-
-    # Iterate over each local user hive
-    foreach ($SID in $HKUSIDs.Keys) {
-        Get-CSRegistryValue -Hive HKU -SubKey "$SID\$ShellFolders" -ValueNameOnly @CommonArgs @RegistryArgs | 
-            Where-Object { -not $_.ValueName.StartsWith('!') -and -not $_.ValueName.StartsWith('{') } |
-            Get-CSRegistryValue
-    }
-
-    Get-CSRegistryValue -Hive HKLM -SubKey "$ShellFolders" -ValueNameOnly @CommonArgs @RegistryArgs | 
-        Where-Object { -not $_.ValueName.StartsWith('!') -and -not $_.ValueName.StartsWith('{') } |
-        Get-CSRegistryValue
-}
-
-filter Get-CSStartMenuEntry {
-<#
-.SYNOPSIS
-
-List user and common start menu items.
-
-Author: Matthew Graeber (@mattifestation)
-License: BSD 3-Clause
-
-.PARAMETER CimSession
-
-Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
-
-.INPUTS
-
-Microsoft.Management.Infrastructure.CimSession
-
-Get-CSStartMenuEntry accepts established CIM sessions over the pipeline.
-
-.NOTES
-
-If a shortcut is present in the start menu, an instance of a Win32_ShortcutFile is returned that has a Target property.
-#>
-
-    [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
-    param(
-        [Parameter(ValueFromPipeline = $True)]
-        [Alias('Session')]
-        [ValidateNotNullOrEmpty()]
-        [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession
-    )
-
-    $CommonArgs = @{}
-
-    if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $CimSession }
-
-    Get-CSShellFolderPath -FolderName 'Startup' @CommonArgs | ForEach-Object {
-        Get-CSDirectoryListing -Path $_.ValueContent @CommonArgs | Where-Object {
-            $_.FileName -ne 'desktop' -and $_.Extension -ne 'ini'
-        }
-    }
-
-    Get-CSShellFolderPath -FolderName 'Common Startup' @CommonArgs | ForEach-Object {
-        Get-CSDirectoryListing -Path $_.ValueContent @CommonArgs | Where-Object {
-            $_.FileName -ne 'desktop' -and $_.Extension -ne 'ini'
-        }
-    }
-}
-
-filter Get-CSTempPathPEAndScript {
-<#
-.SYNOPSIS
-
-Lists executable files and scripts present in all temp paths.
-
-Author: Matthew Graeber (@mattifestation)
-License: BSD 3-Clause
-
-.DESCRIPTION
-
-Get-CSTempPathPEAndScript returns file information for all of the following file extensions present in all temp directories: EXE, DLL, SYS, PS1, BAT, VBS, JS.
-
-.PARAMETER CimSession
-
-Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
-
-.INPUTS
-
-Microsoft.Management.Infrastructure.CimSession
-
-Get-CSTempPathPEAndScript accepts established CIM sessions over the pipeline.
-#>
-
-    [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
-    param(
-        [Parameter(ValueFromPipeline = $True)]
-        [Alias('Session')]
-        [ValidateNotNullOrEmpty()]
-        [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession
-    )
-
-    $CommonArgs = @{}
-
-    if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $CimSession }
-
-    $OSInfo = Get-CimInstance -ClassName Win32_OperatingSystem -Property SystemDrive @CommonArgs
-
-    # Validate that a drive letter was returned
-    if ($OSInfo.SystemDrive) {
-        $TargetExtensions = @('exe', 'dll', 'sys', 'ps1', 'bat', 'vbs', 'js')
-
-        $RootDir = $OSInfo.SystemDrive
-        $UserRootDir = "$RootDir\Users"
-        $UserRootDirClassic = "$RootDir\Documents and Settings"
-
-        # Attempt to get all user directories
-        $UserDirectories = Get-CSDirectoryListing -Path $UserRootDir -Directory @CommonArgs
-        $UserTempLeafPath = 'AppData\Local\Temp'
-
-        # Try to use the WinXP default temp path
-        if (-not $UserDirectories) {
-            $UserDirectories = Get-CSDirectoryListing -Path $UserRootDirClassic -Directory @CommonArgs
-            $UserTempLeafPath = 'Local Settings\Temp'
+    BEGIN {
+        # If a CIM session is not provided, trick the function into thinking there is one.
+        if (-not $PSBoundParameters['CimSession']) {
+            $CimSession = ''
+            $CIMSessionCount = 1
+        } else {
+            $CIMSessionCount = $CimSession.Count
         }
 
-        if ($UserDirectories) {
-            foreach ($UserDir in $UserDirectories) {
-                $UserTempPath = "$($UserDir.Name)\$UserTempLeafPath"
+        $CurrentCIMSession = 0
 
-                Get-CSDirectoryListing -Path $UserTempPath -Recurse -Extension $TargetExtensions @CommonArgs
+        $ShellFolders = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders'
+    }
+
+    PROCESS {
+        foreach ($Session in $CimSession) {
+            if (-not $PSBoundParameters['NoProgressBar']) {
+                $ComputerName = $Session.ComputerName
+                if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
+
+                # Display a progress activity for each CIM session
+                Write-Progress -Id 1 -Activity 'CimSweep - Shell folder path sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+                $CurrentCIMSession++
+            }
+
+            $CommonArgs = @{}
+
+            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
+
+            # Get a precise registry value if a specific folder is specified. This is a performance enhancement.
+            if ($PSBoundParameters['FolderName']) {
+                if (($PSCmdlet.ParameterSetName -eq 'System') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
+                    Get-CSRegistryValue -Hive HKLM -SubKey $ShellFolders -ValueName $FolderName -ValueType REG_SZ @CommonArgs |
+                        Where-Object { $_.ValueContent }
+                }
+
+                if (($PSCmdlet.ParameterSetName -eq 'User') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
+                    # Get the SIDS for each user in the registry
+                    $HKUSIDs = Get-HKUSID @CommonArgs
+
+                    # Iterate over each local user hive
+                    foreach ($SID in $HKUSIDs) {
+                        Get-CSRegistryValue -Hive HKU -SubKey "$SID\$ShellFolders" -ValueName $FolderName -ValueType REG_SZ @CommonArgs |
+                            Where-Object { $_.ValueContent }
+                    }
+                }
+            } else { # Otherwise, retrieve all shell folders
+                if (($PSCmdlet.ParameterSetName -eq 'System') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
+                    Get-CSRegistryValue -Hive HKLM -SubKey $ShellFolders -ValueNameOnly @CommonArgs | 
+                        Where-Object { -not $_.ValueName.StartsWith('!') -and -not $_.ValueName.StartsWith('{') } |
+                        Get-CSRegistryValue
+                }
+
+                if (($PSCmdlet.ParameterSetName -eq 'User') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
+                    # Get the SIDS for each user in the registry
+                    $HKUSIDs = Get-HKUSID @CommonArgs
+
+                    # Iterate over each local user hive
+                    foreach ($SID in $HKUSIDs) {
+                        Get-CSRegistryValue -Hive HKU -SubKey "$SID\$ShellFolders" -ValueNameOnly @CommonArgs | 
+                            Where-Object { -not $_.ValueName.StartsWith('!') -and -not $_.ValueName.StartsWith('{') } |
+                            Get-CSRegistryValue
+                    }
+                } 
             }
         }
-
-        $SystemTempDir = "$RootDir\Windows\Temp"
-        Get-CSDirectoryListing -Path $SystemTempDir -Recurse -Extension $TargetExtensions @CommonArgs
-    } else {
-        Write-Error 'Unable to obtain system drive.'
     }
 }
 
-filter Get-CSLowILPathPEAndScript {
+function Get-CSTempFile {
 <#
 .SYNOPSIS
 
-Lists executable files and scripts present in all user low integrity paths - %USERPROFILE%\AppData\LocalLow
+Lists files present in all user and system temp paths.
 
 Author: Matthew Graeber (@mattifestation)
 License: BSD 3-Clause
+
+.PARAMETER Extension
+
+Specifies that only files of a certain extension should be returned. When specifying extensions, do not include a dot - e.g. 'exe', 'dll', 'sys'.
+
+.PARAMETER SystemFolder
+
+Specifies that only system-level temp directories should be retrieved.
+
+.PARAMETER UserFolder
+
+Specifies that only user-specific temp directories should be retrieved.
+
+.PARAMETER NoProgressBar
+
+Do not display a progress bar. This parameter is designed to be used with wrapper functions.
+
+.PARAMETER DoNotRecurse
+
+Only list files in the root directory.
 
 .PARAMETER CimSession
 
@@ -296,11 +315,199 @@ Specifies the CIM session to use for this cmdlet. Enter a variable that contains
 
 Microsoft.Management.Infrastructure.CimSession
 
-Get-CSLowILPathPEAndScript accepts established CIM sessions over the pipeline.
+Get-CSTempFile accepts established CIM sessions over the pipeline.
+#>
+
+    [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
+    [CmdletBinding(DefaultParameterSetName = 'Default')]
+    param(
+        [Parameter(ParameterSetName = 'Default')]
+        [Parameter(ParameterSetName = 'System')]
+        [Parameter(ParameterSetName = 'User')]
+        [ValidateNotNullOrEmpty()]
+        [String[]]
+        $Extension,
+
+        [Parameter(Mandatory = $True, ParameterSetName = 'System')]
+        [Switch]
+        $SystemFolder,
+
+        [Parameter(Mandatory = $True, ParameterSetName = 'User')]
+        [Switch]
+        $UserFolder,
+
+        [Parameter(ParameterSetName = 'Default')]
+        [Parameter(ParameterSetName = 'System')]
+        [Parameter(ParameterSetName = 'User')]
+        [Switch]
+        $DoNotRecurse,
+
+        [Parameter(ParameterSetName = 'Default')]
+        [Parameter(ParameterSetName = 'System')]
+        [Parameter(ParameterSetName = 'User')]
+        [Switch]
+        $NoProgressBar,
+
+        [Parameter(ParameterSetName = 'Default')]
+        [Parameter(ParameterSetName = 'System')]
+        [Parameter(ParameterSetName = 'User')]
+        [Alias('Session')]
+        [ValidateNotNullOrEmpty()]
+        [Microsoft.Management.Infrastructure.CimSession[]]
+        $CimSession
+    )
+
+    BEGIN {
+        # If a CIM session is not provided, trick the function into thinking there is one.
+        if (-not $PSBoundParameters['CimSession']) {
+            $CimSession = ''
+            $CIMSessionCount = 1
+        } else {
+            $CIMSessionCount = $CimSession.Count
+        }
+
+        $CurrentCIMSession = 0
+
+        $TargetExtensions = @{}
+        if ($PSBoundParameters['Extension']) { $TargetExtensions['Extension'] = $Extension }
+    }
+
+    PROCESS {
+        foreach ($Session in $CimSession) {
+            $ComputerName = $Session.ComputerName
+            if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
+
+            if (-not $PSBoundParameters['NoProgressBar']) {
+                # Display a progress activity for each CIM session
+                Write-Progress -Id 1 -Activity 'CimSweep - Temp directory sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+                $CurrentCIMSession++
+            }
+
+            $CommonArgs = @{}
+
+            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
+
+            if (($PSCmdlet.ParameterSetName -eq 'System') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
+                # Get system temp path from the registry
+                $SystemTempPath = Get-CSEnvironmentVariable -SystemVariable -VariableName TEMP -NoProgressBar @CommonArgs
+
+                if ($SystemTempPath.VariableValue) {
+                    Write-Verbose "[$ComputerName] User temp directory: $($SystemTempPath.VariableValue)"
+
+                    if (-not $PSBoundParameters['NoProgressBar']) {
+                        Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status $SystemTempPath.VariableValue
+                    }
+
+                    # Display files in the root temp dir
+                    Get-CSDirectoryListing -DirectoryPath $SystemTempPath.VariableValue -File @TargetExtensions @CommonArgs
+
+                    if (-not $PSBoundParameters['DoNotRecurse']) {
+                        Get-CSDirectoryListing -DirectoryPath $SystemTempPath.VariableValue -Directory -Recurse @CommonArgs | ForEach-Object {
+                            if (-not $PSBoundParameters['NoProgressBar']) {
+                                Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status ($_.Name)
+                            }
+
+                            $_ | Get-CSDirectoryListing -File @TargetExtensions
+                        }
+                    }
+                } else {
+                    Write-Error "[$ComputerName] Unable to obtain system temp files because the system temp directory could not be retrieved."
+                }
+            }
+
+            if (($PSCmdlet.ParameterSetName -eq 'User') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
+                # Get user %USERPROFILE% and validate the end of %TEMP%. The root path of %TEMP% is not often not resolved properly.
+                $UserProfiles = Get-CSEnvironmentVariable -UserVariable -VariableName USERPROFILE -NoProgressBar @CommonArgs
+                $TempVars = Get-CSEnvironmentVariable -UserVariable -VariableName TEMP -NoProgressBar @CommonArgs
+
+                foreach ($UserProfile in $UserProfiles) {
+                    $TempVars | Where-Object { $_.User -eq $UserProfile.User } | ForEach-Object {
+                        $LegacyTemp = 'Local Settings\Temp'
+                        $ModernTemp = 'AppData\Local\Temp'
+
+                        $FullTempPath = $null
+                        $ExpectedPathObtained = $True
+
+                        if ($_.VariableValue.EndsWith($ModernTemp)) {
+                            $FullTempPath = "$($UserProfile.VariableValue)\$($ModernTemp)"
+                        } elseif ($_.VariableValue.EndsWith($LegacyTemp)) {
+                            $FullTempPath = "$($UserProfile.VariableValue)\$($LegacyTemp)"
+                        } else {
+                            $ExpectedPathObtained = $False
+                            Write-Error "[$ComputerName] Unable to obtain user temp directory. A non standard temp path was detected. Detected path: $($_.VariableValue)"
+                        }
+
+                        if ($ExpectedPathObtained) {
+                            Write-Verbose "[$ComputerName] User temp directory: $FullTempPath"
+
+                            if (-not $PSBoundParameters['NoProgressBar']) {
+                                Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status $FullTempPath
+                            }
+
+                            # Display files in the root temp dir
+                            Get-CSDirectoryListing -DirectoryPath $FullTempPath -File @TargetExtensions @CommonArgs
+
+                            if (-not $PSBoundParameters['DoNotRecurse']) {
+                                Get-CSDirectoryListing -DirectoryPath $FullTempPath -Directory -Recurse @CommonArgs | ForEach-Object {
+                                    if (-not $PSBoundParameters['NoProgressBar']) {
+                                        Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status ($_.Name)
+                                    }
+
+                                    $_ | Get-CSDirectoryListing -File @TargetExtensions
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+function Get-CSLowILPathFile {
+<#
+.SYNOPSIS
+
+Lists executable files and scripts present in all user low integrity paths - %LOCALAPPDATA%Low
+
+Author: Matthew Graeber (@mattifestation)
+License: BSD 3-Clause
+
+.PARAMETER Extension
+
+Specifies that only files of a certain extension should be returned. When specifying extensions, do not include a dot - e.g. 'exe', 'dll', 'sys'.
+
+.PARAMETER NoProgressBar
+
+Do not display a progress bar. This parameter is designed to be used with wrapper functions.
+
+.PARAMETER DoNotRecurse
+
+Only list files in the root directory.
+
+.PARAMETER CimSession
+
+Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
+
+.INPUTS
+
+Microsoft.Management.Infrastructure.CimSession
+
+Get-CSLowILPathFile accepts established CIM sessions over the pipeline.
 #>
 
     [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
     param(
+        [ValidateNotNullOrEmpty()]
+        [String[]]
+        $Extension,
+
+        [Switch]
+        $DoNotRecurse,
+
+        [Switch]
+        $NoProgressBar,
+
         [Parameter(ValueFromPipeline = $True)]
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
@@ -308,30 +515,60 @@ Get-CSLowILPathPEAndScript accepts established CIM sessions over the pipeline.
         $CimSession
     )
 
-    $CommonArgs = @{}
+    BEGIN {
+        # If a CIM session is not provided, trick the function into thinking there is one.
+        if (-not $PSBoundParameters['CimSession']) {
+            $CimSession = ''
+            $CIMSessionCount = 1
+        } else {
+            $CIMSessionCount = $CimSession.Count
+        }
 
-    if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $CimSession }
+        $CurrentCIMSession = 0
 
-    $OSInfo = Get-CimInstance -ClassName Win32_OperatingSystem -Property SystemDrive @CommonArgs
+        $TargetExtensions = @{}
+        if ($PSBoundParameters['Extension']) { $TargetExtensions['Extension'] = $Extension }
+    }
 
-    # Validate that a drive letter was returned
-    if ($OSInfo.SystemDrive) {
-        $TargetExtensions = @('exe', 'dll', 'sys', 'ps1', 'bat', 'vbs', 'js')
+    PROCESS {
+        foreach ($Session in $CimSession) {
+            $ComputerName = $Session.ComputerName
+            if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
 
-        $RootDir = $OSInfo.SystemDrive
-        $UserRootDir = "$RootDir\Users"
+            if (-not $PSBoundParameters['NoProgressBar']) {
+                # Display a progress activity for each CIM session
+                Write-Progress -Id 1 -Activity 'CimSweep - Low integrity level directory sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+                $CurrentCIMSession++
+            }
 
-        # Attempt to get all user directories
-        $UserDirectories = Get-CSDirectoryListing -Path $UserRootDir -Directory @CommonArgs
+            $CommonArgs = @{}
 
-        if ($UserDirectories) {
-            foreach ($UserDir in $UserDirectories) {
-                $LowILPath = "$($UserDir.Name)\AppData\LocalLow"
+            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
 
-                Get-CSDirectoryListing -Path $LowILPath -Recurse -Extension $TargetExtensions @CommonArgs
+            Get-CSEnvironmentVariable -UserVariable -VariableName LOCALAPPDATA -NoProgressBar @CommonArgs | ForEach-Object {
+                Write-Verbose "[$ComputerName] LocalAppData path: $($_.VariableValue)"
+
+                if ($_.VariableValue) {
+                    $LocalLowPath = "$($_.VariableValue)Low"
+
+                    if (-not $PSBoundParameters['NoProgressBar']) {
+                        Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status $LocalLowPath
+                    }
+
+                    # List all files in the root low IL dir
+                    Get-CSDirectoryListing -DirectoryPath $LocalLowPath -File @TargetExtensions @CommonArgs
+
+                    if (-not $PSBoundParameters['DoNotRecurse']) {
+                        Get-CSDirectoryListing -DirectoryPath $LocalLowPath -Recurse -Directory @CommonArgs | ForEach-Object {
+                            if (-not $PSBoundParameters['NoProgressBar']) {
+                                Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status ($_.Name)
+                            }
+
+                            $_ | Get-CSDirectoryListing -File @TargetExtensions
+                        }
+                    }
+                }
             }
         }
-    } else {
-        Write-Error 'Unable to obtain system drive.'
     }
 }
