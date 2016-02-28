@@ -27,6 +27,7 @@ Get-CSScheduledTaskFile accepts established CIM sessions over the pipeline.
 #>
 
     [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
+    [CmdletBinding()]
     param(
         [Switch]
         $NoProgressBar,
@@ -64,27 +65,34 @@ Get-CSScheduledTaskFile accepts established CIM sessions over the pipeline.
 
             if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
-            $OSInfo = Get-CimInstance -ClassName Win32_OperatingSystem -Property SystemDirectory @CommonArgs
+            $OSInfo = Get-CimInstance -ClassName Win32_OperatingSystem -Property SystemDirectory, WindowsDirectory @CommonArgs
 
-            if ($OSInfo.SystemDirectory) {
-                # Root task directory: %SystemRoot%\System32\Tasks
-                $TaskDir = $OSInfo.SystemDirectory + '\Tasks'
+            if ($OSInfo.SystemDirectory -and $OSInfo.WindowsDirectory) {
+                # %SystemRoot%\System32\Tasks
+                $SystemTaskDir = $OSInfo.SystemDirectory + '\Tasks'
+                # %windir%\Tasks
+                $WindowsTaskDir = $OSInfo.WindowsDirectory + '\Tasks'
 
-                if (-not $PSBoundParameters['NoProgressBar']) {
-                    Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status $TaskDir
-                }
+                Write-Verbose "[$ComputerName] System directory task path: $SystemTaskDir"
+                Write-Verbose "[$ComputerName] Windows directory task path: $WindowsTaskDir"
 
-                # List tasks in root directory
-                Get-CSDirectoryListing -DirectoryPath $TaskDir -File @CommonArgs
-
-                # Start by only retrieving directory info recursively. This is a performance enhancement
-                Get-CSDirectoryListing -DirectoryPath $TaskDir -Recurse -Directory -DoNotDetectRecursiveDirs @CommonArgs | ForEach-Object {
+                $WindowsTaskDir, $SystemTaskDir | ForEach-Object {
                     if (-not $PSBoundParameters['NoProgressBar']) {
-                        Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status ($_.Name)
+                        Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status $_
                     }
 
-                    # Get task file information for each subdirectory
-                    $_ | Get-CSDirectoryListing -File @CommonArgs
+                    # List tasks in root directory
+                    Get-CSDirectoryListing -DirectoryPath $_ -File @CommonArgs
+
+                    # Start by only retrieving directory info recursively. This is a performance enhancement
+                    Get-CSDirectoryListing -DirectoryPath $_ -Recurse -Directory -DoNotDetectRecursiveDirs @CommonArgs | ForEach-Object {
+                        if (-not $PSBoundParameters['NoProgressBar']) {
+                            Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status ($_.Name)
+                        }
+
+                        # Get task file information for each subdirectory
+                        $_ | Get-CSDirectoryListing -File @CommonArgs
+                    }
                 }
             } else {
                 Write-Error "[$ComputerName] Unable to obtain scheduled task information because the system directory could not be retrieved."
