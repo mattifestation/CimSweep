@@ -77,7 +77,7 @@ $SessionOption = New-CimSessionOption -Protocol Dcom
 $CimSession_Winxp = New-CimSession -ComputerName winxp -Credential Administrator -SessionOption $SessionOption
 
 # Now I can start running CimSweep commands remotely!
-$CimSession_Nano, $CimSession_Winxp | Get-CSRegistryValue -Hive HKLM -SubKey SOFTWARE\Microsoft\Windows\CurrentVersion\Run
+Get-CSRegistryValue -Hive HKLM -SubKey SOFTWARE\Microsoft\Windows\CurrentVersion\Run -CimSession $CimSession_Nano, $CimSession_Winxp
 ```
 
 ## Contributions and function design
