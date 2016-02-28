@@ -132,7 +132,7 @@ It is not recommended to recursively list all registry keys from most parent key
                 MethodName = 'EnumKey'
             }
 
-            if ($PSBoundParameters['CimSession']) { $CimMethodArgs['CimSession'] = $Session }
+            if ($Session.Id) { $CimMethodArgs['CimSession'] = $Session }
 
             $RegistryMethodArgs = @{
                 hDefKey = $HiveVal
@@ -150,7 +150,7 @@ It is not recommended to recursively list all registry keys from most parent key
                         SubKey = "$TrimmedKey\$KeyName".Trim('\')
                     }
 
-                    if ($PSBoundParameters['CimSession']) { $ObjectProperties['CimSession'] = $Session }
+                    if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
 
                     $KeyObject = New-Object -TypeName PSObject -Property $ObjectProperties
                     Add-Member -InputObject $KeyObject -MemberType NoteProperty -Name PSComputerName -Value $Result.PSComputerName
@@ -336,7 +336,7 @@ Outputs a list of custom objects representing registry value names, their respec
                 Namespace = 'root/default'
             }
 
-            if ($PSBoundParameters['CimSession']) { $CimMethodArgs['CimSession'] = $Session }
+            if ($Session.Id) { $CimMethodArgs['CimSession'] = $Session }
 
             if ($PSBoundParameters['ValueType']) {
                 switch ($ValueType) {
@@ -448,7 +448,7 @@ Outputs a list of custom objects representing registry value names, their respec
                             Namespace = 'root/default'
                         }
 
-                        if ($PSBoundParameters['CimSession']) { $CimMethod2Args['CimSession'] = $Session }
+                        if ($Session.Id) { $CimMethod2Args['CimSession'] = $Session }
 
                         switch ($Types[$i]) {
                             'REG_NONE' {
@@ -655,7 +655,7 @@ Outptus a custom object that can be piped to Get-CSEventLog entry.
 
             $CommonArgs = @{}
 
-            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
+            if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
             Get-CimInstance -ClassName Win32_NTEventlogFile -Property LogfileName @CommonArgs | ForEach-Object {
                 $EventLog = [PSCustomObject] @{
@@ -819,7 +819,7 @@ Outputs Win32_NtLogEvent instances.
 
             $CommonArgs = @{}
 
-            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
+            if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
             $EventLogEntryArgs = @{}
 
@@ -893,7 +893,7 @@ Outputs a list of mounted drive letters.
 
             $CommonArgs = @{}
 
-            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
+            if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
             $Result = Get-CimInstance -ClassName Win32_LogicalDisk -Property DeviceID @CommonArgs
 
@@ -1161,7 +1161,7 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
 
             $CommonArgs = @{}
 
-            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
+            if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
             # Normalize the directory path
             $TrimmedPath = $DirectoryPath.TrimEnd('\')
@@ -1397,7 +1397,7 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
 
             $CommonArgs = @{}
 
-            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
+            if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
             $FilterComponents = New-Object 'Collections.ObjectModel.Collection`1[System.String]'
 
@@ -1537,7 +1537,7 @@ Outputs Win32_Process instances.
 
             $CommonArgs = @{}
 
-            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
+            if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
             $FilterComponents = New-Object 'Collections.ObjectModel.Collection`1[System.String]'
 
@@ -1599,15 +1599,18 @@ Specifies the CIM session to use for this cmdlet. Enter a variable that contains
         [Parameter(ParameterSetName = 'Default')]
         [Parameter(ParameterSetName = 'System')]
         [Parameter(ParameterSetName = 'User')]
+        [Alias('Name')]
         [String]
         [ValidateNotNullOrEmpty()]
         $VariableName,
 
         [Parameter(Mandatory = $True, ParameterSetName = 'System')]
+        [Alias('System')]
         [Switch]
         $SystemVariable,
 
         [Parameter(Mandatory = $True, ParameterSetName = 'User')]
+        [Alias('User')]
         [Switch]
         $UserVariable,
 
@@ -1650,7 +1653,7 @@ Specifies the CIM session to use for this cmdlet. Enter a variable that contains
 
             $CommonArgs = @{}
 
-            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
+            if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
             # Performance enhancements are realized when specifying a specific environment variable name.
             if ($PSBoundParameters['VariableName']) {

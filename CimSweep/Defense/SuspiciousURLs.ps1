@@ -51,7 +51,7 @@ Specifies the CIM session to use for this cmdlet. Enter a variable that contains
 
             $CommonArgs = @{}
 
-            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
+            if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
             $TypedURLs = 'SOFTWARE\Microsoft\Internet Explorer\TypedURLs'
 

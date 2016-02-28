@@ -62,7 +62,7 @@ Get-CSScheduledTaskFile accepts established CIM sessions over the pipeline.
 
             $CommonArgs = @{}
 
-            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
+            if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
             $OSInfo = Get-CimInstance -ClassName Win32_OperatingSystem -Property SystemDirectory @CommonArgs
 
@@ -236,7 +236,7 @@ Get-CSShellFolderPath accepts established CIM sessions over the pipeline.
 
             $CommonArgs = @{}
 
-            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
+            if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
             # Get a precise registry value if a specific folder is specified. This is a performance enhancement.
             if ($PSBoundParameters['FolderName']) {
@@ -385,7 +385,7 @@ Get-CSTempFile accepts established CIM sessions over the pipeline.
 
             $CommonArgs = @{}
 
-            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
+            if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
             if (($PSCmdlet.ParameterSetName -eq 'System') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
                 # Get system temp path from the registry
@@ -543,7 +543,7 @@ Get-CSLowILPathFile accepts established CIM sessions over the pipeline.
 
             $CommonArgs = @{}
 
-            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
+            if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
             Get-CSEnvironmentVariable -UserVariable -VariableName LOCALAPPDATA -NoProgressBar @CommonArgs | ForEach-Object {
                 Write-Verbose "[$ComputerName] LocalAppData path: $($_.VariableValue)"

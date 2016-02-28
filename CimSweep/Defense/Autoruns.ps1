@@ -206,7 +206,7 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
 
             $CommonArgs = @{}
 
-            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
+            if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
             # Get the SIDS for each user in the registry
             $HKUSIDs = Get-HKUSID @CommonArgs
@@ -624,16 +624,16 @@ If a shortcut is present in the start menu, an instance of a Win32_ShortcutFile 
 
             $CommonArgs = @{}
 
-            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
+            if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
             Get-CSShellFolderPath -SystemFolder -FolderName 'Common Startup' -NoProgressBar @CommonArgs | ForEach-Object {
-                Get-CSDirectoryListing -DirectoryPath $_.ValueContent -File | Where-Object {
+                Get-CSDirectoryListing -DirectoryPath $_.ValueContent -File @CommonArgs | Where-Object {
                     $_.FileName -ne 'desktop' -and $_.Extension -ne 'ini'
                 }
             }
 
             Get-CSShellFolderPath -UserFolder -FolderName 'Startup' -NoProgressBar @CommonArgs | ForEach-Object {
-                Get-CSDirectoryListing -DirectoryPath $_.ValueContent -File | Where-Object {
+                Get-CSDirectoryListing -DirectoryPath $_.ValueContent -File @CommonArgs | Where-Object {
                     $_.FileName -ne 'desktop' -and $_.Extension -ne 'ini'
                 }
             }
@@ -689,7 +689,7 @@ Get-CSWMIPersistence accepts established CIM sessions over the pipeline.
 
             $CommonArgs = @{}
 
-            if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $Session }
+            if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
             Write-Verbose "[$($Session.ComputerName)] Retrieving __FilterToConsumerBinding instance."
 
