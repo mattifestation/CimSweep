@@ -1454,6 +1454,14 @@ Specifies the command line used to start a specific process, if applicable.
 
 Specifies the path to the executable file of the process.
 
+.PARAMETER LimitOutput
+
+Specifies that an explicit list of Win32_Process properties should be returned. This can significantly reduce the time it takes to sweep across many systems is only a subset of properties are desired.
+
+.PARAMETER Property
+
+Specifies the desired properties to retrieve from Win32_Process instances. The following properties are returned when limited output is desired: ProcessId, ParentProcessId, Name, ExecutablePath, CommandLine
+
 .PARAMETER NoProgressBar
 
 Do not display a progress bar. This parameter is designed to be used with wrapper functions.
@@ -1474,6 +1482,16 @@ Get-CSProcess -Name chrome
 
 Get-CSProcess -ProcessID 4 -CimSession $CimSession
 
+.EXAMPLE
+
+Get-CSProcess -LimitOutput
+
+Retrieves Win32_Process instances with only the following properties: ProcessId, ParentProcessId, Name, ExecutablePath, CommandLine
+
+.EXAMPLE
+
+Get-CSProcess -LimitOutput -Property Name, ProcessId
+
 .OUTPUTS
 
 Microsoft.Management.Infrastructure.CimInstance
@@ -1482,30 +1500,98 @@ Outputs Win32_Process instances.
 #>
 
     [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
+    [CmdletBinding(DefaultParameterSetName='DefaultOutput')]
     param(
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
         [String]
         [ValidateNotNullOrEmpty()]
         $Name,
 
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
         [Alias('Id')]
         [UInt32]
         $ProcessID,
 
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
         [UInt32]
         $ParentProcessId,
 
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
         [String]
         [ValidateNotNullOrEmpty()]
         $CommandLine,
 
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
         [String]
         [ValidateNotNullOrEmpty()]
         $ExecutablePath,
 
+        [Parameter(Mandatory = $True, ParameterSetName='RestrictOutput')]
+        [Switch]
+        $LimitOutput,
+
+        [Parameter(ParameterSetName='RestrictOutput')]
+        [String[]]
+        [ValidateSet(
+            'Caption',
+            'CommandLine',
+            'CreationClassName',
+            'CreationDate',
+            'CSCreationClassName',
+            'CSName',
+            'Description',
+            'ExecutablePath',
+            'ExecutionState',
+            'Handle',
+            'HandleCount',
+            'InstallDate',
+            'KernelModeTime',
+            'MaximumWorkingSetSize',
+            'MinimumWorkingSetSize',
+            'Name',
+            'OSCreationClassName',
+            'OSName',
+            'OtherOperationCount',
+            'OtherTransferCount',
+            'PageFaults',
+            'PageFileUsage',
+            'ParentProcessId',
+            'PeakPageFileUsage',
+            'PeakVirtualSize',
+            'PeakWorkingSetSize',
+            'Priority',
+            'PrivatePageCount',
+            'ProcessId',
+            'QuotaNonPagedPoolUsage',
+            'QuotaPagedPoolUsage',
+            'QuotaPeakNonPagedPoolUsage',
+            'QuotaPeakPagedPoolUsage',
+            'ReadOperationCount',
+            'ReadTransferCount',
+            'SessionId',
+            'Status',
+            'TerminationDate',
+            'ThreadCount',
+            'UserModeTime',
+            'VirtualSize',
+            'WindowsVersion',
+            'WorkingSetSize',
+            'WriteOperationCount',
+            'WriteTransferCount')]
+        $Property = @('ProcessId', 'ParentProcessId', 'Name', 'ExecutablePath', 'CommandLine'),
+
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
         [Switch]
         $NoProgressBar,
 
-        [Parameter(ValueFromPipeline = $True)]
+        [Parameter(ValueFromPipeline = $True, ParameterSetName='DefaultOutput')]
+        [Parameter(ValueFromPipeline = $True, ParameterSetName='RestrictOutput')]
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
@@ -1554,7 +1640,10 @@ Outputs Win32_Process instances.
                 $ProcessEntryArgs['Filter'] = $Filter
             }
 
-            Get-CimInstance -ClassName Win32_Process @CommonArgs @ProcessEntryArgs
+            $PropertyList = @{}
+            if ($PSBoundParameters['LimitOutput']) { $PropertyList['Property'] = $Property }
+
+            Get-CimInstance -ClassName Win32_Process @CommonArgs @ProcessEntryArgs @PropertyList
         }
     }
 }
