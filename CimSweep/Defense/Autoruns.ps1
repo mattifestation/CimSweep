@@ -67,6 +67,14 @@ Do not display a progress bar. This parameter is designed to be used with wrappe
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
 
+.PARAMETER OperationTimeoutSec
+
+Specifies the amount of time that the cmdlet waits for a response from the computer.
+
+By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
+
+If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
+
 .INPUTS
 
 Microsoft.Management.Infrastructure.CimSession
@@ -126,7 +134,11 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession
+        $CimSession,
+
+        [UInt32]
+        [Alias('OT')]
+        $OperationTimeoutSec
     )
 
     BEGIN {
@@ -139,6 +151,9 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
         }
 
         $CurrentCIMSession = 0
+
+        $Timeout = @{}
+        if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
 
         $ParamCopy = $PSBoundParameters
         $null = $ParamCopy.Remove('CimSession')
@@ -209,7 +224,7 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
             if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
             # Get the SIDS for each user in the registry
-            $HKUSIDs = Get-HKUSID @CommonArgs
+            $HKUSIDs = Get-HKUSID @CommonArgs @Timeout
 
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['Logon']) {
                 $Category = 'Logon'
@@ -219,10 +234,10 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
                     $CurrentAutorunCount++
                 }
 
-                Get-CSRegistryValue -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\Wds\rdpwd' -ValueName StartupPrograms @CommonArgs |
+                Get-CSRegistryValue -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\Wds\rdpwd' -ValueName StartupPrograms @CommonArgs @Timeout |
                     New-AutoRunsEntry -Category $Category
 
-                Get-CSRegistryValue -Hive HKLM -SubKey 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon' -ValueNameOnly @CommonArgs |
+                Get-CSRegistryValue -Hive HKLM -SubKey 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon' -ValueNameOnly @CommonArgs @Timeout |
                     Where-Object { ('VmApplet', 'Userinit', 'Shell', 'TaskMan', 'AppSetup') -contains $_.ValueName } | ForEach-Object {
                         $_ | Get-CSRegistryValue | New-AutoRunsEntry -Category $Category
                     }
@@ -235,11 +250,11 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
                 #>
 
                 $GPExtensionKey = 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\GPExtensions'
-                Get-CSRegistryKey -Hive HKLM -SubKey $GPExtensionKey @CommonArgs |
-                    Get-CSRegistryValue -ValueName DllName |
+                Get-CSRegistryKey -Hive HKLM -SubKey $GPExtensionKey @CommonArgs @Timeout |
+                    Get-CSRegistryValue -ValueName DllName @Timeout |
                         ForEach-Object { $_ | New-AutoRunsEntry -SubKey $GPExtensionKey -AutoRunEntry $_.Subkey.Split('\')[-1] -Category $Category }
 
-                $AlternateShell = Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\SafeBoot' -ValueName AlternateShell @CommonArgs
+                $AlternateShell = Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\SafeBoot' -ValueName AlternateShell @CommonArgs @Timeout
 
                 if ($AlternateShell) { $AlternateShell | New-AutoRunsEntry -AutoRunEntry $AlternateShell.ValueContent -Category $Category }
 
@@ -251,28 +266,28 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
                 )
 
                 foreach ($AutoStartPath in $AutoStartPaths) {
-                    Get-CSRegistryValue -Hive HKLM -SubKey $AutoStartPath @CommonArgs |
+                    Get-CSRegistryValue -Hive HKLM -SubKey $AutoStartPath @CommonArgs @Timeout |
                         New-AutoRunsEntry -Category $Category
 
                     # Iterate over each local user hive
                     foreach ($SID in $HKUSIDs) {
-                        Get-CSRegistryValue -Hive HKU -SubKey "$SID\$AutoStartPath" @CommonArgs |
+                        Get-CSRegistryValue -Hive HKU -SubKey "$SID\$AutoStartPath" @CommonArgs @Timeout |
                             New-AutoRunsEntry -Category $Category
                     }
                 }
 
                 $null, 'Wow6432Node\' | ForEach-Object {
                     $InstalledComponents = "SOFTWARE\$($_)Microsoft\Active Setup\Installed Components"
-                    Get-CSRegistryKey -Hive HKLM -SubKey $InstalledComponents @CommonArgs
-                } | Get-CSRegistryValue -ValueName StubPath | ForEach-Object {
-                    $AutoRunEntry = $_ | Get-CSRegistryValue -ValueName '' -ValueType REG_SZ
+                    Get-CSRegistryKey -Hive HKLM -SubKey $InstalledComponents @CommonArgs @Timeout
+                } | Get-CSRegistryValue -ValueName StubPath @Timeout | ForEach-Object {
+                    $AutoRunEntry = $_ | Get-CSRegistryValue -ValueName '' -ValueType REG_SZ @Timeout
 
                     if ($AutoRunEntry.ValueContent) { $AutoRunEntryName = $AutoRunEntry.ValueContent } else { $AutoRunEntryName = 'n/a' }
 
                     $_ | New-AutoRunsEntry -SubKey $InstalledComponents -AutoRunEntry $AutoRunEntryName -Category $Category
                 }
 
-                $IconLib = Get-CSRegistryValue -Hive HKLM -SubKey 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\Windows' -ValueName IconServiceLib @CommonArgs
+                $IconLib = Get-CSRegistryValue -Hive HKLM -SubKey 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\Windows' -ValueName IconServiceLib @CommonArgs @Timeout
 
                 if ($IconLib) { $IconLib | New-AutoRunsEntry -SubKey "$($IconLib.SubKey)\$($IconLib.ValueName)" -AutoRunEntry $IconLib.ValueContent -Category $Category }
             }
@@ -285,13 +300,13 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
                     $CurrentAutorunCount++
                 }
 
-                Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\Session Manager' -ValueNameOnly @CommonArgs |
+                Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\Session Manager' -ValueNameOnly @CommonArgs @Timeout |
                     Where-Object { ('BootExecute','SetupExecute','Execute','S0InitialCommand') -contains $_.ValueName } | ForEach-Object {
-                        $_ | Get-CSRegistryValue | Where-Object { $_.ValueContent.Count } |
+                        $_ | Get-CSRegistryValue @Timeout | Where-Object { $_.ValueContent.Count } |
                             ForEach-Object { $_ | New-AutoRunsEntry -ImagePath "$($_.ValueContent)" -Category $Category }
                     }
 
-                Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control' -ValueName ServiceControlManagerExtension @CommonArgs |
+                Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control' -ValueName ServiceControlManagerExtension @CommonArgs @Timeout |
                     New-AutoRunsEntry -AutoRunEntry ServiceControlManagerExtension -Category $Category
             }
 
@@ -303,9 +318,10 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
                     $CurrentAutorunCount++
                 }
 
-                Get-CSRegistryKey -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\Print\Monitors' @CommonArgs | Get-CSRegistryValue -ValueName Driver | ForEach-Object {
-                    $_ | New-AutoRunsEntry -SubKey 'SYSTEM\CurrentControlSet\Control\Print\Monitors' -AutoRunEntry $_.SubKey.Split('\')[-1] -Category $Category
-                }
+                Get-CSRegistryKey -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\Print\Monitors' @CommonArgs @Timeout |
+                    Get-CSRegistryValue -ValueName Driver @Timeout | ForEach-Object {
+                        $_ | New-AutoRunsEntry -SubKey 'SYSTEM\CurrentControlSet\Control\Print\Monitors' -AutoRunEntry $_.SubKey.Split('\')[-1] -Category $Category
+                    }
             }
 
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['NetworkProviders']) {
@@ -316,7 +332,7 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
                     $CurrentAutorunCount++
                 }
 
-                $NetworkOrder = Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\NetworkProvider\Order' -ValueName ProviderOrder @CommonArgs
+                $NetworkOrder = Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\NetworkProvider\Order' -ValueName ProviderOrder @CommonArgs @Timeout
 
                 if ($NetworkOrder.ValueContent) {
                     $NetworkOrder.ValueContent.Split(',') | ForEach-Object {
@@ -326,9 +342,9 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
             }
 
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['Services'] -or $PSBoundParameters['Drivers']) {
-                $ServiceKeys = Get-CSRegistryKey -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Services' @CommonArgs
+                $ServiceKeys = Get-CSRegistryKey -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Services' @CommonArgs @Timeout
 
-                $ServiceKeys | Get-CSRegistryValue -ValueName 'Type' @CommonArgs | ForEach-Object {
+                $ServiceKeys | Get-CSRegistryValue -ValueName 'Type' @CommonArgs @Timeout | ForEach-Object {
                     $SERVICE_KERNEL_DRIVER = 1
                     $SERVICE_FILE_SYSTEM_DRIVER = 2
                     $SERVICE_WIN32_OWN_PROCESS = 0x10
@@ -344,7 +360,7 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
                             $CurrentAutorunCount++
                         }
 
-                        $ImagePath = ($_ | Get-CSRegistryValue -ValueName ImagePath @CommonArgs).ValueContent
+                        $ImagePath = ($_ | Get-CSRegistryValue -ValueName ImagePath @CommonArgs @Timeout).ValueContent
 
                         New-AutoRunsEntry HKLM 'SYSTEM\CurrentControlSet\Services' $ServiceShortName $ImagePath $Category $_.PSComputerName
                     }
@@ -358,7 +374,7 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
                         }
 
                         if ($_.ValueContent -eq $SERVICE_WIN32_OWN_PROCESS) {
-                            $ImagePath = ($_ | Get-CSRegistryValue -ValueName ImagePath @CommonArgs).ValueContent
+                            $ImagePath = ($_ | Get-CSRegistryValue -ValueName ImagePath @CommonArgs @Timeout).ValueContent
 
                             New-AutoRunsEntry HKLM 'SYSTEM\CurrentControlSet\Services' $ServiceShortName $ImagePath $Category $_.PSComputerName
                         }
@@ -366,7 +382,7 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
                         if ($_.ValueContent -eq $SERVICE_WIN32_SHARE_PROCESS) {
                             $SubKey = "$($_.SubKey)\Parameters"
 
-                            $ImagePath = ($_ | Get-CSRegistryValue -SubKey $SubKey -ValueName ServiceDll @CommonArgs).ValueContent
+                            $ImagePath = ($_ | Get-CSRegistryValue -SubKey $SubKey -ValueName ServiceDll @CommonArgs @Timeout).ValueContent
 
                             New-AutoRunsEntry HKLM 'SYSTEM\CurrentControlSet\Services' $ServiceShortName $ImagePath $Category $_.PSComputerName
                         }
@@ -383,16 +399,16 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
                     $CurrentAutorunCount++
                 }
 
-                $SecProviders = Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\SecurityProviders' @CommonArgs
+                $SecProviders = Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\SecurityProviders' @CommonArgs @Timeout
                 $SecProviders | New-AutoRunsEntry -ImagePath "$($SecProviders.ValueContent)" -Category $Category
 
-                $AuthPackages = Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\Lsa' -ValueName 'Authentication Packages' @CommonArgs
+                $AuthPackages = Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\Lsa' -ValueName 'Authentication Packages' @CommonArgs @Timeout
                 $AuthPackages | New-AutoRunsEntry -ImagePath "$($AuthPackages.ValueContent)" -Category $Category
 
-                $NotPackages =  Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\Lsa' -ValueName 'Notification Packages' @CommonArgs
+                $NotPackages =  Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\Lsa' -ValueName 'Notification Packages' @CommonArgs @Timeout
                 $NotPackages | New-AutoRunsEntry -ImagePath "$($NotPackages.ValueContent)" -Category $Category
 
-                $SecPackages = Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\Lsa\OSConfig' -ValueName 'Security Packages' @CommonArgs
+                $SecPackages = Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\Lsa\OSConfig' -ValueName 'Security Packages' @CommonArgs @Timeout
                 $SecPackages | New-AutoRunsEntry -ImagePath "$($SecPackages.ValueContent)" -Category $Category
             }
 
@@ -414,43 +430,43 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
                 )
 
                 foreach ($CommonKey in $CommonKeys) {
-                    Get-CSRegistryValue -Hive HKLM -SubKey $CommonKey -ValueName '' @CommonArgs |
+                    Get-CSRegistryValue -Hive HKLM -SubKey $CommonKey -ValueName '' @CommonArgs @Timeout |
                         New-AutoRunsEntry -AutoRunEntry $CommonKey.Split('\')[2] -Category $Category
 
                     # Iterate over each local user hive
                     foreach ($SID in $HKUSIDs) {
-                        Get-CSRegistryValue -Hive HKU -SubKey "$SID\$CommonKey" -ValueName '' @CommonArgs |
+                        Get-CSRegistryValue -Hive HKU -SubKey "$SID\$CommonKey" -ValueName '' @CommonArgs @Timeout |
                             New-AutoRunsEntry -AutoRunEntry $CommonKey.Split('\')[2] -Category $Category
                     }
                 }
 
-                Get-CSRegistryValue -Hive HKLM -SubKey SOFTWARE\Classes\exefile\shell\open\command -ValueName 'IsolatedCommand' @CommonArgs |
+                Get-CSRegistryValue -Hive HKLM -SubKey SOFTWARE\Classes\exefile\shell\open\command -ValueName 'IsolatedCommand' @CommonArgs @Timeout |
                     New-AutoRunsEntry -Category $Category
 
                 $null, 'Wow6432Node\' | ForEach-Object {
-                    Get-CSRegistryKey -Hive HKLM -SubKey "SOFTWARE\$($_)Microsoft\Windows NT\CurrentVersion\Image File Execution Options" @CommonArgs |
-                        Get-CSRegistryValue -ValueName Debugger | ForEach-Object {
+                    Get-CSRegistryKey -Hive HKLM -SubKey "SOFTWARE\$($_)Microsoft\Windows NT\CurrentVersion\Image File Execution Options" @CommonArgs @Timeout |
+                        Get-CSRegistryValue -ValueName Debugger @Timeout | ForEach-Object {
                             $_ | New-AutoRunsEntry -AutoRunEntry $_.SubKey.Substring($_.SubKey.LastIndexOf('\') + 1) -Category $Category
                         }
 
-                    Get-CSRegistryValue -Hive HKLM -SubKey "SOFTWARE\$($_)Microsoft\Command Processor" -ValueName 'Autorun' @CommonArgs |
+                    Get-CSRegistryValue -Hive HKLM -SubKey "SOFTWARE\$($_)Microsoft\Command Processor" -ValueName 'Autorun' @CommonArgs @Timeout |
                         New-AutoRunsEntry -Category $Category
                 }
 
-                $Class_exe = Get-CSRegistryValue -Hive HKLM -SubKey 'SOFTWARE\Classes\.exe' -ValueName '' -ValueType REG_SZ @CommonArgs
+                $Class_exe = Get-CSRegistryValue -Hive HKLM -SubKey 'SOFTWARE\Classes\.exe' -ValueName '' -ValueType REG_SZ @CommonArgs @Timeout
 
                 if ($Class_exe.ValueContent) {
-                    $OpenCommand = Get-CSRegistryValue -Hive HKLM -SubKey "SOFTWARE\Classes\$($Class_exe.ValueContent)\Shell\Open\Command" -ValueName '' -ValueType REG_SZ @CommonArgs
+                    $OpenCommand = Get-CSRegistryValue -Hive HKLM -SubKey "SOFTWARE\Classes\$($Class_exe.ValueContent)\Shell\Open\Command" -ValueName '' -ValueType REG_SZ @CommonArgs @Timeout
 
                     if ($OpenCommand.ValueContent) {
                         $OpenCommand | New-AutoRunsEntry -Hive $Class_exe.Hive -SubKey $Class_exe.SubKey -AutoRunEntry $Class_exe.ValueContent -Category $Category
                     }
                 }
 
-                $Class_cmd = Get-CSRegistryValue -Hive HKLM -SubKey 'SOFTWARE\Classes\.cmd' -ValueName '' -ValueType REG_SZ @CommonArgs
+                $Class_cmd = Get-CSRegistryValue -Hive HKLM -SubKey 'SOFTWARE\Classes\.cmd' -ValueName '' -ValueType REG_SZ @CommonArgs @Timeout
 
                 if ($Class_cmd.ValueContent) {
-                    $OpenCommand = Get-CSRegistryValue -Hive HKLM -SubKey "SOFTWARE\Classes\$($Class_cmd.ValueContent)\Shell\Open\Command" -ValueName '' -ValueType REG_SZ @CommonArgs
+                    $OpenCommand = Get-CSRegistryValue -Hive HKLM -SubKey "SOFTWARE\Classes\$($Class_cmd.ValueContent)\Shell\Open\Command" -ValueName '' -ValueType REG_SZ @CommonArgs @Timeout
 
                     if ($OpenCommand.ValueContent) {
                         $OpenCommand | New-AutoRunsEntry -Hive $Class_cmd.Hive -SubKey $Class_cmd.SubKey -AutoRunEntry $Class_cmd.ValueContent -Category $Category
@@ -458,23 +474,23 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
                 }
 
                 foreach ($SID in $HKUSIDs) {
-                    Get-CSRegistryValue -Hive HKU -SubKey "$SID\SOFTWARE\Microsoft\Command Processor" -ValueName 'Autorun' @CommonArgs |
+                    Get-CSRegistryValue -Hive HKU -SubKey "$SID\SOFTWARE\Microsoft\Command Processor" -ValueName 'Autorun' @CommonArgs @Timeout |
                         New-AutoRunsEntry -Category $Category
 
-                    $Class_exe = Get-CSRegistryValue -Hive HKU -SubKey "$SID\SOFTWARE\Classes\.exe" -ValueName '' -ValueType REG_SZ @CommonArgs
+                    $Class_exe = Get-CSRegistryValue -Hive HKU -SubKey "$SID\SOFTWARE\Classes\.exe" -ValueName '' -ValueType REG_SZ @CommonArgs @Timeout
 
                     if ($Class_exe.ValueContent) {
-                        $OpenCommand = Get-CSRegistryValue -Hive HKU -SubKey "$SID\SOFTWARE\Classes\$($Class_exe.ValueContent)\Shell\Open\Command" -ValueName '' -ValueType REG_SZ @CommonArgs
+                        $OpenCommand = Get-CSRegistryValue -Hive HKU -SubKey "$SID\SOFTWARE\Classes\$($Class_exe.ValueContent)\Shell\Open\Command" -ValueName '' -ValueType REG_SZ @CommonArgs @Timeout
 
                         if ($OpenCommand.ValueContent) {
                             $OpenCommand | New-AutoRunsEntry -Hive $Class_exe.Hive -SubKey $Class_exe.SubKey -AutoRunEntry $Class_exe.ValueContent -Category $Category
                         }
                     }
 
-                    $Class_cmd = Get-CSRegistryValue -Hive HKU -SubKey "$SID\SOFTWARE\Classes\.cmd" -ValueName '' -ValueType REG_SZ @CommonArgs
+                    $Class_cmd = Get-CSRegistryValue -Hive HKU -SubKey "$SID\SOFTWARE\Classes\.cmd" -ValueName '' -ValueType REG_SZ @CommonArgs @Timeout
 
                     if ($Class_cmd.ValueContent) {
-                        $OpenCommand = Get-CSRegistryValue -Hive HKU -SubKey "$SID\SOFTWARE\Classes\$($Class_cmd.ValueContent)\Shell\Open\Command" -ValueName '' -ValueType REG_SZ @CommonArgs
+                        $OpenCommand = Get-CSRegistryValue -Hive HKU -SubKey "$SID\SOFTWARE\Classes\$($Class_cmd.ValueContent)\Shell\Open\Command" -ValueName '' -ValueType REG_SZ @CommonArgs @Timeout
 
                         if ($OpenCommand.ValueContent) {
                             $OpenCommand | New-AutoRunsEntry -Hive $Class_cmd.Hive -SubKey $Class_cmd.SubKey -AutoRunEntry $Class_cmd.ValueContent -Category $Category
@@ -492,13 +508,13 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
                 }
 
                 $null,'Wow6432Node\' | ForEach-Object {
-                    Get-CSRegistryValue -Hive HKLM -SubKey "SOFTWARE\$($_)Microsoft\Windows NT\CurrentVersion\Windows" -ValueName 'AppInit_DLLs' @CommonArgs |
+                    Get-CSRegistryValue -Hive HKLM -SubKey "SOFTWARE\$($_)Microsoft\Windows NT\CurrentVersion\Windows" -ValueName 'AppInit_DLLs' @CommonArgs @Timeout |
                         New-AutoRunsEntry -Category $Category
-                    Get-CSRegistryValue -Hive HKLM -SubKey "SOFTWARE\$($_)Microsoft\Command Processor" -ValueName 'Autorun' @CommonArgs |
+                    Get-CSRegistryValue -Hive HKLM -SubKey "SOFTWARE\$($_)Microsoft\Command Processor" -ValueName 'Autorun' @CommonArgs @Timeout |
                         New-AutoRunsEntry -Category $Category
                 }
 
-                Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\Session Manager\AppCertDlls' @CommonArgs |
+                Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\Session Manager\AppCertDlls' @CommonArgs @Timeout |
                     New-AutoRunsEntry -Category $Category
             }
 
@@ -510,7 +526,7 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
                     $CurrentAutorunCount++
                 }
 
-                Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\Session Manager\KnownDLLs' @CommonArgs |
+                Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\Session Manager\KnownDLLs' @CommonArgs @Timeout |
                     New-AutoRunsEntry -Category $Category
             }
 
@@ -522,37 +538,37 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
                     $CurrentAutorunCount++
                 }
 
-                $CmdLine = Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\Setup' -ValueName 'CmdLine' @CommonArgs
+                $CmdLine = Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\Setup' -ValueName 'CmdLine' @CommonArgs @Timeout
 
                 if ($CmdLine -and $CmdLine.ValueContent) {
                     $CmdLine | New-AutoRunsEntry -Category $Category
                 }
 
                 'Credential Providers', 'Credential Provider Filters', 'PLAP Providers' |
-                    ForEach-Object { Get-CSRegistryKey -Hive HKLM -SubKey "SOFTWARE\Microsoft\Windows\CurrentVersion\Authentication\$_" @CommonArgs } | ForEach-Object {
+                    ForEach-Object { Get-CSRegistryKey -Hive HKLM -SubKey "SOFTWARE\Microsoft\Windows\CurrentVersion\Authentication\$_" @CommonArgs @Timeout } | ForEach-Object {
                         $LastBSIndex = $_.SubKey.LastIndexOf('\')
                         $ParentKey = $_.SubKey.Substring(0, $LastBSIndex)
                         $Guid = $_.SubKey.Substring($LastBSIndex + 1)
 
                         if ($Guid -as [Guid]) {
-                            $AutoRunEntry = Get-CSRegistryValue -Hive HKLM -SubKey "SOFTWARE\Classes\CLSID\$Guid" -ValueName '' -ValueType REG_SZ @CommonArgs
-                            $InprocServer32 = Get-CSRegistryValue -Hive HKLM -SubKey "SOFTWARE\Classes\CLSID\$Guid\InprocServer32" -ValueName '' -ValueType REG_EXPAND_SZ @CommonArgs
+                            $AutoRunEntry = Get-CSRegistryValue -Hive HKLM -SubKey "SOFTWARE\Classes\CLSID\$Guid" -ValueName '' -ValueType REG_SZ @CommonArgs @Timeout
+                            $InprocServer32 = Get-CSRegistryValue -Hive HKLM -SubKey "SOFTWARE\Classes\CLSID\$Guid\InprocServer32" -ValueName '' -ValueType REG_EXPAND_SZ @CommonArgs @Timeout
 
                             New-AutoRunsEntry $_.Hive $ParentKey $AutoRunEntry.ValueContent $InprocServer32.ValueContent $Category $_.PSComputerName
                         }
                     }
 
-                $BootVer = Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\BootVerificationProgram' -ValueName 'ImagePath' @CommonArgs
+                $BootVer = Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\BootVerificationProgram' -ValueName 'ImagePath' @CommonArgs @Timeout
 
                 if ($BootVer) {
                     $BootVer | New-AutoRunsEntry -Hive $BootVer.Hive -SubKey "$($BootVer.SubKey)\ImagePath"
                 }
 
                 foreach ($SID in $HKUSIDs) {
-                    $Scrnsave = Get-CSRegistryValue -Hive HKU -SubKey "$SID\SOFTWARE\Policies\Microsoft\Windows\Control Panel\Desktop" -ValueName 'Scrnsave.exe' @CommonArgs
+                    $Scrnsave = Get-CSRegistryValue -Hive HKU -SubKey "$SID\SOFTWARE\Policies\Microsoft\Windows\Control Panel\Desktop" -ValueName 'Scrnsave.exe' @CommonArgs @Timeout
                     if ($Scrnsave) { $Scrnsave | New-AutoRunsEntry }
 
-                    $Scrnsave = Get-CSRegistryValue -Hive HKU -SubKey "$SID\Control Panel\Desktop" -ValueName 'Scrnsave.exe' @CommonArgs
+                    $Scrnsave = Get-CSRegistryValue -Hive HKU -SubKey "$SID\Control Panel\Desktop" -ValueName 'Scrnsave.exe' @CommonArgs @Timeout
                     if ($Scrnsave) { $Scrnsave | New-AutoRunsEntry }
                 }
             }
@@ -577,6 +593,14 @@ Do not display a progress bar. This parameter is designed to be used with wrappe
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
 
+.PARAMETER OperationTimeoutSec
+
+Specifies the amount of time that the cmdlet waits for a response from the computer.
+
+By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
+
+If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
+
 .INPUTS
 
 Microsoft.Management.Infrastructure.CimSession
@@ -596,7 +620,11 @@ If a shortcut is present in the start menu, an instance of a Win32_ShortcutFile 
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession
+        $CimSession,
+
+        [UInt32]
+        [Alias('OT')]
+        $OperationTimeoutSec
     )
 
     BEGIN {
@@ -609,6 +637,9 @@ If a shortcut is present in the start menu, an instance of a Win32_ShortcutFile 
         }
 
         $CurrentCIMSession = 0
+
+        $Timeout = @{}
+        if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
     }
 
     PROCESS {
@@ -626,14 +657,14 @@ If a shortcut is present in the start menu, an instance of a Win32_ShortcutFile 
 
             if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
-            Get-CSShellFolderPath -SystemFolder -FolderName 'Common Startup' -NoProgressBar @CommonArgs | ForEach-Object {
-                Get-CSDirectoryListing -DirectoryPath $_.ValueContent -File @CommonArgs | Where-Object {
+            Get-CSShellFolderPath -SystemFolder -FolderName 'Common Startup' -NoProgressBar @CommonArgs @Timeout | ForEach-Object {
+                Get-CSDirectoryListing -DirectoryPath $_.ValueContent -File @CommonArgs @Timeout | Where-Object {
                     $_.FileName -ne 'desktop' -and $_.Extension -ne 'ini'
                 }
             }
 
-            Get-CSShellFolderPath -UserFolder -FolderName 'Startup' -NoProgressBar @CommonArgs | ForEach-Object {
-                Get-CSDirectoryListing -DirectoryPath $_.ValueContent -File @CommonArgs | Where-Object {
+            Get-CSShellFolderPath -UserFolder -FolderName 'Startup' -NoProgressBar @CommonArgs @Timeout | ForEach-Object {
+                Get-CSDirectoryListing -DirectoryPath $_.ValueContent -File @CommonArgs @Timeout | Where-Object {
                     $_.FileName -ne 'desktop' -and $_.Extension -ne 'ini'
                 }
             }
@@ -654,6 +685,14 @@ License: BSD 3-Clause
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
 
+.PARAMETER OperationTimeoutSec
+
+Specifies the amount of time that the cmdlet waits for a response from the computer.
+
+By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
+
+If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
+
 .INPUTS
 
 Microsoft.Management.Infrastructure.CimSession
@@ -666,7 +705,11 @@ Get-CSWMIPersistence accepts established CIM sessions over the pipeline.
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession
+        $CimSession,
+
+        [UInt32]
+        [Alias('OT')]
+        $OperationTimeoutSec
     )
 
     BEGIN {
@@ -680,6 +723,9 @@ Get-CSWMIPersistence accepts established CIM sessions over the pipeline.
         }
 
         $Current = 0
+
+        $Timeout = @{}
+        if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
     }
 
     PROCESS {
@@ -693,13 +739,13 @@ Get-CSWMIPersistence accepts established CIM sessions over the pipeline.
 
             Write-Verbose "[$($Session.ComputerName)] Retrieving __FilterToConsumerBinding instance."
 
-            Get-CimInstance -Namespace root/subscription -ClassName __FilterToConsumerBinding @CommonArgs | ForEach-Object {
+            Get-CimInstance -Namespace root/subscription -ClassName __FilterToConsumerBinding @CommonArgs @Timeout | ForEach-Object {
                 Write-Verbose "[$($Session.ComputerName)] Correlating referenced __EventFilter instance."
-                $Filter = Get-CimInstance -Namespace root/subscription -ClassName __EventFilter -Filter "Name=`"$($_.Filter.Name)`"" @CommonArgs
+                $Filter = Get-CimInstance -Namespace root/subscription -ClassName __EventFilter -Filter "Name=`"$($_.Filter.Name)`"" @CommonArgs @Timeout
 
                 $ConsumerClass = $_.Consumer.PSObject.TypeNames[0].Split('/')[-1]
                 Write-Verbose "[$($Session.ComputerName)] Correlating referenced __EventConsumer instance."
-                $Consumer = Get-CimInstance -Namespace root/subscription -ClassName $ConsumerClass -Filter "Name=`"$($_.Consumer.Name)`"" @CommonArgs
+                $Consumer = Get-CimInstance -Namespace root/subscription -ClassName $ConsumerClass -Filter "Name=`"$($_.Consumer.Name)`"" @CommonArgs @Timeout
 
                 [PSCustomObject] @{
                     Filter = $Filter

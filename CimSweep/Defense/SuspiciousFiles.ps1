@@ -19,6 +19,14 @@ Do not display a progress bar. This parameter is designed to be used with wrappe
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
 
+.PARAMETER OperationTimeoutSec
+
+Specifies the amount of time that the cmdlet waits for a response from the computer.
+
+By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
+
+If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
+
 .INPUTS
 
 Microsoft.Management.Infrastructure.CimSession
@@ -35,7 +43,11 @@ Get-CSScheduledTaskFile accepts established CIM sessions over the pipeline.
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession
+        $CimSession,
+
+        [UInt32]
+        [Alias('OT')]
+        $OperationTimeoutSec
     )
 
     BEGIN {
@@ -48,6 +60,9 @@ Get-CSScheduledTaskFile accepts established CIM sessions over the pipeline.
         }
 
         $CurrentCIMSession = 0
+
+        $Timeout = @{}
+        if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
     }
 
     PROCESS {
@@ -65,7 +80,7 @@ Get-CSScheduledTaskFile accepts established CIM sessions over the pipeline.
 
             if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
-            $OSInfo = Get-CimInstance -ClassName Win32_OperatingSystem -Property SystemDirectory, WindowsDirectory @CommonArgs
+            $OSInfo = Get-CimInstance -ClassName Win32_OperatingSystem -Property SystemDirectory, WindowsDirectory @CommonArgs @Timeout
 
             if ($OSInfo.SystemDirectory -and $OSInfo.WindowsDirectory) {
                 # %SystemRoot%\System32\Tasks
@@ -82,16 +97,16 @@ Get-CSScheduledTaskFile accepts established CIM sessions over the pipeline.
                     }
 
                     # List tasks in root directory
-                    Get-CSDirectoryListing -DirectoryPath $_ -File @CommonArgs
+                    Get-CSDirectoryListing -DirectoryPath $_ -File @CommonArgs @Timeout
 
                     # Start by only retrieving directory info recursively. This is a performance enhancement
-                    Get-CSDirectoryListing -DirectoryPath $_ -Recurse -Directory -DoNotDetectRecursiveDirs @CommonArgs | ForEach-Object {
+                    Get-CSDirectoryListing -DirectoryPath $_ -Recurse -Directory -DoNotDetectRecursiveDirs @CommonArgs @Timeout | ForEach-Object {
                         if (-not $PSBoundParameters['NoProgressBar']) {
                             Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status ($_.Name)
                         }
 
                         # Get task file information for each subdirectory
-                        $_ | Get-CSDirectoryListing -File @CommonArgs
+                        $_ | Get-CSDirectoryListing -File @CommonArgs @Timeout
                     }
                 }
             } else {
@@ -133,6 +148,14 @@ Do not display a progress bar. This parameter is designed to be used with wrappe
 .PARAMETER CimSession
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
+
+.PARAMETER OperationTimeoutSec
+
+Specifies the amount of time that the cmdlet waits for a response from the computer.
+
+By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
+
+If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
 
 .EXAMPLE
 
@@ -214,7 +237,11 @@ Get-CSShellFolderPath accepts established CIM sessions over the pipeline.
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession
+        $CimSession,
+
+        [UInt32]
+        [Alias('OT')]
+        $OperationTimeoutSec
     )
 
     BEGIN {
@@ -227,6 +254,9 @@ Get-CSShellFolderPath accepts established CIM sessions over the pipeline.
         }
 
         $CurrentCIMSession = 0
+
+        $Timeout = @{}
+        if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
 
         $ShellFolders = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders'
     }
@@ -249,23 +279,23 @@ Get-CSShellFolderPath accepts established CIM sessions over the pipeline.
             # Get a precise registry value if a specific folder is specified. This is a performance enhancement.
             if ($PSBoundParameters['FolderName']) {
                 if (($PSCmdlet.ParameterSetName -eq 'System') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
-                    Get-CSRegistryValue -Hive HKLM -SubKey $ShellFolders -ValueName $FolderName -ValueType REG_SZ @CommonArgs |
+                    Get-CSRegistryValue -Hive HKLM -SubKey $ShellFolders -ValueName $FolderName -ValueType REG_SZ @CommonArgs @Timeout |
                         Where-Object { $_.ValueContent }
                 }
 
                 if (($PSCmdlet.ParameterSetName -eq 'User') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
                     # Get the SIDS for each user in the registry
-                    $HKUSIDs = Get-HKUSID @CommonArgs
+                    $HKUSIDs = Get-HKUSID @CommonArgs @Timeout
 
                     # Iterate over each local user hive
                     foreach ($SID in $HKUSIDs) {
-                        Get-CSRegistryValue -Hive HKU -SubKey "$SID\$ShellFolders" -ValueName $FolderName -ValueType REG_SZ @CommonArgs |
+                        Get-CSRegistryValue -Hive HKU -SubKey "$SID\$ShellFolders" -ValueName $FolderName -ValueType REG_SZ @CommonArgs @Timeout |
                             Where-Object { $_.ValueContent }
                     }
                 }
             } else { # Otherwise, retrieve all shell folders
                 if (($PSCmdlet.ParameterSetName -eq 'System') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
-                    Get-CSRegistryValue -Hive HKLM -SubKey $ShellFolders -ValueNameOnly @CommonArgs | 
+                    Get-CSRegistryValue -Hive HKLM -SubKey $ShellFolders -ValueNameOnly @CommonArgs @Timeout | 
                         Where-Object { -not $_.ValueName.StartsWith('!') -and -not $_.ValueName.StartsWith('{') } |
                         Get-CSRegistryValue
                 }
@@ -276,7 +306,7 @@ Get-CSShellFolderPath accepts established CIM sessions over the pipeline.
 
                     # Iterate over each local user hive
                     foreach ($SID in $HKUSIDs) {
-                        Get-CSRegistryValue -Hive HKU -SubKey "$SID\$ShellFolders" -ValueNameOnly @CommonArgs | 
+                        Get-CSRegistryValue -Hive HKU -SubKey "$SID\$ShellFolders" -ValueNameOnly @CommonArgs @Timeout | 
                             Where-Object { -not $_.ValueName.StartsWith('!') -and -not $_.ValueName.StartsWith('{') } |
                             Get-CSRegistryValue
                     }
@@ -318,6 +348,14 @@ Only list files in the root directory.
 .PARAMETER CimSession
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
+
+.PARAMETER OperationTimeoutSec
+
+Specifies the amount of time that the cmdlet waits for a response from the computer.
+
+By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
+
+If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
 
 .INPUTS
 
@@ -362,7 +400,11 @@ Get-CSTempFile accepts established CIM sessions over the pipeline.
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession
+        $CimSession,
+
+        [UInt32]
+        [Alias('OT')]
+        $OperationTimeoutSec
     )
 
     BEGIN {
@@ -375,6 +417,9 @@ Get-CSTempFile accepts established CIM sessions over the pipeline.
         }
 
         $CurrentCIMSession = 0
+
+        $Timeout = @{}
+        if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
 
         $TargetExtensions = @{}
         if ($PSBoundParameters['Extension']) { $TargetExtensions['Extension'] = $Extension }
@@ -397,7 +442,7 @@ Get-CSTempFile accepts established CIM sessions over the pipeline.
 
             if (($PSCmdlet.ParameterSetName -eq 'System') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
                 # Get system temp path from the registry
-                $SystemTempPath = Get-CSEnvironmentVariable -SystemVariable -VariableName TEMP -NoProgressBar @CommonArgs
+                $SystemTempPath = Get-CSEnvironmentVariable -SystemVariable -VariableName TEMP -NoProgressBar @CommonArgs @Timeout
 
                 if ($SystemTempPath.VariableValue) {
                     Write-Verbose "[$ComputerName] User temp directory: $($SystemTempPath.VariableValue)"
@@ -407,15 +452,15 @@ Get-CSTempFile accepts established CIM sessions over the pipeline.
                     }
 
                     # Display files in the root temp dir
-                    Get-CSDirectoryListing -DirectoryPath $SystemTempPath.VariableValue -File @TargetExtensions @CommonArgs
+                    Get-CSDirectoryListing -DirectoryPath $SystemTempPath.VariableValue -File @TargetExtensions @CommonArgs @Timeout
 
                     if (-not $PSBoundParameters['DoNotRecurse']) {
-                        Get-CSDirectoryListing -DirectoryPath $SystemTempPath.VariableValue -Directory -Recurse @CommonArgs | ForEach-Object {
+                        Get-CSDirectoryListing -DirectoryPath $SystemTempPath.VariableValue -Directory -Recurse @CommonArgs @Timeout | ForEach-Object {
                             if (-not $PSBoundParameters['NoProgressBar']) {
                                 Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status ($_.Name)
                             }
 
-                            $_ | Get-CSDirectoryListing -File @TargetExtensions
+                            $_ | Get-CSDirectoryListing -File @TargetExtensions @Timeout
                         }
                     }
                 } else {
@@ -425,8 +470,8 @@ Get-CSTempFile accepts established CIM sessions over the pipeline.
 
             if (($PSCmdlet.ParameterSetName -eq 'User') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
                 # Get user %USERPROFILE% and validate the end of %TEMP%. The root path of %TEMP% is not often not resolved properly.
-                $UserProfiles = Get-CSEnvironmentVariable -UserVariable -VariableName USERPROFILE -NoProgressBar @CommonArgs
-                $TempVars = Get-CSEnvironmentVariable -UserVariable -VariableName TEMP -NoProgressBar @CommonArgs
+                $UserProfiles = Get-CSEnvironmentVariable -UserVariable -VariableName USERPROFILE -NoProgressBar @CommonArgs @Timeout
+                $TempVars = Get-CSEnvironmentVariable -UserVariable -VariableName TEMP -NoProgressBar @CommonArgs @Timeout
 
                 foreach ($UserProfile in $UserProfiles) {
                     $TempVars | Where-Object { $_.User -eq $UserProfile.User } | ForEach-Object {
@@ -453,15 +498,15 @@ Get-CSTempFile accepts established CIM sessions over the pipeline.
                             }
 
                             # Display files in the root temp dir
-                            Get-CSDirectoryListing -DirectoryPath $FullTempPath -File @TargetExtensions @CommonArgs
+                            Get-CSDirectoryListing -DirectoryPath $FullTempPath -File @TargetExtensions @CommonArgs @Timeout
 
                             if (-not $PSBoundParameters['DoNotRecurse']) {
-                                Get-CSDirectoryListing -DirectoryPath $FullTempPath -Directory -Recurse @CommonArgs | ForEach-Object {
+                                Get-CSDirectoryListing -DirectoryPath $FullTempPath -Directory -Recurse @CommonArgs @Timeout | ForEach-Object {
                                     if (-not $PSBoundParameters['NoProgressBar']) {
                                         Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status ($_.Name)
                                     }
 
-                                    $_ | Get-CSDirectoryListing -File @TargetExtensions
+                                    $_ | Get-CSDirectoryListing -File @TargetExtensions @Timeout
                                 }
                             }
                         }
@@ -497,6 +542,14 @@ Only list files in the root directory.
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
 
+.PARAMETER OperationTimeoutSec
+
+Specifies the amount of time that the cmdlet waits for a response from the computer.
+
+By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
+
+If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
+
 .INPUTS
 
 Microsoft.Management.Infrastructure.CimSession
@@ -520,7 +573,11 @@ Get-CSLowILPathFile accepts established CIM sessions over the pipeline.
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession
+        $CimSession,
+
+        [UInt32]
+        [Alias('OT')]
+        $OperationTimeoutSec
     )
 
     BEGIN {
@@ -533,6 +590,9 @@ Get-CSLowILPathFile accepts established CIM sessions over the pipeline.
         }
 
         $CurrentCIMSession = 0
+
+        $Timeout = @{}
+        if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
 
         $TargetExtensions = @{}
         if ($PSBoundParameters['Extension']) { $TargetExtensions['Extension'] = $Extension }
@@ -553,7 +613,7 @@ Get-CSLowILPathFile accepts established CIM sessions over the pipeline.
 
             if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
-            Get-CSEnvironmentVariable -UserVariable -VariableName LOCALAPPDATA -NoProgressBar @CommonArgs | ForEach-Object {
+            Get-CSEnvironmentVariable -UserVariable -VariableName LOCALAPPDATA -NoProgressBar @CommonArgs @Timeout | ForEach-Object {
                 Write-Verbose "[$ComputerName] LocalAppData path: $($_.VariableValue)"
 
                 if ($_.VariableValue) {
@@ -564,15 +624,15 @@ Get-CSLowILPathFile accepts established CIM sessions over the pipeline.
                     }
 
                     # List all files in the root low IL dir
-                    Get-CSDirectoryListing -DirectoryPath $LocalLowPath -File @TargetExtensions @CommonArgs
+                    Get-CSDirectoryListing -DirectoryPath $LocalLowPath -File @TargetExtensions @CommonArgs @Timeout
 
                     if (-not $PSBoundParameters['DoNotRecurse']) {
-                        Get-CSDirectoryListing -DirectoryPath $LocalLowPath -Recurse -Directory @CommonArgs | ForEach-Object {
+                        Get-CSDirectoryListing -DirectoryPath $LocalLowPath -Recurse -Directory @CommonArgs @Timeout | ForEach-Object {
                             if (-not $PSBoundParameters['NoProgressBar']) {
                                 Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status ($_.Name)
                             }
 
-                            $_ | Get-CSDirectoryListing -File @TargetExtensions
+                            $_ | Get-CSDirectoryListing -File @TargetExtensions @Timeout
                         }
                     }
                 }
