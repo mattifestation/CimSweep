@@ -1403,6 +1403,14 @@ Specifies the full path or a portion of the path to the service binary file that
 
 Specifies the service description.
 
+.PARAMETER LimitOutput
+
+Specifies that an explicit list of Win32_Process properties should be returned. This can significantly reduce the time it takes to sweep across many systems is only a subset of properties are desired.
+
+.PARAMETER Property
+
+Specifies the desired properties to retrieve from Win32_Process instances. The following properties are returned when limited output is desired: ProcessId, ParentProcessId, Name, ExecutablePath, CommandLine
+
 .PARAMETER NoProgressBar
 
 Do not display a progress bar. This parameter is designed to be used with wrapper functions.
@@ -1445,38 +1453,88 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
 #>
 
     [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
+    [CmdletBinding(DefaultParameterSetName='DefaultOutput')]
     param(
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
         [String]
         [ValidateNotNullOrEmpty()]
         $Name,
 
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
         [String]
         [ValidateNotNullOrEmpty()]
         $DisplayName,
 
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
         [String]
         [ValidateSet('Stopped', 'Start Pending', 'Stop Pending', 'Running', 'Continue Pending', 'Pause Pending', 'Paused', 'Unknown')]
         $State,
 
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
         [String]
         [ValidateSet('Boot', 'System', 'Auto', 'Manual', 'Disabled')]
         $StartMode,
 
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
         [String]
         [ValidateSet('Kernel Driver', 'File System Driver', 'Adapter', 'Recognizer Driver', 'Own Process', 'Share Process', 'Interactive Process')]
         $ServiceType,
 
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
         [String]
         [ValidateNotNullOrEmpty()]
         $PathName,
 
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
         [String]
         [ValidateNotNullOrEmpty()]
         $Description,
 
+        [Parameter(Mandatory = $True, ParameterSetName='RestrictOutput')]
+        [Switch]
+        $LimitOutput,
+
+        [Parameter(ParameterSetName='RestrictOutput')]
+        [String[]]
+        [ValidateSet(
+            'AcceptPause',
+            'AcceptStop',
+            'Caption',
+            'CreationClassName',
+            'Description',
+            'DesktopInteract',
+            'DisplayName',
+            'ErrorControl',
+            'ExitCode',
+            'InstallDate',
+            'Name',
+            'PathName',
+            'ServiceSpecificExitCode',
+            'ServiceType',
+            'Started',
+            'StartMode',
+            'StartName',
+            'State',
+            'Status',
+            'SystemCreationClassName',
+            'SystemName',
+            'TagId')]
+        $Property = @('Name', 'DisplayName', 'Description', 'State', 'ServiceType', 'PathName'),
+
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
         [Switch]
         $NoProgressBar,
 
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
@@ -1497,6 +1555,9 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
         }
 
         $CurrentCIMSession = 0
+
+        $PropertyList = @{}
+        if ($PSBoundParameters['LimitOutput']) { $PropertyList['Property'] = $Property }
 
         $Timeout = @{}
         if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
@@ -1534,7 +1595,7 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
                 $ServiceEntryArgs['Filter'] = $Filter
             }
 
-            Get-CimInstance -ClassName Win32_BaseService @CommonArgs @ServiceEntryArgs @Timeout
+            Get-CimInstance -ClassName Win32_BaseService @CommonArgs @ServiceEntryArgs @PropertyList @Timeout
         }
     }
 }
@@ -1716,8 +1777,8 @@ Outputs Win32_Process instances.
         [Switch]
         $NoProgressBar,
 
-        [Parameter(ValueFromPipeline = $True, ParameterSetName='DefaultOutput')]
-        [Parameter(ValueFromPipeline = $True, ParameterSetName='RestrictOutput')]
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
@@ -1741,6 +1802,9 @@ Outputs Win32_Process instances.
 
         $Timeout = @{}
         if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
+
+        $PropertyList = @{}
+        if ($PSBoundParameters['LimitOutput']) { $PropertyList['Property'] = $Property }
     }
 
     PROCESS {
@@ -1772,9 +1836,6 @@ Outputs Win32_Process instances.
                 $Filter = $FilterComponents -join ' AND '
                 $ProcessEntryArgs['Filter'] = $Filter
             }
-
-            $PropertyList = @{}
-            if ($PSBoundParameters['LimitOutput']) { $PropertyList['Property'] = $Property }
 
             Get-CimInstance -ClassName Win32_Process @CommonArgs @ProcessEntryArgs @PropertyList @Timeout
         }

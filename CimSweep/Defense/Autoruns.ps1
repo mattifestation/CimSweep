@@ -158,6 +158,7 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
         $ParamCopy = $PSBoundParameters
         $null = $ParamCopy.Remove('CimSession')
         $null = $ParamCopy.Remove('NoProgressBar')
+        $null = $ParamCopy.Remove('OperationTimeoutSec')
 
         # Count the number of options provided for use of displaying a progress bar
         $AutoRunOptionCount = $ParamCopy.Keys.Count
@@ -344,6 +345,9 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['Services'] -or $PSBoundParameters['Drivers']) {
                 $ServiceKeys = Get-CSRegistryKey -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Services' @CommonArgs @Timeout
 
+                if ($PSBoundParameters['Services']) { $CurrentAutorunCount++ }
+                if ($PSBoundParameters['Drivers']) { $CurrentAutorunCount++ }
+
                 $ServiceKeys | Get-CSRegistryValue -ValueName 'Type' @CommonArgs @Timeout | ForEach-Object {
                     $SERVICE_KERNEL_DRIVER = 1
                     $SERVICE_FILE_SYSTEM_DRIVER = 2
@@ -357,7 +361,6 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
 
                         if (-not $PSBoundParameters['NoProgressBar']) {
                             Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
-                            $CurrentAutorunCount++
                         }
 
                         $ImagePath = ($_ | Get-CSRegistryValue -ValueName ImagePath @CommonArgs @Timeout).ValueContent
@@ -370,7 +373,6 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
 
                         if (-not $PSBoundParameters['NoProgressBar']) {
                             Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
-                            $CurrentAutorunCount++
                         }
 
                         if ($_.ValueContent -eq $SERVICE_WIN32_OWN_PROCESS) {
