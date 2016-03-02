@@ -748,6 +748,10 @@ Use the parameters of Get-CSEventLogEntry to search for events by using their pr
 
 Specifies the event log. Event log names can be obtained with Get-CSEventLog.
 
+.PARAMETER EventCode
+
+Gets only events with the specified event code. EventCode refers to the value of the lower 16-bits of the EventIdentifier property. EventCode matches the value displayed in the Windows Event Viewer.
+
 .PARAMETER EventIdentifier
 
 Gets only events with the specified event identifier.
@@ -775,6 +779,14 @@ Gets events that were written to the log by the specified sources.
 .PARAMETER UserName
 
 Gets only the events that are associated with the specified user names.
+
+.PARAMETER LimitOutput
+
+Specifies that an explicit list of Win32_Process properties should be returned. This can significantly reduce the time it takes to sweep across many systems is only a subset of properties are desired.
+
+.PARAMETER Property
+
+Specifies the desired properties to retrieve from Win32_Process instances. The following properties are returned when limited output is desired: ProcessId, ParentProcessId, Name, ExecutablePath, CommandLine
 
 .PARAMETER CimSession
 
@@ -818,42 +830,86 @@ Outputs Win32_NtLogEvent instances.
 #>
 
     [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
+    [CmdletBinding(DefaultParameterSetName='DefaultOutput')]
     param(
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
         [Parameter(ValueFromPipelineByPropertyName = $True)]
         [String]
         $LogName,
 
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
+        [UInt32[]]
+        $EventCode,
+
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
         [UInt32[]]
         $EventIdentifier,
 
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
         [String]
         [ValidateSet('Error', 'Information', 'FailureAudit', 'SuccessAudit', 'Warning')]
         $EntryType,
 
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
         [DateTime]
         [ValidateNotNullOrEmpty()]
         $After,
 
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
         [DateTime]
         [ValidateNotNullOrEmpty()]
         $Before,
 
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
         [String]
         [ValidateNotNullOrEmpty()]
         $Message,
 
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
         [String]
         [ValidateNotNullOrEmpty()]
         $Source,
 
-        [String]
-        [ValidateNotNullOrEmpty()]
-        $UserName,
+        [Parameter(Mandatory = $True, ParameterSetName='RestrictOutput')]
+        [Switch]
+        $LimitOutput,
 
+        [Parameter(ParameterSetName='RestrictOutput')]
+        [String[]]
+        [ValidateSet(
+            'Category',
+            'CategoryString',
+            'ComputerName',
+            'Data',
+            'EventCode',
+            'EventIdentifier',
+            'EventType',
+            'InsertionStrings',
+            'Logfile',
+            'Message',
+            'RecordNumber',
+            'SourceName',
+            'TimeGenerated',
+            'TimeWritten',
+            'Type',
+            'User')]
+        $Property = @('LogFile', 'CategoryString', 'EventCode', 'EventIdentifier', 'Message', 'SourceName', 'TimeGenerated', 'Type'),
+
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
         [Switch]
         $NoProgressBar,
 
-        [Parameter(ValueFromPipelineByPropertyName = $True)]
+        [Parameter(ValueFromPipelineByPropertyName = $True, ParameterSetName='DefaultOutput')]
+        [Parameter(ValueFromPipelineByPropertyName = $True, ParameterSetName='RestrictOutput')]
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
@@ -874,6 +930,9 @@ Outputs Win32_NtLogEvent instances.
         }
 
         $CurrentCIMSession = 0
+
+        $PropertyList = @{}
+        if ($PSBoundParameters['LimitOutput']) { $PropertyList['Property'] = $Property }
 
         $Timeout = @{}
         if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
@@ -907,20 +966,20 @@ Outputs Win32_NtLogEvent instances.
             }
 
             if ($PSBoundParameters['LogName']) { $FilterComponents.Add("LogFile='$LogName'") }
+            if ($PSBoundParameters['EventCode']) { $FilterComponents.Add("($(($EventCode | ForEach-Object { "EventCode = $_" }) -join ' OR '))") }
             if ($PSBoundParameters['EventIdentifier']) { $FilterComponents.Add("($(($EventIdentifier | ForEach-Object { "EventIdentifier = $_" }) -join ' OR '))") }
             if ($PSBoundParameters['EntryType']) { $FilterComponents.Add("EventType=$($TypeMapping[$EntryType])") }
             if ($PSBoundParameters['Before']) { $FilterComponents.Add("TimeGenerated<'$($Before.ToUniversalTime().ToString('yyyyMMddHHmmss.ffffff+000'))'") }
             if ($PSBoundParameters['After']) { $FilterComponents.Add("TimeGenerated>'$($After.ToUniversalTime().ToString('yyyyMMddHHmmss.ffffff+000'))'") }
             if ($PSBoundParameters['Message']) { $FilterComponents.Add("Message LIKE '%$($Message)%'") }
             if ($PSBoundParameters['Source']) { $FilterComponents.Add("SourceName LIKE '%$Source%'") }
-            if ($PSBoundParameters['UserName']) { $FilterComponents.Add("User LIKE '%$UserName%'") }
 
             if ($FilterComponents.Count) {
                 $Filter = $FilterComponents -join ' AND '
                 $EventLogEntryArgs['Filter'] = $Filter
             }
 
-            Get-CimInstance -ClassName Win32_NTLogEvent @CommonArgs @EventLogEntryArgs @Timeout
+            Get-CimInstance -ClassName Win32_NTLogEvent @CommonArgs @EventLogEntryArgs @PropertyList @Timeout
         }
     }
 }
