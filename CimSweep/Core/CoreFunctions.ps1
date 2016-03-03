@@ -1063,7 +1063,7 @@ Outputs a list of mounted drive letters.
                 if ($Volume.DeviceID) {
                     $DiskInfo = [PSCustomObject] @{
                         DriveLetter = $Volume.DeviceID[0]
-                        Path = "$($Volume.DeviceID)\"
+                        DirectoryPath = "$($Volume.DeviceID)\"
                         PSComputerName = $Volume.PSComputerName
                         CimSession = $CimSession
                     }
@@ -1227,10 +1227,10 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
     [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
     [CmdletBinding(DefaultParameterSetName = 'DirOnly')]
     param(
-        [Parameter(ValueFromPipelineByPropertyName = $True, Mandatory = $True, Position = 0)]
+        [Parameter(ValueFromPipelineByPropertyName = $True, Position = 0)]
         [Alias('Name')]
         [String]
-        [ValidatePattern('^(?<ValidDriveLetter>[A-Za-z]:)(?<ValidPath>\\.*)$')]
+        [ValidatePattern('^[A-Za-z]:\\.*$')]
         $DirectoryPath,
 
         [Parameter(ParameterSetName = 'FileQuery')]
@@ -1332,6 +1332,14 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
     }
 
     PROCESS {
+        if (-not $DirectoryPath) {
+            # If no directory path is provided, perform a file/directory listing of the root of all mounted partitions
+            Get-CSMountedVolumeDriveLetter | Get-CSDirectoryListing @PSBoundParameters
+            return
+        } else {
+            Write-Verbose "[$ComputerName] Current directory: $DirectoryPath"
+        }
+
         foreach ($Session in $CimSession) {
             $ComputerName = $Session.ComputerName
             if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
@@ -1410,7 +1418,7 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
                 if ($PSBoundParameters['CreationDate']) { $FilterComponents.Add("CreationDate=`"$($CreationDate.ToUniversalTime().ToString($DmtfFormat))`"") }
                 if ($PSBoundParameters['CreationDateBefore']) { $FilterComponents.Add("CreationDate<`"$($CreationDateBefore.ToUniversalTime().ToString($DmtfFormat))`"") }
                 if ($PSBoundParameters['CreationDateAfter']) { $FilterComponents.Add("CreationDate>`"$($CreationDateAfter.ToUniversalTime().ToString($DmtfFormat))`"") }
-                if ($PSBoundParameters['CreationDateAfter']) { $FilterComponents.Add('Hidden = "True"') }
+                if ($PSBoundParameters['Hidden']) { $FilterComponents.Add('Hidden = "True"') }
 
                 $FileFilter = $null
 

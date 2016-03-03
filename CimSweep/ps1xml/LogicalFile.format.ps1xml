@@ -40,7 +40,7 @@
                         <Label>DriveLetter</Label>
                     </TableColumnHeader>
                     <TableColumnHeader>
-                        <Label>Path</Label>
+                        <Label>DirectoryPath</Label>
                     </TableColumnHeader>
                     <TableColumnHeader>
                         <Label>PSComputerName</Label>
@@ -53,7 +53,7 @@
                                 <PropertyName>DriveLetter</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>Path</PropertyName>
+                                <PropertyName>DirectoryPath</PropertyName>
                             </TableColumnItem>
                             <TableColumnItem>
                                 <PropertyName>PSComputerName</PropertyName>

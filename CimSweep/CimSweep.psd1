@@ -1,7 +1,7 @@
 ﻿@{
 RootModule = 'CimSweep.psm1'
 
-ModuleVersion = '0.3.1.0'
+ModuleVersion = '0.3.2.0'
 
 GUID = 'f347ef1c-d752-4d07-bf68-3197c0aa661a'
 
