@@ -558,6 +558,7 @@ Get-CSLowILPathFile accepts established CIM sessions over the pipeline.
 #>
 
     [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
+    [CmdletBinding()]
     param(
         [ValidateNotNullOrEmpty()]
         [String[]]

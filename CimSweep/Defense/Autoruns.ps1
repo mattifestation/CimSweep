@@ -82,7 +82,7 @@ Microsoft.Management.Infrastructure.CimSession
 Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
 #>
 
-    [OutputType([PSObject])]
+    [CmdletBinding()]
     param(
         [Parameter(ParameterSetName = 'SpecificCheck')]
         [Switch]
@@ -615,6 +615,7 @@ If a shortcut is present in the start menu, an instance of a Win32_ShortcutFile 
 #>
 
     [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
+    [CmdletBinding()]
     param(
         [Switch]
         $NoProgressBar,

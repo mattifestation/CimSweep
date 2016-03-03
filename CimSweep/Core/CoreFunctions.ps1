@@ -265,27 +265,37 @@ Outputs a list of custom objects representing registry value names, their respec
 
 #>
     
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName='HiveValueNameNoType')]
     param(
-        [Parameter(Mandatory = $True, ValueFromPipelineByPropertyName = $True, ParameterSetName = 'ExplicitPath')]
+        [Parameter(Mandatory = $True, ValueFromPipelineByPropertyName = $True, ParameterSetName = 'HiveValueNameNoType')]
+        [Parameter(Mandatory = $True, ValueFromPipelineByPropertyName = $True, ParameterSetName = 'HiveValues')]
+        [Parameter(Mandatory = $True, ValueFromPipelineByPropertyName = $True, ParameterSetName = 'HiveValueNameWithType')]
         [String]
         [ValidateSet('HKLM', 'HKCU', 'HKU', 'HKCR', 'HKCC')]
         $Hive,
 
-        [Parameter(ValueFromPipelineByPropertyName = $True, ParameterSetName = 'ExplicitPath')]
+        [Parameter(ValueFromPipelineByPropertyName = $True, ParameterSetName = 'HiveValueNameNoType')]
+        [Parameter(ValueFromPipelineByPropertyName = $True, ParameterSetName = 'HiveValues')]
+        [Parameter(ValueFromPipelineByPropertyName = $True, ParameterSetName = 'HiveValueNameWithType')]
         [String]
         $SubKey = '',
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'PSDrivePath')]
+        [Parameter(Mandatory = $True, ParameterSetName = 'PathValueNameNoType')]
+        [Parameter(Mandatory = $True, ParameterSetName = 'PathValues')]
+        [Parameter(Mandatory = $True, ParameterSetName = 'PathValueNameWithType')]
         [String]
         [ValidatePattern('^(HKLM|HKCU|HKU|HKCR|HKCC):\\.*$')]
         $Path,
 
-        [Parameter(ValueFromPipelineByPropertyName = $True, ParameterSetName = 'ExplicitPath')]
-        [Parameter(ParameterSetName = 'PSDrivePath')]
+        [Parameter(ValueFromPipelineByPropertyName = $True, ParameterSetName = 'HiveValueNameNoType')]
+        [Parameter(ValueFromPipelineByPropertyName = $True, ParameterSetName = 'HiveValueNameWithType')]
+        [Parameter(ParameterSetName = 'PathValueNameNoType')]
+        [Parameter(ParameterSetName = 'PathValueNameWithType')]
         [String]
         $ValueName,
 
+        [Parameter(Mandatory = $True, ParameterSetName = 'HiveValueNameWithType')]
+        [Parameter(Mandatory = $True, ParameterSetName = 'PathValueNameWithType')]
         [String]
         [ValidateSet(
             'REG_NONE',
@@ -301,6 +311,8 @@ Outputs a list of custom objects representing registry value names, their respec
         )]
         $ValueType,
 
+        [Parameter(Mandatory = $True, ParameterSetName = 'HiveValues')]
+        [Parameter(Mandatory = $True, ParameterSetName = 'PathValues')]
         [Switch]
         $ValueNameOnly,
 
@@ -605,6 +617,7 @@ By default, the value of this parameter is 0, which means that the cmdlet uses t
 If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
 #>
 
+    [CmdletBinding()]
     param(
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
@@ -671,6 +684,7 @@ PSObject
 Outptus a custom object that can be piped to Get-CSEventLog entry.
 #>
 
+    [CmdletBinding()]
     param(
         [Switch]
         $NoProgressBar,
@@ -878,7 +892,7 @@ Outputs Win32_NtLogEvent instances.
         [ValidateNotNullOrEmpty()]
         $Source,
 
-        [Parameter(Mandatory = $True, ParameterSetName='RestrictOutput')]
+        [Parameter(ParameterSetName='DefaultOutput')]
         [Switch]
         $LimitOutput,
 
@@ -932,7 +946,7 @@ Outputs Win32_NtLogEvent instances.
         $CurrentCIMSession = 0
 
         $PropertyList = @{}
-        if ($PSBoundParameters['LimitOutput']) { $PropertyList['Property'] = $Property }
+        if ($PSBoundParameters['LimitOutput'] -or $PSBoundParameters['Property']) { $PropertyList['Property'] = $Property }
 
         $Timeout = @{}
         if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
@@ -1012,6 +1026,7 @@ PSObject
 Outputs a list of mounted drive letters.
 #>
 
+    [CmdletBinding()]
     param(
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
@@ -1556,7 +1571,7 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
         [ValidateNotNullOrEmpty()]
         $Description,
 
-        [Parameter(Mandatory = $True, ParameterSetName='RestrictOutput')]
+        [Parameter(ParameterSetName='DefaultOutput')]
         [Switch]
         $LimitOutput,
 
@@ -1616,7 +1631,7 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
         $CurrentCIMSession = 0
 
         $PropertyList = @{}
-        if ($PSBoundParameters['LimitOutput']) { $PropertyList['Property'] = $Property }
+        if ($PSBoundParameters['LimitOutput'] -or $PSBoundParameters['Property']) { $PropertyList['Property'] = $Property }
 
         $Timeout = @{}
         if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
@@ -1777,7 +1792,7 @@ Outputs Win32_Process instances.
         [ValidateNotNullOrEmpty()]
         $ExecutablePath,
 
-        [Parameter(Mandatory = $True, ParameterSetName='RestrictOutput')]
+        [Parameter(ParameterSetName='DefaultOutput')]
         [Switch]
         $LimitOutput,
 
@@ -1863,7 +1878,7 @@ Outputs Win32_Process instances.
         if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
 
         $PropertyList = @{}
-        if ($PSBoundParameters['LimitOutput']) { $PropertyList['Property'] = $Property }
+        if ($PSBoundParameters['LimitOutput'] -or $PSBoundParameters['Property']) { $PropertyList['Property'] = $Property }
     }
 
     PROCESS {

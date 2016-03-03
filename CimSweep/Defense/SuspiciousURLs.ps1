@@ -25,6 +25,7 @@ If the OperationTimeoutSec parameter is set to a value less than the robust conn
 
 #>
 
+    [CmdletBinding()]
     param(
         [Switch]
         $NoProgressBar,
