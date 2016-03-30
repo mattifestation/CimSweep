@@ -32,6 +32,10 @@ FunctionsToExport = @(
     'Get-CSStartMenuEntry',
     'Get-CSTypedURL',
     'Get-CSWmiPersistence'
+    'Get-CSProxyConfig'
+    'Get-CSAVInfo'
+    'Invoke-CSShadowCopy'
+    'Enable-Rdp'
 )
 
 FormatsToProcess = @(
