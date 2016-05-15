@@ -75,14 +75,15 @@ By default, the value of this parameter is 0, which means that the cmdlet uses t
 
 If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
 
-.INPUTS
+.OUTPUTS
 
-Microsoft.Management.Infrastructure.CimSession
+CimSweep.AutoRunEntry
 
-Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
+Outputs objects representing autoruns entries similar to the output of Sysinternals Autoruns.
 #>
 
     [CmdletBinding()]
+    [OutputType('CimSweep.AutoRunEntry')]
     param(
         [Parameter(ParameterSetName = 'SpecificCheck')]
         [Switch]
@@ -194,16 +195,38 @@ Get-CSRegistryAutoStart accepts established CIM sessions over the pipeline.
 
                 [Parameter(Position = 5, ValueFromPipelineByPropertyName = $True)]
                 [String]
-                $PSComputerName
+                $PSComputerName,
+
+                [Parameter(ValueFromPipelineByPropertyName = $True)]
+                [Alias('Session')]
+                [Microsoft.Management.Infrastructure.CimSession]
+                $CimSession
             )
 
-            [PSCustomObject] @{
+            $ObjectProperties = [Ordered] @{
+                PSTypeName = 'CimSweep.AutoRunEntry'
                 Path = "$($Hive)\$($SubKey)"
                 AutoRunEntry = $AutoRunEntry
                 ImagePath = $ImagePath
                 Category = $Category
-                PSComputerName = $PSComputerName
             }
+
+            $DefaultProperties = 'Path', 'AutoRunEntry', 'ImagePath', 'Category' -as [Type] 'Collections.Generic.List[String]'
+
+            if ($PSComputerName) {
+                $ObjectProperties['PSComputerName'] = $PSComputerName
+                $DefaultProperties.Add('PSComputerName')
+            } else {
+                $ObjectProperties['PSComputerName'] = $null
+            }
+
+            if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
+
+            $AutoRunsEntry = [PSCustomObject] $ObjectProperties
+
+            Set-DefaultDisplayProperties -InputObject $AutoRunsEntry -PropertyNames $DefaultProperties
+
+            $AutoRunsEntry
         }
     }
 

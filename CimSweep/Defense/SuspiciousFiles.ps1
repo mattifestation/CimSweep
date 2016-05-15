@@ -27,15 +27,15 @@ By default, the value of this parameter is 0, which means that the cmdlet uses t
 
 If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
 
-.INPUTS
+.OUTPUTS
 
-Microsoft.Management.Infrastructure.CimSession
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/CIM_DataFile
 
-Get-CSScheduledTaskFile accepts established CIM sessions over the pipeline.
+Outputs CIM_DataFile instances representing task XML files.
 #>
 
-    [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
     [CmdletBinding()]
+    [OutputType('Microsoft.Management.Infrastructure.CimInstance#root/cimv2/CIM_DataFile')]
     param(
         [Switch]
         $NoProgressBar,
@@ -169,14 +169,15 @@ Get-CSShellFolderPath -FolderName 'Common Start Menu'
 
 Get-CSShellFolderPath -FolderName 'Start Menu' -CimSession $CimSession
 
-.INPUTS
+.OUTPUTS
 
-Microsoft.Management.Infrastructure.CimSession
+CimSweep.RegistryValue
 
-Get-CSShellFolderPath accepts established CIM sessions over the pipeline.
+Outputs a list of registry values representing shell folder paths.
 #>
 
     [CmdletBinding(DefaultParameterSetName = 'Default')]
+    [OutputType('CimSweep.RegistryValue')]
     param(
         [Parameter(ParameterSetName = 'Default')]
         [Parameter(ParameterSetName = 'System')]
@@ -357,15 +358,15 @@ By default, the value of this parameter is 0, which means that the cmdlet uses t
 
 If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
 
-.INPUTS
+.OUTPUTS
 
-Microsoft.Management.Infrastructure.CimSession
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/CIM_DataFile
 
-Get-CSTempFile accepts established CIM sessions over the pipeline.
+Outputs CIM_DataFile instances of files present in the specified temp directory (and its subdirectories).
 #>
 
-    [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
     [CmdletBinding(DefaultParameterSetName = 'Default')]
+    [OutputType('Microsoft.Management.Infrastructure.CimInstance#root/cimv2/CIM_DataFile')]
     param(
         [Parameter(ParameterSetName = 'Default')]
         [Parameter(ParameterSetName = 'System')]
@@ -550,15 +551,15 @@ By default, the value of this parameter is 0, which means that the cmdlet uses t
 
 If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
 
-.INPUTS
+.OUTPUTS
 
-Microsoft.Management.Infrastructure.CimSession
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/CIM_DataFile
 
-Get-CSLowILPathFile accepts established CIM sessions over the pipeline.
+Outputs CIM_DataFile instances of files present in low-integrity level directories.
 #>
 
-    [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
     [CmdletBinding()]
+    [OutputType('Microsoft.Management.Infrastructure.CimInstance#root/cimv2/CIM_DataFile')]
     param(
         [ValidateNotNullOrEmpty()]
         [String[]]

@@ -122,11 +122,9 @@ Describe 'Get-CSRegistryKey' {
         }
 
         It 'should not return a computer name when not using a CIM session' {
-            $Results = Get-CSRegistryKey -Hive HKLM
+            $Result = Get-CSRegistryKey -Hive HKLM | Select -First 1
 
-            $UniqueComputerNames = @($Results.PSComputerName | Sort-Object -Unique)
-
-            $UniqueComputerNames | Should BeNullOrEmpty
+            $Result.PSComputerName | Should BeNullOrEmpty
         }
 
         It 'should return nothing upon querying a nonexistent key' {
@@ -1084,11 +1082,11 @@ Describe 'Get-CSProcess' {
     $ProcessWMIType = 'Microsoft.Management.Infrastructure.CimInstance#ROOT/cimv2/Win32_Process'
 
     It 'should return nothing when a nonexistent process name is specified' {
-        Get-CSProcess -Name nonexistentprocess | Should BeNullOrEmpty
+        Get-CSProcess -Name nonexistentprocess -NoProgressBar | Should BeNullOrEmpty
     }
 
     It 'should return nothing when a nonexistent process name is specified w/ CIM sessions' {
-        Get-CSProcess -Name nonexistentprocess -CimSession $TestCimSession1 | Should BeNullOrEmpty
+        Get-CSProcess -Name nonexistentprocess -CimSession $TestCimSession1 -NoProgressBar | Should BeNullOrEmpty
     }
 
     It 'should return the system process' {
@@ -1192,7 +1190,7 @@ Describe 'Get-CSProcess' {
 
 Describe 'Get-CSEnvironmentVariable' {
     It 'should return a populated environment variable' {
-        $EnvVar = Get-CSEnvironmentVariable | Select-Object -First 1
+        $EnvVar = Get-CSEnvironmentVariable -NoProgressBar | Select-Object -First 1
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should Not BeNullOrEmpty
         $EnvVar.User | Should Not BeNullOrEmpty
@@ -1201,7 +1199,7 @@ Describe 'Get-CSEnvironmentVariable' {
     }
 
     It 'should return a populated environment variable w/ CIM sessions' {
-        $EnvVar = Get-CSEnvironmentVariable -CimSession $TestCimSession1 | Select-Object -First 1
+        $EnvVar = Get-CSEnvironmentVariable -CimSession $TestCimSession1 -NoProgressBar | Select-Object -First 1
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should Not BeNullOrEmpty
         $EnvVar.User | Should Not BeNullOrEmpty
@@ -1210,7 +1208,7 @@ Describe 'Get-CSEnvironmentVariable' {
     }
 
     It 'should return a populated system environment variable' {
-        $EnvVar = Get-CSEnvironmentVariable -SystemVariable | Select-Object -First 1
+        $EnvVar = Get-CSEnvironmentVariable -SystemVariable -NoProgressBar | Select-Object -First 1
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should Not BeNullOrEmpty
         $EnvVar.User | Should BeExactly '<SYSTEM>'
@@ -1219,7 +1217,7 @@ Describe 'Get-CSEnvironmentVariable' {
     }
 
     It 'should return a populated system environment variable w/ CIM sessions' {
-        $EnvVar = Get-CSEnvironmentVariable -SystemVariable -CimSession $TestCimSession1 | Select-Object -First 1
+        $EnvVar = Get-CSEnvironmentVariable -SystemVariable -CimSession $TestCimSession1 -NoProgressBar | Select-Object -First 1
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should Not BeNullOrEmpty
         $EnvVar.User | Should BeExactly '<SYSTEM>'
@@ -1228,7 +1226,7 @@ Describe 'Get-CSEnvironmentVariable' {
     }
 
     It 'should return a populated user environment variable' {
-        $EnvVar = Get-CSEnvironmentVariable -UserVariable | Select-Object -First 1
+        $EnvVar = Get-CSEnvironmentVariable -UserVariable -NoProgressBar | Select-Object -First 1
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should Not BeNullOrEmpty
         $EnvVar.User | Should Not BeNullOrEmpty
@@ -1238,7 +1236,7 @@ Describe 'Get-CSEnvironmentVariable' {
     }
 
     It 'should return a populated user environment variable w/ CIM sessions' {
-        $EnvVar = Get-CSEnvironmentVariable -UserVariable -CimSession $TestCimSession1 | Select-Object -First 1
+        $EnvVar = Get-CSEnvironmentVariable -UserVariable -CimSession $TestCimSession1 -NoProgressBar | Select-Object -First 1
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should Not BeNullOrEmpty
         $EnvVar.User | Should Not BeNullOrEmpty
@@ -1248,7 +1246,7 @@ Describe 'Get-CSEnvironmentVariable' {
     }
 
     It 'should return a named environment variable' {
-        $EnvVar = Get-CSEnvironmentVariable -VariableName TEMP | Select-Object -First 1
+        $EnvVar = Get-CSEnvironmentVariable -VariableName TEMP -NoProgressBar | Select-Object -First 1
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should BeExactly 'TEMP'
         $EnvVar.User | Should Not BeNullOrEmpty
@@ -1257,7 +1255,7 @@ Describe 'Get-CSEnvironmentVariable' {
     }
 
     It 'should return a named environment variable w/ CIM sessions' {
-        $EnvVar = Get-CSEnvironmentVariable -VariableName TEMP -CimSession $TestCimSession1 | Select-Object -First 1
+        $EnvVar = Get-CSEnvironmentVariable -VariableName TEMP -CimSession $TestCimSession1 -NoProgressBar | Select-Object -First 1
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should BeExactly 'TEMP'
         $EnvVar.User | Should Not BeNullOrEmpty
@@ -1266,7 +1264,7 @@ Describe 'Get-CSEnvironmentVariable' {
     }
 
     It 'should return a named system environment variable' {
-        $EnvVar = Get-CSEnvironmentVariable -SystemVariable -VariableName TEMP | Select-Object -First 1
+        $EnvVar = Get-CSEnvironmentVariable -SystemVariable -VariableName TEMP -NoProgressBar | Select-Object -First 1
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should BeExactly 'TEMP'
         $EnvVar.User | Should BeExactly '<SYSTEM>'
@@ -1275,7 +1273,7 @@ Describe 'Get-CSEnvironmentVariable' {
     }
 
     It 'should return a named system environment variable w/ CIM sessions' {
-        $EnvVar = Get-CSEnvironmentVariable -SystemVariable -VariableName TEMP -CimSession $TestCimSession1 | Select-Object -First 1
+        $EnvVar = Get-CSEnvironmentVariable -SystemVariable -VariableName TEMP -CimSession $TestCimSession1 -NoProgressBar | Select-Object -First 1
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should BeExactly 'TEMP'
         $EnvVar.User | Should BeExactly '<SYSTEM>'
@@ -1284,7 +1282,7 @@ Describe 'Get-CSEnvironmentVariable' {
     }
 
     It 'should return a named user environment variable' {
-        $EnvVar = Get-CSEnvironmentVariable -UserVariable -VariableName TEMP | Select-Object -First 1
+        $EnvVar = Get-CSEnvironmentVariable -UserVariable -VariableName TEMP -NoProgressBar | Select-Object -First 1
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should BeExactly 'TEMP'
         $EnvVar.User | Should Not BeNullOrEmpty
@@ -1294,7 +1292,7 @@ Describe 'Get-CSEnvironmentVariable' {
     }
 
     It 'should return a named user environment variable w/ CIM sessions' {
-        $EnvVar = Get-CSEnvironmentVariable -UserVariable -VariableName TEMP -CimSession $TestCimSession1 | Select-Object -First 1
+        $EnvVar = Get-CSEnvironmentVariable -UserVariable -VariableName TEMP -CimSession $TestCimSession1 -NoProgressBar | Select-Object -First 1
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should BeExactly 'TEMP'
         $EnvVar.User | Should Not BeNullOrEmpty

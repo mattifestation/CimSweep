@@ -1,4 +1,28 @@
-﻿function Get-CSRegistryKey {
+﻿<#
+Helper function used to explicitly set which object properties are displayed
+This is used primarily to hide CimSession properties and to display PSComputerName
+only if a function was performed against a remote computer.
+
+Technique described here: https://poshoholic.com/2008/07/05/essential-powershell-define-default-properties-for-custom-objects/
+Thanks Kirk Munro (@Poshoholic)!
+#>
+function Set-DefaultDisplayProperties {
+    Param (
+        [Parameter(Mandatory = $True, ValueFromPipeline = $True)]
+        [Object]
+        $InputObject,
+
+        [Parameter(Mandatory = $True)]
+        [String[]]
+        $PropertyNames
+    )
+
+    $DefaultDisplayPropertySet = New-Object Management.Automation.PSPropertySet(‘DefaultDisplayPropertySet’, [String[]] $PropertyNames)
+    $PSStandardMembers = [Management.Automation.PSMemberInfo[]]@($DefaultDisplayPropertySet)
+    Add-Member -InputObject $InputObject -MemberType MemberSet -Name PSStandardMembers -Value $PSStandardMembers
+}
+
+function Get-CSRegistryKey {
 <#
 .SYNOPSIS
 
@@ -71,9 +95,9 @@ Accepts output from Get-CSRegistryKey. This enables recursion.
 
 .OUTPUTS
 
-PSObject
+CimSweep.RegistryKey
 
-Outputs a list of custom objects representing registry keys.
+Outputs a list of objects representing registry keys.
 
 .NOTES
 
@@ -82,6 +106,7 @@ It is not recommended to recursively list all registry keys from most parent key
 #>
 
     [CmdletBinding()]
+    [OutputType('CimSweep.RegistryKey')]
     param(
         [Parameter(Mandatory = $True, ValueFromPipelineByPropertyName = $True, ParameterSetName = 'ExplicitPath')]
         [String]
@@ -131,6 +156,8 @@ It is not recommended to recursively list all registry keys from most parent key
                 $SubKey = $Matches.SubKey
             }
 
+            # These values are defined in WinReg.h and here:
+            # https://msdn.microsoft.com/en-us/library/windows/desktop/aa390387.aspx
             switch ($Hive) {
                 'HKLM' { $HiveVal = [UInt32] 2147483650 }
                 'HKCU' { $HiveVal = [UInt32] 2147483649 }
@@ -142,8 +169,8 @@ It is not recommended to recursively list all registry keys from most parent key
             $TrimmedKey = $SubKey.Trim('\')
 
             $CimMethodArgs = @{
-                ClassName = 'StdRegProv'
-                Namespace = 'root/default'
+                ClassName =  'StdRegProv'
+                Namespace =  'root/default'
                 MethodName = 'EnumKey'
             }
 
@@ -160,21 +187,35 @@ It is not recommended to recursively list all registry keys from most parent key
 
             if ($Result.sNames) {
                 foreach ($KeyName in $Result.sNames) {
+                    # I would like for this to just be a PSCustomObject but it has to remain
+                    # a hashtable since I am using it as splatted arguments to itself in the
+                    # case of recursion.
                     $ObjectProperties = [Ordered] @{
+                        PSTypeName = 'CimSweep.RegistryKey'
                         Hive = $Hive
                         SubKey = "$TrimmedKey\$KeyName".Trim('\')
+                        PSComputerName = $null
+                    }
+
+                    $DefaultProperties = @('Hive', 'SubKey') -as [Type] 'Collections.Generic.List[String]'
+
+                    if ($Result.PSComputerName) {
+                        $ObjectProperties['PSComputerName'] = $Result.PSComputerName
+                        $DefaultProperties.Add('PSComputerName')
                     }
 
                     if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
 
                     $KeyObject = New-Object -TypeName PSObject -Property $ObjectProperties
-                    Add-Member -InputObject $KeyObject -MemberType NoteProperty -Name PSComputerName -Value $Result.PSComputerName
-                    $KeyObject.PSObject.TypeNames.Insert(0, 'CimSweep.RegistryKey')
+
+                    Set-DefaultDisplayProperties -InputObject $KeyObject -PropertyNames $DefaultProperties
 
                     $KeyObject
 
                     if ($PSBoundParameters['Recurse']) {
-                        Get-CSRegistryKey -Recurse @ObjectProperties @Timeout
+                        $ObjectProperties.Remove('PSTypeName')
+                        $ObjectProperties.Remove('PSComputerName')
+                        Get-CSRegistryKey @ObjectProperties @Timeout -Recurse
                     }
                 }
             }
@@ -253,19 +294,20 @@ Get-CSRegistryValue -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\' 
 
 .INPUTS
 
-PSObject
+CimSweep.RegistryKey
 
 Accepts output from Get-CSRegistryKey. This allows you to list all registry value names for all keys contained within a parent key.
 
 .OUTPUTS
 
-PSObject
+CimSweep.RegistryValue
 
-Outputs a list of custom objects representing registry value names, their respective types, and content for a specified key.
+Outputs a list of objects representing registry value names, their respective types, and content for a specified key.
 
 #>
     
     [CmdletBinding(DefaultParameterSetName='HiveValueNameNoType')]
+    [OutputType('CimSweep.RegistryValue')]
     param(
         [Parameter(Mandatory = $True, ValueFromPipelineByPropertyName = $True, ParameterSetName = 'HiveValueNameNoType')]
         [Parameter(Mandatory = $True, ValueFromPipelineByPropertyName = $True, ParameterSetName = 'HiveValues')]
@@ -451,17 +493,29 @@ Outputs a list of custom objects representing registry value names, their respec
                     }
                 }
 
-                $ValueObject = [PSCustomObject] @{
+                $ObjectProperties = [Ordered] @{
                     Hive = $Hive
                     SubKey = $TrimmedKey
                     ValueName = if ($ValueName) { $ValueName } else { '(Default)' }
                     Type = $ValueType
                     ValueContent = $ValueContent
-                    PSComputerName = $Result.PSComputerName
-                    CimSession = $Session
                 }
 
-                $ValueObject.PSObject.TypeNames.Insert(0, 'CimSweep.RegistryValue')
+                $DefaultProperties = [String[]] $ObjectProperties.Keys -as [Type] 'Collections.Generic.List[String]'
+                $ObjectProperties['PSTypeName'] = 'CimSweep.RegistryValue'
+
+                if ($Result.PSComputerName) {
+                    $ObjectProperties['PSComputerName'] = $Result.PSComputerName
+                    $DefaultProperties.Add('PSComputerName')
+                } else {
+                    $ObjectProperties['PSComputerName'] = $null
+                }
+
+                if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
+
+                $ValueObject = [PSCustomObject] $ObjectProperties
+
+                Set-DefaultDisplayProperties -InputObject $ValueObject -PropertyNames $DefaultProperties
 
                 $ValueObject
             } else {
@@ -570,17 +624,29 @@ Outputs a list of custom objects representing registry value names, their respec
                                 }
                             }
 
-                            $ValueObject = [PSCustomObject] @{
+                            $ObjectProperties = [Ordered] @{
                                 Hive = $Hive
                                 SubKey = $TrimmedKey
                                 ValueName = if ($ValueNames[$i]) { $ValueNames[$i] } else { '(Default)' }
                                 Type = $Types[$i]
                                 ValueContent = $ValueContent
-                                PSComputerName = $Result.PSComputerName
-                                CimSession = $Session
                             }
 
-                            $ValueObject.PSObject.TypeNames.Insert(0, 'CimSweep.RegistryValue')
+                            $DefaultProperties = [String[]] $ObjectProperties.Keys -as [Type] 'Collections.Generic.List[String]'
+                            $ObjectProperties['PSTypeName'] = 'CimSweep.RegistryValue'
+
+                            if ($Result.PSComputerName) {
+                                $ObjectProperties['PSComputerName'] = $Result.PSComputerName
+                                $DefaultProperties.Add('PSComputerName')
+                            } else {
+                                $ObjectProperties['PSComputerName'] = $null
+                            }
+
+                            if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
+
+                            $ValueObject = [PSCustomObject] $ObjectProperties
+
+                            Set-DefaultDisplayProperties -InputObject $ValueObject -PropertyNames $DefaultProperties
 
                             $ValueObject
                         }
@@ -671,20 +737,15 @@ If the OperationTimeoutSec parameter is set to a value less than the robust conn
 
 Get-CSEventLog is useful for determining which event log to filter off of in Get-CSEventLogEntry.
 
-.INPUTS
-
-PSObject
-
-Accepts input from Get-CSEventLog.
-
 .OUTPUTS
 
-PSObject
+CimSweep.EventLog
 
-Outptus a custom object that can be piped to Get-CSEventLog entry.
+Outputs objects representing the available event logs which can be piped to Get-CSEventLogEntry.
 #>
 
     [CmdletBinding()]
+    [OutputType('CimSweep.EventLog')]
     param(
         [Switch]
         $NoProgressBar,
@@ -730,13 +791,26 @@ Outptus a custom object that can be piped to Get-CSEventLog entry.
             if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
             Get-CimInstance -ClassName Win32_NTEventlogFile -Property LogfileName @CommonArgs @Timeout | ForEach-Object {
-                $EventLog = [PSCustomObject] @{
+                $ObjectProperties = [Ordered] @{
+                    PSTypeName = 'CimSweep.EventLog'
                     LogName = $_.LogfileName
-                    PSComputerName = $_.PSComputerName
-                    CimSession = $CimSession
                 }
 
-                $EventLog.PSObject.TypeNames.Insert(0, 'CimSweep.EventLog')
+                $DefaultProperties = @('LogName') -as [Type] 'Collections.Generic.List[String]'
+
+                if ($_.PSComputerName) {
+                    $ObjectProperties['PSComputerName'] = $_.PSComputerName
+                    $DefaultProperties.Add('PSComputerName')
+                } else {
+                    $ObjectProperties['PSComputerName'] = $null
+                }
+
+                if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
+
+                $EventLog = [PSCustomObject] $ObjectProperties
+
+                Set-DefaultDisplayProperties -InputObject $EventLog -PropertyNames $DefaultProperties
+
                 $EventLog
             }
         }
@@ -832,18 +906,18 @@ Get-CSEventLogEntry -CimSession $CimSession -EntryType FailureAudit
 
 .INPUTS
 
-PSObject
+CimSweep.EventLog
 
 Accepts input from Get-CSEventLog.
 
 .OUTPUTS
 
-Microsoft.Management.Infrastructure.CimInstance
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_NTLogEvent
 
 Outputs Win32_NtLogEvent instances.
 #>
 
-    [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
+    [OutputType('Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_NTLogEvent')]
     [CmdletBinding(DefaultParameterSetName='DefaultOutput')]
     param(
         [Parameter(ParameterSetName='DefaultOutput')]
@@ -1021,12 +1095,13 @@ If the OperationTimeoutSec parameter is set to a value less than the robust conn
 
 .OUTPUTS
 
-PSObject
+CimSweep.DiskInfo
 
 Outputs a list of mounted drive letters.
 #>
 
     [CmdletBinding()]
+    [OutputType('CimSweep.DiskInfo')]
     param(
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
@@ -1061,14 +1136,27 @@ Outputs a list of mounted drive letters.
 
             foreach ($Volume in $Result) {
                 if ($Volume.DeviceID) {
-                    $DiskInfo = [PSCustomObject] @{
+                    $ObjectProperties = [Ordered] @{
+                        PSTypeName = 'CimSweep.DiskInfo'
                         DriveLetter = $Volume.DeviceID[0]
                         DirectoryPath = "$($Volume.DeviceID)\"
-                        PSComputerName = $Volume.PSComputerName
-                        CimSession = $CimSession
                     }
 
-                    $DiskInfo.PSObject.TypeNames.Insert(0, 'CimSweep.DiskInfo')
+                    $DefaultProperties = 'DriveLetter', 'DirectoryPath' -as [Type] 'Collections.Generic.List[String]'
+
+                    if ($Volume.PSComputerName) {
+                        $ObjectProperties['PSComputerName'] = $Volume.PSComputerName
+                        $DefaultProperties.Add('PSComputerName')
+                    } else {
+                        $ObjectProperties['PSComputerName'] = $null
+                    }
+
+                    if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
+
+                    $DiskInfo = [PSCustomObject] $ObjectProperties
+
+                    Set-DefaultDisplayProperties -InputObject $DiskInfo -PropertyNames $DefaultProperties
+
                     $DiskInfo
                 }
             }
@@ -1215,17 +1303,17 @@ List all files and directories present in c:\$recycle.bin. Note: single quotes a
 
 .OUTPUTS
 
-Microsoft.Management.Infrastructure.CimInstance
+Microsoft.Management.Infrastructure.CimInstance#ROOT/cimv2/CIM_LogicalFile
 
-Outputs a CIM_DataFile or Win32_Directory instance representing file or directory information.
+Outputs a CIM_DataFile, Win32_ShortcutFile, or a Win32_Directory instance representing file, shortcut, or directory information.
 
 .NOTES
 
 Filter parameters in Get-CSDirectoryListing only apply to files, not directories.
 #>
 
-    [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
     [CmdletBinding(DefaultParameterSetName = 'DirOnly')]
+    [OutputType('Microsoft.Management.Infrastructure.CimInstance#ROOT/cimv2/CIM_LogicalFile')]
     param(
         [Parameter(ValueFromPipelineByPropertyName = $True, Position = 0)]
         [Alias('Name')]
@@ -1372,7 +1460,6 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
                 # Get all directories present in the specified folder
                 Get-CimInstance @CommonArgs @DirArguments @Timeout | ForEach-Object {
                     $DirObject = $_
-                    $DirObject.PSObject.TypeNames.Insert(0, 'CimSweep.LogicalFile')
 
                     # Append the CimSession instance. This enables piping Get-CSDirectoryListing to itself
                     Add-Member -InputObject $DirObject -MemberType NoteProperty -Name CimSession -Value $CimSession
@@ -1435,7 +1522,6 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
                 # Get all files present in the specified folder
                 Get-CimInstance @CommonArgs @FileArguments @Timeout | ForEach-Object {
                     $Object = $_
-                    $Object.PSObject.TypeNames.Insert(0, 'CimSweep.LogicalFile')
                     Add-Member -InputObject $Object -MemberType NoteProperty -Name CimSession -Value $CimSession
                     $Object
                 }
@@ -1529,13 +1615,13 @@ Get-CSService -PathName svchost.exe
 
 .OUTPUTS
 
-Microsoft.Management.Infrastructure.CimInstance
+Microsoft.Management.Infrastructure.CimInstance#ROOT/cimv2/Win32_BaseService
 
 Outputs Win32_Service or Win32_SystemDriver instances both of which derive from Win32_BaseService.
 #>
 
-    [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
     [CmdletBinding(DefaultParameterSetName='DefaultOutput')]
+    [OutputType('Microsoft.Management.Infrastructure.CimInstance#ROOT/cimv2/Win32_BaseService')]
     param(
         [Parameter(ParameterSetName='DefaultOutput')]
         [Parameter(ParameterSetName='RestrictOutput')]
@@ -1763,13 +1849,13 @@ Get-CSProcess -LimitOutput -Property Name, ProcessId
 
 .OUTPUTS
 
-Microsoft.Management.Infrastructure.CimInstance
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Process
 
 Outputs Win32_Process instances.
 #>
 
-    [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
     [CmdletBinding(DefaultParameterSetName='DefaultOutput')]
+    [OutputType('Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Process')]
     param(
         [Parameter(ParameterSetName='DefaultOutput')]
         [Parameter(ParameterSetName='RestrictOutput')]
@@ -1964,9 +2050,16 @@ Specifies the amount of time that the cmdlet waits for a response from the compu
 By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
 
 If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
+
+.OUTPUTS
+
+CimSweep.EnvironmentVariable
+
+Outputs objects consisting of the name, value, and scope (user vs. system) of an environment variable.
 #>
 
     [CmdletBinding(DefaultParameterSetName = 'Default')]
+    [OutputType('CimSweep.EnvironmentVariable')]
     param(
         [Parameter(ParameterSetName = 'Default')]
         [Parameter(ParameterSetName = 'System')]
@@ -2017,6 +2110,9 @@ If the OperationTimeoutSec parameter is set to a value less than the robust conn
         if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
 
         $SystemEnvPath = 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment'
+
+        $ObjectType = 'CimSweep.EnvironmentVariable'
+        $DefaultPropertyNames = 'Name', 'User', 'VariableValue'
     }
 
     PROCESS {
@@ -2040,14 +2136,28 @@ If the OperationTimeoutSec parameter is set to a value less than the robust conn
                     $Result = Get-CSRegistryValue -Hive HKLM -SubKey $SystemEnvPath -ValueName $VariableName -ValueType REG_SZ @CommonArgs @Timeout
 
                     if ($Result.ValueContent) {
-                        $EnvVarInfo = [PSCustomObject] @{
+                        $ObjectProperties = [Ordered] @{
+                            PSTypeName = $ObjectType
                             Name = $Result.ValueName
                             User = '<SYSTEM>'
                             VariableValue = $Result.ValueContent
-                            PSComputerName = $null
                         }
 
-                        if ($Result.PSComputerName) { $EnvVarInfo.PSComputerName = $Result.PSComputerName }
+                        $DefaultProperties = $DefaultPropertyNames -as [Type] 'Collections.Generic.List[String]'
+
+                        if ($Result.PSComputerName) {
+                            $ObjectProperties['PSComputerName'] = $Result.PSComputerName
+                            $DefaultProperties.Add('PSComputerName')
+                        } else {
+                            $ObjectProperties['PSComputerName'] = $null
+                        }
+
+                        if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
+
+                        $EnvVarInfo = [PSCustomObject] $ObjectProperties
+
+                        Set-DefaultDisplayProperties -InputObject $EnvVarInfo -PropertyNames $DefaultProperties
+
                         $EnvVarInfo
                     }
                 }
@@ -2061,27 +2171,55 @@ If the OperationTimeoutSec parameter is set to a value less than the robust conn
                         $Result = Get-CSRegistryValue -Hive HKU -SubKey "$SID\Volatile Environment" -ValueName $VariableName -ValueType REG_SZ @CommonArgs @Timeout
 
                         if ($Result.ValueContent) {
-                            $EnvVarInfo = [PSCustomObject] @{
+                            $ObjectProperties = [Ordered] @{
+                                PSTypeName = $ObjectType
                                 Name = $Result.ValueName
                                 User = $SID
                                 VariableValue = $Result.ValueContent
-                                PSComputerName = $null
                             }
 
-                            if ($Result.PSComputerName) { $EnvVarInfo.PSComputerName = $Result.PSComputerName }
+                            $DefaultProperties = $DefaultPropertyNames -as [Type] 'Collections.Generic.List[String]'
+
+                            if ($Result.PSComputerName) {
+                                $ObjectProperties['PSComputerName'] = $Result.PSComputerName
+                                $DefaultProperties.Add('PSComputerName')
+                            } else {
+                                $ObjectProperties['PSComputerName'] = $null
+                            }
+
+                            if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
+
+                            $EnvVarInfo = [PSCustomObject] $ObjectProperties
+
+                            Set-DefaultDisplayProperties -InputObject $EnvVarInfo -PropertyNames $DefaultProperties
+
                             $EnvVarInfo
                         } else {
                             $Result = Get-CSRegistryValue -Hive HKU -SubKey "$SID\Environment" -ValueName $VariableName -ValueType REG_SZ @CommonArgs @Timeout
 
                             if ($Result.ValueContent) {
-                                $EnvVarInfo = [PSCustomObject] @{
+                                $ObjectProperties = [Ordered] @{
+                                    PSTypeName = $ObjectType
                                     Name = $Result.ValueName
                                     User = $SID
                                     VariableValue = $Result.ValueContent
-                                    PSComputerName = $null
                                 }
 
-                                if ($Result.PSComputerName) { $EnvVarInfo.PSComputerName = $Result.PSComputerName }
+                                $DefaultProperties = $DefaultPropertyNames -as [Type] 'Collections.Generic.List[String]'
+
+                                if ($Result.PSComputerName) {
+                                    $ObjectProperties['PSComputerName'] = $Result.PSComputerName
+                                    $DefaultProperties.Add('PSComputerName')
+                                } else {
+                                    $ObjectProperties['PSComputerName'] = $null
+                                }
+
+                                if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
+
+                                $EnvVarInfo = [PSCustomObject] $ObjectProperties
+
+                                Set-DefaultDisplayProperties -InputObject $EnvVarInfo -PropertyNames $DefaultProperties
+
                                 $EnvVarInfo
                             }
                         }
@@ -2090,14 +2228,28 @@ If the OperationTimeoutSec parameter is set to a value less than the robust conn
             } else { # Retrieve all environment variables
                 if (($PSCmdlet.ParameterSetName -eq 'System') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
                     Get-CSRegistryValue -Hive HKLM -SubKey $SystemEnvPath @CommonArgs @Timeout | ForEach-Object {
-                        $EnvVarInfo = [PSCustomObject] @{
+                        $ObjectProperties = [Ordered] @{
+                            PSTypeName = $ObjectType
                             Name = $_.ValueName
                             User = '<SYSTEM>'
                             VariableValue = $_.ValueContent
-                            PSComputerName = $null
                         }
 
-                        if ($_.PSComputerName) { $EnvVarInfo.PSComputerName = $_.PSComputerName }
+                        $DefaultProperties = $DefaultPropertyNames -as [Type] 'Collections.Generic.List[String]'
+
+                        if ($_.PSComputerName) {
+                            $ObjectProperties['PSComputerName'] = $_.PSComputerName
+                            $DefaultProperties.Add('PSComputerName')
+                        } else {
+                            $ObjectProperties['PSComputerName'] = $null
+                        }
+
+                        if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
+
+                        $EnvVarInfo = [PSCustomObject] $ObjectProperties
+
+                        Set-DefaultDisplayProperties -InputObject $EnvVarInfo -PropertyNames $DefaultProperties
+
                         $EnvVarInfo
                     }
                 }
@@ -2109,26 +2261,54 @@ If the OperationTimeoutSec parameter is set to a value less than the robust conn
                     # Iterate over each local user hive
                     foreach ($SID in $HKUSIDs) {
                         Get-CSRegistryValue -Hive HKU -SubKey "$SID\Volatile Environment" @CommonArgs @Timeout | ForEach-Object {
-                            $EnvVarInfo = [PSCustomObject] @{
+                            $ObjectProperties = [Ordered] @{
+                                PSTypeName = $ObjectType
                                 Name = $_.ValueName
                                 User = $SID
                                 VariableValue = $_.ValueContent
-                                PSComputerName = $null
                             }
 
-                            if ($_.PSComputerName) { $EnvVarInfo.PSComputerName = $_.PSComputerName }
+                            $DefaultProperties = $DefaultPropertyNames -as [Type] 'Collections.Generic.List[String]'
+
+                            if ($_.PSComputerName) {
+                                $ObjectProperties['PSComputerName'] = $_.PSComputerName
+                                $DefaultProperties.Add('PSComputerName')
+                            } else {
+                                $ObjectProperties['PSComputerName'] = $null
+                            }
+
+                            if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
+
+                            $EnvVarInfo = [PSCustomObject] $ObjectProperties
+
+                            Set-DefaultDisplayProperties -InputObject $EnvVarInfo -PropertyNames $DefaultProperties
+
                             $EnvVarInfo
                         }
 
                         Get-CSRegistryValue -Hive HKU -SubKey "$SID\Environment" @CommonArgs @Timeout | ForEach-Object {
-                            $EnvVarInfo = [PSCustomObject] @{
+                            $ObjectProperties = [Ordered] @{
+                                PSTypeName = $ObjectType
                                 Name = $_.ValueName
                                 User = $SID
                                 VariableValue = $_.ValueContent
-                                PSComputerName = $null
                             }
 
-                            if ($_.PSComputerName) { $EnvVarInfo.PSComputerName = $_.PSComputerName }
+                            $DefaultProperties = $DefaultPropertyNames -as [Type] 'Collections.Generic.List[String]'
+
+                            if ($_.PSComputerName) {
+                                $ObjectProperties['PSComputerName'] = $_.PSComputerName
+                                $DefaultProperties.Add('PSComputerName')
+                            } else {
+                                $ObjectProperties['PSComputerName'] = $null
+                            }
+
+                            if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
+
+                            $EnvVarInfo = [PSCustomObject] $ObjectProperties
+
+                            Set-DefaultDisplayProperties -InputObject $EnvVarInfo -PropertyNames $DefaultProperties
+
                             $EnvVarInfo
                         }
                     }

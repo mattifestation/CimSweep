@@ -34,12 +34,6 @@ FunctionsToExport = @(
     'Get-CSWmiPersistence'
 )
 
-FormatsToProcess = @(
-    'ps1xml\Registry.format.ps1xml',
-    'ps1xml\LogicalFile.format.ps1xml',
-    'ps1xml\EventLog.format.ps1xml'
-)
-
 PrivateData = @{
 
     PSData = @{
