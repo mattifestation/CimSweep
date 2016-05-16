@@ -46,6 +46,7 @@ PrivateData = @{
         ReleaseNotes = @'
 0.4.0
 -----
+* Compatible PS Editions: Desktop, Core (i.e. Nano Server and Win 10 IoT)
 * -IncludeAcl switch added to Get-CSRegistryKey and Get-CSDirectoryListing. Appending this argument will add an ACL parameter to each object returned.
 * The output types of all functions are now fully and properly documented.
 '@
