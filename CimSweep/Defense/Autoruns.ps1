@@ -224,7 +224,7 @@ Outputs objects representing autoruns entries similar to the output of Sysintern
 
             $AutoRunsEntry = [PSCustomObject] $ObjectProperties
 
-            Set-DefaultDisplayProperties -InputObject $AutoRunsEntry -PropertyNames $DefaultProperties
+            Set-DefaultDisplayProperty -InputObject $AutoRunsEntry -PropertyNames $DefaultProperties
 
             $AutoRunsEntry
         }
