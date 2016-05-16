@@ -47,6 +47,10 @@ Specifies the path that contains the subkeys to be enumerated. The absense of th
 
 Specifies the desired registry hive and path in the standard PSDrive format. e.g. HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion. This parameter enables local tab expansion of key paths. Note: the tab expansion expands based on local registry paths not remote paths.
 
+.PARAMETER IncludeAcl
+
+Specifies that the ACL for the key should be returned. -IncludeAcl will append an ACL property to each returned CimSweep.RegistryKey object. The ACL property is a System.Security.AccessControl.RegistrySecurity object.
+
 .PARAMETER Recurse
 
 Gets the registry keys in the specified subkey as well as all child keys.
@@ -123,6 +127,9 @@ It is not recommended to recursively list all registry keys from most parent key
         $Path,
 
         [Switch]
+        $IncludeAcl,
+
+        [Switch]
         $Recurse,
 
         [Parameter(ValueFromPipelineByPropertyName = $True)]
@@ -140,6 +147,9 @@ It is not recommended to recursively list all registry keys from most parent key
         if (-not $PSBoundParameters['CimSession']) {
             $CimSession = ''
         }
+
+        $AddAcl = @{}
+        if ($PSBoundParameters['IncludeAcl']) { $AddAcl['IncludeAcl'] = $True }
 
         $Timeout = @{}
         if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
@@ -187,21 +197,59 @@ It is not recommended to recursively list all registry keys from most parent key
 
             if ($Result.sNames) {
                 foreach ($KeyName in $Result.sNames) {
+                    $NewSubKey = "$TrimmedKey\$KeyName".Trim('\')
+
                     # I would like for this to just be a PSCustomObject but it has to remain
                     # a hashtable since I am using it as splatted arguments to itself in the
                     # case of recursion.
                     $ObjectProperties = [Ordered] @{
                         PSTypeName = 'CimSweep.RegistryKey'
                         Hive = $Hive
-                        SubKey = "$TrimmedKey\$KeyName".Trim('\')
-                        PSComputerName = $null
+                        SubKey = $NewSubKey
                     }
 
                     $DefaultProperties = @('Hive', 'SubKey') -as [Type] 'Collections.Generic.List[String]'
 
+                    if ($IncludeAcl) {
+                        $GetSDArgs = @{
+                            Namespace = 'root/default'
+                            ClassName = 'StdRegProv'
+                            MethodName = 'GetSecurityDescriptor'
+                            Arguments = @{
+                                hDefKey = $HiveVal
+                                sSubKeyName = $NewSubKey
+                            }
+                        }
+
+                        $GetSDResult = Invoke-CimMethod @GetSDArgs
+                        $RegSD = $null
+
+                        if ($GetSDResult.ReturnValue -eq 0) {
+                            $Win32SDToBinarySDArgs = @{
+                                ClassName = 'Win32_SecurityDescriptorHelper'
+                                MethodName = 'Win32SDToBinarySD'
+                                Arguments = @{
+                                    Descriptor = $GetSDResult.Descriptor
+                                }
+                            }
+
+                            $ConversionResult = Invoke-CimMethod @Win32SDToBinarySDArgs
+
+                            if ($ConversionResult.ReturnValue -eq 0) {
+                                $RegSD = New-Object Security.AccessControl.RegistrySecurity
+                                $RegSD.SetSecurityDescriptorBinaryForm($ConversionResult.BinarySD, 'All')
+                            }
+                        }
+
+                        $ObjectProperties['ACL'] = $RegSD
+                        $DefaultProperties.Add('ACL')
+                    }
+
                     if ($Result.PSComputerName) {
                         $ObjectProperties['PSComputerName'] = $Result.PSComputerName
                         $DefaultProperties.Add('PSComputerName')
+                    } else {
+                        $ObjectProperties['PSComputerName'] = $null
                     }
 
                     if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
@@ -215,7 +263,8 @@ It is not recommended to recursively list all registry keys from most parent key
                     if ($PSBoundParameters['Recurse']) {
                         $ObjectProperties.Remove('PSTypeName')
                         $ObjectProperties.Remove('PSComputerName')
-                        Get-CSRegistryKey @ObjectProperties @Timeout -Recurse
+                        $ObjectProperties.Remove('ACL')
+                        Get-CSRegistryKey @ObjectProperties @Timeout @AddAcl -Recurse
                     }
                 }
             }
