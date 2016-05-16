@@ -49,7 +49,7 @@ Specifies the desired registry hive and path in the standard PSDrive format. e.g
 
 .PARAMETER IncludeAcl
 
-Specifies that the ACL for the key should be returned. -IncludeAcl will append an ACL property to each returned CimSweep.RegistryKey object. The ACL property is a System.Security.AccessControl.RegistrySecurity object.
+Specifies that the ACL for the key should be returned. -IncludeAcl will append an ACL property to each returned CimSweep.RegistryKey object. The ACL property is a System.Security.AccessControl.RegistrySecurity object. It is not recommended to use -IncludeAcl with -Recurse as it will significantly increase execution time and network bandwidth if used with CIM sessions.
 
 .PARAMETER Recurse
 
@@ -221,7 +221,10 @@ It is not recommended to recursively list all registry keys from most parent key
                             }
                         }
 
-                        $GetSDResult = Invoke-CimMethod @GetSDArgs
+                        $SessionArg = @{}
+                        if ($Session.Id) { $SessionArg['CimSession'] = $Session }
+
+                        $GetSDResult = Invoke-CimMethod @GetSDArgs @SessionArg
                         $RegSD = $null
 
                         if ($GetSDResult.ReturnValue -eq 0) {
@@ -233,7 +236,7 @@ It is not recommended to recursively list all registry keys from most parent key
                                 }
                             }
 
-                            $ConversionResult = Invoke-CimMethod @Win32SDToBinarySDArgs
+                            $ConversionResult = Invoke-CimMethod @Win32SDToBinarySDArgs @SessionArg
 
                             if ($ConversionResult.ReturnValue -eq 0) {
                                 $RegSD = New-Object Security.AccessControl.RegistrySecurity
