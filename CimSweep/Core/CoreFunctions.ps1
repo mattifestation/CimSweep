@@ -244,6 +244,10 @@ It is not recommended to recursively list all registry keys from most parent key
                             }
                         }
 
+                        if ($RegSD -eq $null) {
+                            Write-Warning "[$ComputerName] Unable to obtain registry key ACL for: $Hive\$NewSubKey"
+                        }
+
                         $ObjectProperties['ACL'] = $RegSD
                         $DefaultProperties.Add('ACL')
                     }
@@ -1293,6 +1297,10 @@ Specifies that only files should be returned for the specified directory. This i
 
 Specifies that only directories should be listed.
 
+.PARAMETER IncludeAcl
+
+Specifies that the ACL for the returned file or directory should be included. -IncludeAcl will append an ACL property to each returned object. The ACL property is a System.Security.AccessControl.FileSecurity or DirectorySecurity object. It is not recommended to use -IncludeAcl with -Recurse as it will significantly increase execution time and network bandwidth if used with CIM sessions.
+
 .PARAMETER DoNotDetectRecursiveDirs
 
 Do not perform checks on self-referential directories when performing recursion. Many tools allow you to not follow path pointed to by symlinks. Unfortunately, Win32_Directory doesn't reflect whether or not a directory is a symlink. By default, Get-CSDirectoryListing will attempt to check if it's recursing through a self-referential directory. There is a possibility that this could lead to false negatives though. This option specifies that this check should not be performed.
@@ -1446,6 +1454,9 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
         $Directory,
 
         [Switch]
+        $IncludeAcl,
+
+        [Switch]
         $DoNotDetectRecursiveDirs,
         
         [Switch]
@@ -1517,7 +1528,46 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
                     Add-Member -InputObject $DirObject -MemberType NoteProperty -Name CimSession -Value $CimSession
 
                     # Output the directories present if file query arguments are not present
-                    if ($PSCmdlet.ParameterSetName -ne 'FileQuery') { $DirObject }
+                    if ($PSCmdlet.ParameterSetName -ne 'FileQuery') {
+                        if ($IncludeAcl) {
+                            $AssocArgs = @{
+                                InputObject = $DirObject
+                                ResultClassName = 'Win32_LogicalFileSecuritySetting'
+                            }
+
+                            $DirectorySecurity = Get-CimAssociatedInstance @AssocArgs @CommonArgs -ErrorAction SilentlyContinue
+                            $DirectorySD = $null
+
+                            if ($DirectorySecurity) {
+                                $SD = Invoke-CimMethod -InputObject $DirectorySecurity -MethodName GetSecurityDescriptor @CommonArgs
+
+                                if ($SD.ReturnValue -eq 0) {
+                                    $Win32SDToBinarySDArgs = @{
+                                        ClassName = 'Win32_SecurityDescriptorHelper'
+                                        MethodName = 'Win32SDToBinarySD'
+                                        Arguments = @{
+                                            Descriptor = $SD.Descriptor
+                                        }
+                                    }
+
+                                    $ConversionResult = Invoke-CimMethod @Win32SDToBinarySDArgs @CommonArgs
+
+                                    if ($ConversionResult.ReturnValue -eq 0) {
+                                        $DirectorySD = New-Object Security.AccessControl.DirectorySecurity
+                                        $DirectorySD.SetSecurityDescriptorBinaryForm($ConversionResult.BinarySD, 'All')
+                                    }
+                                }
+                            }
+
+                            Add-Member -InputObject $DirObject -MemberType NoteProperty -Name ACL -Value $DirectorySD
+
+                            if ($DirectorySD -eq $null) {
+                                Write-Warning "[$ComputerName] Unable to obtain directory ACL for: $($DirObject.Name)"
+                            }
+                        }
+
+                        $DirObject
+                    }
 
                     if ($PSBoundParameters['Recurse']) {
                         $PSBoundParametersCopy = $PSBoundParameters
@@ -1575,6 +1625,44 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
                 Get-CimInstance @CommonArgs @FileArguments @Timeout | ForEach-Object {
                     $Object = $_
                     Add-Member -InputObject $Object -MemberType NoteProperty -Name CimSession -Value $CimSession
+
+                    if ($IncludeAcl) {
+                        $AssocArgs = @{
+                            InputObject = $Object
+                            ResultClassName = 'Win32_LogicalFileSecuritySetting'
+                        }
+
+                        $FileSecurity = Get-CimAssociatedInstance @AssocArgs @CommonArgs -ErrorAction SilentlyContinue
+                        $FileSD = $null
+
+                        if ($FileSecurity) {
+                            $SD = Invoke-CimMethod -InputObject $FileSecurity -MethodName GetSecurityDescriptor @CommonArgs
+
+                            if ($SD.ReturnValue -eq 0) {
+                                $Win32SDToBinarySDArgs = @{
+                                    ClassName = 'Win32_SecurityDescriptorHelper'
+                                    MethodName = 'Win32SDToBinarySD'
+                                    Arguments = @{
+                                        Descriptor = $SD.Descriptor
+                                    }
+                                }
+
+                                $ConversionResult = Invoke-CimMethod @Win32SDToBinarySDArgs @CommonArgs
+
+                                if ($ConversionResult.ReturnValue -eq 0) {
+                                    $FileSD = New-Object Security.AccessControl.FileSecurity
+                                    $FileSD.SetSecurityDescriptorBinaryForm($ConversionResult.BinarySD, 'All')
+                                }
+                            }
+                        }
+
+                        Add-Member -InputObject $Object -MemberType NoteProperty -Name ACL -Value $FileSD
+
+                        if ($FileSD -eq $null) {
+                            Write-Warning "[$ComputerName] Unable to obtain file ACL for: $($Object.Name)"
+                        }
+                    }
+
                     $Object
                 }
             }
