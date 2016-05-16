@@ -1,7 +1,7 @@
 ﻿@{
 RootModule = 'CimSweep.psm1'
 
-ModuleVersion = '0.4.0.0'
+ModuleVersion = '0.4.1.0'
 
 GUID = 'f347ef1c-d752-4d07-bf68-3197c0aa661a'
 
@@ -44,6 +44,11 @@ PrivateData = @{
         ProjectUri = 'https://github.com/PowerShellMafia/CimSweep'
 
         ReleaseNotes = @'
+0.4.1
+-----
+* Bigfix: Forgot to rename Set-DefaultDisplayProperty in Get-CSRegistryAutoStart.
+* Enhancement: Addressed PSScriptAnalyzer warnings
+
 0.4.0
 -----
 * Compatible PS Editions: Desktop, Core (i.e. Nano Server and Win 10 IoT)
