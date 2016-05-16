@@ -1,6 +1,7 @@
 ﻿@{
 RootModule = 'CimSweep.psm1'
 
+ModuleVersion = '0.4.0.0'
 
 GUID = 'f347ef1c-d752-4d07-bf68-3197c0aa661a'
 
@@ -43,6 +44,7 @@ PrivateData = @{
         ProjectUri = 'https://github.com/PowerShellMafia/CimSweep'
 
         ReleaseNotes = @'
+0.4.0
 -----
 * -IncludeAcl switch added to Get-CSRegistryKey and Get-CSDirectoryListing. Appending this argument will add an ACL parameter to each object returned.
 * The output types of all functions are now fully and properly documented.
