@@ -37,7 +37,7 @@ FunctionsToExport = @(
 PrivateData = @{
 
     PSData = @{
-        Tags = @('security', 'incident response', 'defense')
+        Tags = @('security', 'DFIR', 'defense')
 
         LicenseUri = 'http://www.apache.org/licenses/LICENSE-2.0.html'
 

@@ -1,4 +1,4 @@
 ﻿Get-ChildItem $PSScriptRoot -Directory |
-    ? {$_.Name -ne 'ps1xml' -and $_.Name -ne 'Tests'} |
+    Where-Object { $_.Name -ne 'ps1xml' -and $_.Name -ne 'Tests' } |
     Get-ChildItem -Include '*.ps1' |
-    % {. $_.FullName}
+    ForEach-Object { . $_.FullName }

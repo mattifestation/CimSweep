@@ -6,7 +6,7 @@ only if a function was performed against a remote computer.
 Technique described here: https://poshoholic.com/2008/07/05/essential-powershell-define-default-properties-for-custom-objects/
 Thanks Kirk Munro (@Poshoholic)!
 #>
-function Set-DefaultDisplayProperties {
+function Set-DefaultDisplayProperty {
     Param (
         [Parameter(Mandatory = $True, ValueFromPipeline = $True)]
         [Object]
@@ -244,7 +244,7 @@ It is not recommended to recursively list all registry keys from most parent key
                             }
                         }
 
-                        if ($RegSD -eq $null) {
+                        if ($null -eq $RegSD) {
                             Write-Warning "[$ComputerName] Unable to obtain registry key ACL for: $Hive\$NewSubKey"
                         }
 
@@ -263,7 +263,7 @@ It is not recommended to recursively list all registry keys from most parent key
 
                     $KeyObject = New-Object -TypeName PSObject -Property $ObjectProperties
 
-                    Set-DefaultDisplayProperties -InputObject $KeyObject -PropertyNames $DefaultProperties
+                    Set-DefaultDisplayProperty -InputObject $KeyObject -PropertyNames $DefaultProperties
 
                     $KeyObject
 
@@ -571,7 +571,7 @@ Outputs a list of objects representing registry value names, their respective ty
 
                 $ValueObject = [PSCustomObject] $ObjectProperties
 
-                Set-DefaultDisplayProperties -InputObject $ValueObject -PropertyNames $DefaultProperties
+                Set-DefaultDisplayProperty -InputObject $ValueObject -PropertyNames $DefaultProperties
 
                 $ValueObject
             } else {
@@ -702,7 +702,7 @@ Outputs a list of objects representing registry value names, their respective ty
 
                             $ValueObject = [PSCustomObject] $ObjectProperties
 
-                            Set-DefaultDisplayProperties -InputObject $ValueObject -PropertyNames $DefaultProperties
+                            Set-DefaultDisplayProperty -InputObject $ValueObject -PropertyNames $DefaultProperties
 
                             $ValueObject
                         }
@@ -865,7 +865,7 @@ Outputs objects representing the available event logs which can be piped to Get-
 
                 $EventLog = [PSCustomObject] $ObjectProperties
 
-                Set-DefaultDisplayProperties -InputObject $EventLog -PropertyNames $DefaultProperties
+                Set-DefaultDisplayProperty -InputObject $EventLog -PropertyNames $DefaultProperties
 
                 $EventLog
             }
@@ -1211,7 +1211,7 @@ Outputs a list of mounted drive letters.
 
                     $DiskInfo = [PSCustomObject] $ObjectProperties
 
-                    Set-DefaultDisplayProperties -InputObject $DiskInfo -PropertyNames $DefaultProperties
+                    Set-DefaultDisplayProperty -InputObject $DiskInfo -PropertyNames $DefaultProperties
 
                     $DiskInfo
                 }
@@ -1561,7 +1561,7 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
 
                             Add-Member -InputObject $DirObject -MemberType NoteProperty -Name ACL -Value $DirectorySD
 
-                            if ($DirectorySD -eq $null) {
+                            if ($null -eq $DirectorySD) {
                                 Write-Warning "[$ComputerName] Unable to obtain directory ACL for: $($DirObject.Name)"
                             }
                         }
@@ -1658,7 +1658,7 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
 
                         Add-Member -InputObject $Object -MemberType NoteProperty -Name ACL -Value $FileSD
 
-                        if ($FileSD -eq $null) {
+                        if ($null -eq $FileSD) {
                             Write-Warning "[$ComputerName] Unable to obtain file ACL for: $($Object.Name)"
                         }
                     }
@@ -2296,7 +2296,7 @@ Outputs objects consisting of the name, value, and scope (user vs. system) of an
 
                         $EnvVarInfo = [PSCustomObject] $ObjectProperties
 
-                        Set-DefaultDisplayProperties -InputObject $EnvVarInfo -PropertyNames $DefaultProperties
+                        Set-DefaultDisplayProperty -InputObject $EnvVarInfo -PropertyNames $DefaultProperties
 
                         $EnvVarInfo
                     }
@@ -2331,7 +2331,7 @@ Outputs objects consisting of the name, value, and scope (user vs. system) of an
 
                             $EnvVarInfo = [PSCustomObject] $ObjectProperties
 
-                            Set-DefaultDisplayProperties -InputObject $EnvVarInfo -PropertyNames $DefaultProperties
+                            Set-DefaultDisplayProperty -InputObject $EnvVarInfo -PropertyNames $DefaultProperties
 
                             $EnvVarInfo
                         } else {
@@ -2358,7 +2358,7 @@ Outputs objects consisting of the name, value, and scope (user vs. system) of an
 
                                 $EnvVarInfo = [PSCustomObject] $ObjectProperties
 
-                                Set-DefaultDisplayProperties -InputObject $EnvVarInfo -PropertyNames $DefaultProperties
+                                Set-DefaultDisplayProperty -InputObject $EnvVarInfo -PropertyNames $DefaultProperties
 
                                 $EnvVarInfo
                             }
@@ -2388,7 +2388,7 @@ Outputs objects consisting of the name, value, and scope (user vs. system) of an
 
                         $EnvVarInfo = [PSCustomObject] $ObjectProperties
 
-                        Set-DefaultDisplayProperties -InputObject $EnvVarInfo -PropertyNames $DefaultProperties
+                        Set-DefaultDisplayProperty -InputObject $EnvVarInfo -PropertyNames $DefaultProperties
 
                         $EnvVarInfo
                     }
@@ -2421,7 +2421,7 @@ Outputs objects consisting of the name, value, and scope (user vs. system) of an
 
                             $EnvVarInfo = [PSCustomObject] $ObjectProperties
 
-                            Set-DefaultDisplayProperties -InputObject $EnvVarInfo -PropertyNames $DefaultProperties
+                            Set-DefaultDisplayProperty -InputObject $EnvVarInfo -PropertyNames $DefaultProperties
 
                             $EnvVarInfo
                         }
@@ -2447,7 +2447,7 @@ Outputs objects consisting of the name, value, and scope (user vs. system) of an
 
                             $EnvVarInfo = [PSCustomObject] $ObjectProperties
 
-                            Set-DefaultDisplayProperties -InputObject $EnvVarInfo -PropertyNames $DefaultProperties
+                            Set-DefaultDisplayProperty -InputObject $EnvVarInfo -PropertyNames $DefaultProperties
 
                             $EnvVarInfo
                         }
