@@ -1,28 +1,4 @@
-﻿<#
-Helper function used to explicitly set which object properties are displayed
-This is used primarily to hide CimSession properties and to display PSComputerName
-only if a function was performed against a remote computer.
-
-Technique described here: https://poshoholic.com/2008/07/05/essential-powershell-define-default-properties-for-custom-objects/
-Thanks Kirk Munro (@Poshoholic)!
-#>
-function Set-DefaultDisplayProperty {
-    Param (
-        [Parameter(Mandatory = $True, ValueFromPipeline = $True)]
-        [Object]
-        $InputObject,
-
-        [Parameter(Mandatory = $True)]
-        [String[]]
-        $PropertyNames
-    )
-
-    $DefaultDisplayPropertySet = New-Object Management.Automation.PSPropertySet(‘DefaultDisplayPropertySet’, [String[]] $PropertyNames)
-    $PSStandardMembers = [Management.Automation.PSMemberInfo[]]@($DefaultDisplayPropertySet)
-    Add-Member -InputObject $InputObject -MemberType MemberSet -Name PSStandardMembers -Value $PSStandardMembers
-}
-
-function Get-CSRegistryKey {
+﻿function Get-CSRegistryKey {
 <#
 .SYNOPSIS
 
@@ -1719,6 +1695,10 @@ Specifies that an explicit list of Win32_Process properties should be returned. 
 
 Specifies the desired properties to retrieve from Win32_Process instances. The following properties are returned when limited output is desired: ProcessId, ParentProcessId, Name, ExecutablePath, CommandLine
 
+.PARAMETER IncludeAcl
+
+Specifies that the ACL for the service should be returned. -IncludeAcl will append an ACL property to each returned Win32_Service object. The ACL property is a CimSweep.ServiceSecurity object.
+
 .PARAMETER NoProgressBar
 
 Do not display a progress bar. This parameter is designed to be used with wrapper functions.
@@ -1836,6 +1816,9 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
             'TagId')]
         $Property = @('Name', 'DisplayName', 'Description', 'State', 'ServiceType', 'PathName'),
 
+        [Switch]
+        $IncludeAcl,
+
         [Parameter(ParameterSetName='DefaultOutput')]
         [Parameter(ParameterSetName='RestrictOutput')]
         [Switch]
@@ -1869,6 +1852,105 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
 
         $Timeout = @{}
         if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
+
+        if ($IncludeAcl) {
+            <#
+            # This won't compile using Add-Type in Nano Server TP5 due to
+            # a bug where it cannot determine the proper framework dir.
+
+            Add-Type -TypeDefinition @'
+            using System;
+            using System.Security.AccessControl;
+
+            namespace CimSweep
+            {
+                [Flags]
+                public enum ServiceFlags
+                {
+                    QueryConfig =         0x00000001,
+                    ChangeConfig =        0x00000002,
+                    QueryStatus =         0x00000004,
+                    EnumerateDependents = 0x00000008,
+                    Start =               0x00000010,
+                    Stop =                0x00000020,
+                    PauseContinue =       0x00000040,
+                    Interrogate =         0x00000080,
+                    UserDefinedControl =  0x00000100,
+                    Delete =              0x00010000,
+                    ReadControl =         0x00020000,
+                    WriteDac =            0x00040000,
+                    WriteOwner =          0x00080000
+                }
+
+                // I have no clue why this class isn't defined in .NET. Psh
+                public class ServiceSecurity : ObjectSecurity<ServiceFlags>
+	            {
+                    public ServiceSecurity() : base(false, ResourceType.Service)
+		            {
+		            }
+                }
+            }
+            '@ -ReferencedAssemblies ([System.Security.AccessControl.ResourceType].Assembly.Location)
+            #>
+
+            # Helper function code used supply ACL information Get-CSService when Get-CSService is used.
+            # The pure reflection version of the above C# code:
+            function Local:Get-ServiceSecurityType {
+                [OutputType('CimSweep.ServiceSecurity')]
+                param ()
+
+                $AppDomain = [Reflection.Assembly].Assembly.GetType('System.AppDomain').GetProperty('CurrentDomain').GetValue($null)
+                $DynamicAssembly = New-Object Reflection.AssemblyName('CimSweepAssembly')
+                $AssemblyBuilder = $AppDomain.DefineDynamicAssembly($DynamicAssembly, [Reflection.Emit.AssemblyBuilderAccess]::Run)
+                $ModuleBuilder = $AssemblyBuilder.DefineDynamicModule('CimSweepModule', $false)
+
+                $EnumTypeAttributes = [Reflection.TypeAttributes]::Public
+                $EnumBuilder = $ModuleBuilder.DefineEnum('CimSweep.ServiceFlags', $EnumTypeAttributes, [Int])
+                $null = $EnumBuilder.DefineLiteral('QueryConfig', 0x00000001)
+                $null = $EnumBuilder.DefineLiteral('ChangeConfig', 0x00000002)
+                $null = $EnumBuilder.DefineLiteral('QueryStatus', 0x00000004)
+                $null = $EnumBuilder.DefineLiteral('EnumerateDependents', 0x00000008)
+                $null = $EnumBuilder.DefineLiteral('Start', 0x00000010)
+                $null = $EnumBuilder.DefineLiteral('Stop', 0x00000020)
+                $null = $EnumBuilder.DefineLiteral('PauseContinue', 0x00000040)
+                $null = $EnumBuilder.DefineLiteral('Interrogate', 0x00000080)
+                $null = $EnumBuilder.DefineLiteral('UserDefinedControl', 0x00000100)
+                $null = $EnumBuilder.DefineLiteral('Delete', 0x00010000)
+                $null = $EnumBuilder.DefineLiteral('ReadControl', 0x00020000)
+                $null = $EnumBuilder.DefineLiteral('WriteDac', 0x00040000)
+                $null = $EnumBuilder.DefineLiteral('WriteOwner', 0x00080000)
+
+                $FlagsConstructor = [FlagsAttribute].GetConstructor([Type[]] @())
+                $FlagsAttribute = New-Object Reflection.Emit.CustomAttributeBuilder -ArgumentList $FlagsConstructor, ([Object[]] @())
+
+                # Reflection version of applying [Flags] to the enum
+                $EnumBuilder.SetCustomAttribute($FlagsAttribute)
+
+                $EnumType = $EnumBuilder.CreateType()
+
+                $BaseType = [Security.AccessControl.ObjectSecurity`1].MakeGenericType([Type[]] @($EnumType))
+                $TypeAttributes = [Reflection.TypeAttributes] 'AutoLayout, AnsiClass, Class, Public, BeforeFieldInit'
+
+                $TypeBuilder = $ModuleBuilder.DefineType('CimSweep.ServiceSecurity', $TypeAttributes, $BaseType)
+
+                $MethodAttributes = [Reflection.MethodAttributes] 'PrivateScope, Public, HideBySig, SpecialName, RTSpecialName'
+                $CallingConvention = [Reflection.CallingConventions] 'Standard, HasThis'
+                $ConstructorBuilder = $TypeBuilder.DefineConstructor($MethodAttributes, $CallingConvention, [Type[]] @())
+                $ILGen = $ConstructorBuilder.GetILGenerator()
+
+                # I got this by building the above C# then disassembling it. When dealing with implementing
+                # methods (in this case, a constructor), you only get to assemble CIL opcodes. No compilation. :(
+                $ILGen.Emit([Reflection.Emit.OpCodes]::Ldarg_0)
+                $ILGen.Emit([Reflection.Emit.OpCodes]::Ldc_I4_0)
+                $ILGen.Emit([Reflection.Emit.OpCodes]::Ldc_I4_2)
+                $ILGen.Emit([Reflection.Emit.OpCodes]::Call, $BaseType.GetConstructor([Reflection.BindingFlags] 'NonPublic, Instance', $null, [Type[]] @([Boolean], [Security.AccessControl.ResourceType]), $null))
+                $ILGen.Emit([Reflection.Emit.OpCodes]::Ret)
+
+                $ServiceSecurityType = $TypeBuilder.CreateType()
+
+                $ServiceSecurityType
+            }
+        }
     }
 
     PROCESS {
@@ -1903,7 +1985,44 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
                 $ServiceEntryArgs['Filter'] = $Filter
             }
 
-            Get-CimInstance -ClassName Win32_BaseService @CommonArgs @ServiceEntryArgs @PropertyList @Timeout
+            Get-CimInstance -ClassName Win32_BaseService @CommonArgs @ServiceEntryArgs @PropertyList @Timeout | ForEach-Object {
+                $CurrentService = $_
+
+                if ($IncludeAcl) {
+                    $ServiceSd = $null
+
+                    if ($CurrentService.PSTypeNames[0] -eq 'Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Service') {
+                        $GetSDResult = Invoke-CimMethod -InputObject $CurrentService -MethodName GetSecurityDescriptor @CommonArgs
+
+                        if ($GetSDResult.ReturnValue -eq 0) {
+                            $Win32SDToBinarySDArgs = @{
+                                ClassName = 'Win32_SecurityDescriptorHelper'
+                                MethodName = 'Win32SDToBinarySD'
+                                Arguments = @{
+                                    Descriptor = $GetSDResult.Descriptor
+                                }
+                            }
+
+                            # Convert the WMI security descriptor to a raw byte array.
+                            $ConversionResult = Invoke-CimMethod @Win32SDToBinarySDArgs
+
+                            if ($ConversionResult.ReturnValue -eq 0) {
+                                # Convert to a proper, fully parsed .NET class (using the ServiceSecurity class created with reflection above).
+                                $ServiceSD = [Activator]::CreateInstance((Get-ServiceSecurityType))
+                                $ServiceSD.SetSecurityDescriptorBinaryForm($ConversionResult.BinarySD, 'All')
+                            }
+                        }
+
+                        if ($null -eq $ServiceSd) {
+                            Write-Warning "[$ComputerName] Unable to obtain service ACL for: $($_.DisplayName) ($($_.Name))"
+                        }
+                    }
+
+                    Add-Member -InputObject $CurrentService -NotePropertyName ACL -NotePropertyValue $ServiceSd
+                }
+
+                $CurrentService
+            }
         }
     }
 }
