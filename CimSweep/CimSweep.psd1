@@ -31,7 +31,8 @@ FunctionsToExport = @(
     'Get-CSShellFolderPath',
     'Get-CSStartMenuEntry',
     'Get-CSTypedURL',
-    'Get-CSWmiPersistence'
+    'Get-CSWmiPersistence',
+    'Get-CSWmiNamespace'
 )
 
 PrivateData = @{
@@ -44,6 +45,15 @@ PrivateData = @{
         ProjectUri = 'https://github.com/PowerShellMafia/CimSweep'
 
         ReleaseNotes = @'
+0.5.0
+-----
+Enhancements:
+* Added Get-CSWmiNamespace.
+* -IncludeACL added to Get-CSRegistryKey, Get-CSDirectoryListing, Get-CSService, and Get-CSWmiNamespace.
+* -IncludeFileInfo added to Get-CSService. The file info returned also includes the file ACL.
+* Functions that accept exact datetimes now mask off milliseconds to enable more flexible time-based sweeps with second granularity.
+* Added optional -UserModeServices and -Drivers switches to Get-CSService. This is helpful if you only want drivers or only want user-mode services.
+
 0.4.1
 -----
 * Bigfix: Forgot to rename Set-DefaultDisplayProperty in Get-CSRegistryAutoStart.

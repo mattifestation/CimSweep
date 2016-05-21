@@ -1,28 +1,4 @@
-﻿<#
-Helper function used to explicitly set which object properties are displayed
-This is used primarily to hide CimSession properties and to display PSComputerName
-only if a function was performed against a remote computer.
-
-Technique described here: https://poshoholic.com/2008/07/05/essential-powershell-define-default-properties-for-custom-objects/
-Thanks Kirk Munro (@Poshoholic)!
-#>
-function Set-DefaultDisplayProperty {
-    Param (
-        [Parameter(Mandatory = $True, ValueFromPipeline = $True)]
-        [Object]
-        $InputObject,
-
-        [Parameter(Mandatory = $True)]
-        [String[]]
-        $PropertyNames
-    )
-
-    $DefaultDisplayPropertySet = New-Object Management.Automation.PSPropertySet(‘DefaultDisplayPropertySet’, [String[]] $PropertyNames)
-    $PSStandardMembers = [Management.Automation.PSMemberInfo[]]@($DefaultDisplayPropertySet)
-    Add-Member -InputObject $InputObject -MemberType MemberSet -Name PSStandardMembers -Value $PSStandardMembers
-}
-
-function Get-CSRegistryKey {
+﻿function Get-CSRegistryKey {
 <#
 .SYNOPSIS
 
@@ -157,6 +133,9 @@ It is not recommended to recursively list all registry keys from most parent key
 
     PROCESS {
         foreach ($Session in $CimSession) {
+            $ComputerName = $Session.ComputerName
+            if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
+
             # Note: -Path is not guaranteed to expand if the PSDrive doesn't exist. e.g. HKCR doesn't exist by default.
             # The point of -Path is to speed up your workflow.
             if ($PSBoundParameters['Path']) {
@@ -249,7 +228,6 @@ It is not recommended to recursively list all registry keys from most parent key
                         }
 
                         $ObjectProperties['ACL'] = $RegSD
-                        $DefaultProperties.Add('ACL')
                     }
 
                     if ($Result.PSComputerName) {
@@ -713,57 +691,6 @@ Outputs a list of objects representing registry value names, their respective ty
     }
 }
 
-function Get-HKUSID {
-<#
-.SYNOPSIS
-
-Returns a hashtable mapping SIDs present in the HKU hive to account names.
-
-Author: Matthew Graeber (@mattifestation)
-License: BSD 3-Clause
-
-.DESCRIPTION
-
-Get-HKUSID is a helper function that returns user SIDs from the root of the HKU hive. Remotely querying HKU for each local user is ideal over querying HKCU.
-
-.PARAMETER CimSession
-
-Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
-
-.PARAMETER OperationTimeoutSec
-
-Specifies the amount of time that the cmdlet waits for a response from the computer.
-
-By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
-
-If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
-#>
-
-    [CmdletBinding()]
-    param(
-        [Alias('Session')]
-        [ValidateNotNullOrEmpty()]
-        [Microsoft.Management.Infrastructure.CimSession]
-        $CimSession,
-
-        [UInt32]
-        [Alias('OT')]
-        $OperationTimeoutSec
-    )
-
-    $CommonArgs = @{}
-
-    if ($PSBoundParameters['CimSession']) { $CommonArgs['CimSession'] = $CimSession }
-    if ($PSBoundParameters['OperationTimeoutSec']) { $CommonArgs['OperationTimeoutSec'] = $OperationTimeoutSec }
-
-    Get-CSRegistryKey -Hive HKU @CommonArgs | ForEach-Object {
-        # S-1-5-18 is equivalent to HKLM
-        if (($_.SubKey -ne '.DEFAULT') -and ($_.SubKey -ne 'S-1-5-18') -and (-not $_.SubKey.EndsWith('_Classes'))) {
-            $_.SubKey
-        }
-    }
-}
-
 function Get-CSEventLog {
 <#
 .SYNOPSIS
@@ -904,11 +831,15 @@ Gets only events with the specified event identifier.
 
 Gets only events with the specified entry type. Valid values are Error, Information, FailureAudit, SuccessAudit, and Warning. The default is all events.
 
-.PARAMETER After
+.PARAMETER TimeGenerated
+
+Gets only the events that occur within one second the specified date and time. Enter a DateTime object, such as the one returned by the Get-Date cmdlet. Note: Datetimes are automatically converted to UTC.
+
+.PARAMETER TimeGeneratedAfter
 
 Gets only the events that occur after the specified date and time. Enter a DateTime object, such as the one returned by the Get-Date cmdlet. Note: Datetimes are automatically converted to UTC.
 
-.PARAMETER Before
+.PARAMETER TimeGeneratedBefore
 
 Gets only the events that occur before the specified date and time. Enter a DateTime object, such as the one returned by the Get-Date cmdlet. Note: Datetimes are automatically converted to UTC.
 
@@ -1002,13 +933,21 @@ Outputs Win32_NtLogEvent instances.
         [Parameter(ParameterSetName='RestrictOutput')]
         [DateTime]
         [ValidateNotNullOrEmpty()]
-        $After,
+        $TimeGenerated,
 
         [Parameter(ParameterSetName='DefaultOutput')]
         [Parameter(ParameterSetName='RestrictOutput')]
         [DateTime]
         [ValidateNotNullOrEmpty()]
-        $Before,
+        [Alias('After')]
+        $TimeGeneratedAfter,
+
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
+        [DateTime]
+        [ValidateNotNullOrEmpty()]
+        [Alias('Before')]
+        $TimeGeneratedBefore,
 
         [Parameter(ParameterSetName='DefaultOutput')]
         [Parameter(ParameterSetName='RestrictOutput')]
@@ -1113,8 +1052,15 @@ Outputs Win32_NtLogEvent instances.
             if ($PSBoundParameters['EventCode']) { $FilterComponents.Add("($(($EventCode | ForEach-Object { "EventCode = $_" }) -join ' OR '))") }
             if ($PSBoundParameters['EventIdentifier']) { $FilterComponents.Add("($(($EventIdentifier | ForEach-Object { "EventIdentifier = $_" }) -join ' OR '))") }
             if ($PSBoundParameters['EntryType']) { $FilterComponents.Add("EventType=$($TypeMapping[$EntryType])") }
-            if ($PSBoundParameters['Before']) { $FilterComponents.Add("TimeGenerated<'$($Before.ToUniversalTime().ToString('yyyyMMddHHmmss.ffffff+000'))'") }
-            if ($PSBoundParameters['After']) { $FilterComponents.Add("TimeGenerated>'$($After.ToUniversalTime().ToString('yyyyMMddHHmmss.ffffff+000'))'") }
+            if ($PSBoundParameters['TimeGenerated']) {
+                # Mask off milliseconds. I can't think of anyone who would want to search within millisecond granularity.
+                $BeginningOfSecond = $TimeGenerated.AddMilliseconds(- $TimeGenerated.Millisecond)
+                $EndOfSecond = $BeginningOfSecond.AddSeconds(1)
+
+                $FilterComponents.Add("TimeGenerated>='$($BeginningOfSecond.ToUniversalTime().ToString('yyyyMMddHHmmss.ffffff+000'))' AND TimeGenerated<='$($EndOfSecond.ToUniversalTime().ToString('yyyyMMddHHmmss.ffffff+000'))'")
+            }
+            if ($PSBoundParameters['TimeGeneratedBefore']) { $FilterComponents.Add("TimeGenerated<'$($TimeGeneratedBefore.ToUniversalTime().ToString('yyyyMMddHHmmss.ffffff+000'))'") }
+            if ($PSBoundParameters['TimeGeneratedAfter']) { $FilterComponents.Add("TimeGenerated>'$($TimeGeneratedAfter.ToUniversalTime().ToString('yyyyMMddHHmmss.ffffff+000'))'") }
             if ($PSBoundParameters['Message']) { $FilterComponents.Add("Message LIKE '%$($Message)%'") }
             if ($PSBoundParameters['Source']) { $FilterComponents.Add("SourceName LIKE '%$Source%'") }
 
@@ -1591,20 +1537,33 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
             if (-not $PSBoundParameters['Directory']) {
                 $FilterComponents = New-Object 'Collections.ObjectModel.Collection`1[System.String]'
 
-                # To do: to make exact datetime matches more usable, I may need to not account for milliseconds
-                # and scan for a range that matched within the second.
                 $DmtfFormat = 'yyyyMMddHHmmss.ffffff+000'
 
                 if ($PSBoundParameters['FileName']) { $FilterComponents.Add("($(($FileName | ForEach-Object { "Name=``"$($TrimmedPath.Replace('\', '\\'))\\$_``"" }) -join ' OR '))") }
                 if ($PSBoundParameters['FileSize']) { $FilterComponents.Add("($(($FileSize | ForEach-Object { "FileSize = $_" }) -join ' OR '))") }
                 if ($PSBoundParameters['Extension']) { $FilterComponents.Add("($(($Extension | ForEach-Object { "Extension =``"$_``"" }) -join ' OR '))") }
-                if ($PSBoundParameters['LastModified']) { $FilterComponents.Add("LastModified=`"$($LastModified.ToUniversalTime().ToString($DmtfFormat))`"") }
+                if ($PSBoundParameters['LastModified']) {
+                    $BeginningOfSecond = $LastModified.AddMilliseconds(- $LastModified.Millisecond)
+                    $EndOfSecond = $BeginningOfSecond.AddSeconds(1)
+
+                    $FilterComponents.Add("LastModified>=`"$($BeginningOfSecond.ToUniversalTime().ToString($DmtfFormat))`" AND LastModified<=`"$($EndOfSecond.ToUniversalTime().ToString($DmtfFormat))`"")
+                }
                 if ($PSBoundParameters['LastModifiedBefore']) { $FilterComponents.Add("LastModified<`"$($LastModifiedBefore.ToUniversalTime().ToString($DmtfFormat))`"") }
                 if ($PSBoundParameters['LastModifiedAfter']) { $FilterComponents.Add("LastModified>`"$($LastModifiedAfter.ToUniversalTime().ToString($DmtfFormat))`"") }
-                if ($PSBoundParameters['LastAccessed']) { $FilterComponents.Add("LastAccessed=`"$($LastAccessed.ToUniversalTime().ToString($DmtfFormat))`"") }
+                if ($PSBoundParameters['LastAccessed']) {
+                    $BeginningOfSecond = $LastAccessed.AddMilliseconds(- $LastAccessed.Millisecond)
+                    $EndOfSecond = $BeginningOfSecond.AddSeconds(1)
+
+                    $FilterComponents.Add("LastAccessed>=`"$($BeginningOfSecond.ToUniversalTime().ToString($DmtfFormat))`" AND LastAccessed<=`"$($EndOfSecond.ToUniversalTime().ToString($DmtfFormat))`"")
+                }
                 if ($PSBoundParameters['LastAccessedBefore']) { $FilterComponents.Add("LastAccessed<`"$($LastAccessedBefore.ToUniversalTime().ToString($DmtfFormat))`"") }
                 if ($PSBoundParameters['LastAccessedAfter']) { $FilterComponents.Add("LastAccessed>`"$($LastAccessedAfter.ToUniversalTime().ToString($DmtfFormat))`"") }
-                if ($PSBoundParameters['CreationDate']) { $FilterComponents.Add("CreationDate=`"$($CreationDate.ToUniversalTime().ToString($DmtfFormat))`"") }
+                if ($PSBoundParameters['CreationDate']) {
+                    $BeginningOfSecond = $CreationDate.AddMilliseconds(- $CreationDate.Millisecond)
+                    $EndOfSecond = $BeginningOfSecond.AddSeconds(1)
+
+                    $FilterComponents.Add("CreationDate>=`"$($BeginningOfSecond.ToUniversalTime().ToString($DmtfFormat))`" AND CreationDate<=`"$($EndOfSecond.ToUniversalTime().ToString($DmtfFormat))`"")
+                }
                 if ($PSBoundParameters['CreationDateBefore']) { $FilterComponents.Add("CreationDate<`"$($CreationDateBefore.ToUniversalTime().ToString($DmtfFormat))`"") }
                 if ($PSBoundParameters['CreationDateAfter']) { $FilterComponents.Add("CreationDate>`"$($CreationDateAfter.ToUniversalTime().ToString($DmtfFormat))`"") }
                 if ($PSBoundParameters['Hidden']) { $FilterComponents.Add('Hidden = "True"') }
@@ -1674,7 +1633,7 @@ function Get-CSService {
 <#
 .SYNOPSIS
 
-Gets the services on a local or remote computer.
+Gets the services including installed drivers on a local or remote computer.
 
 Author: Matthew Graeber (@mattifestation)
 License: BSD 3-Clause
@@ -1711,6 +1670,14 @@ Specifies the full path or a portion of the path to the service binary file that
 
 Specifies the service description.
 
+.PARAMETER UserModeServices
+
+Specifies that only classes of type Win32_Service should be returned.
+
+.PARAMETER Drivers
+
+Specifies that only classes of type Win32_SystemDriver should be returned.
+
 .PARAMETER LimitOutput
 
 Specifies that an explicit list of Win32_Process properties should be returned. This can significantly reduce the time it takes to sweep across many systems is only a subset of properties are desired.
@@ -1718,6 +1685,14 @@ Specifies that an explicit list of Win32_Process properties should be returned. 
 .PARAMETER Property
 
 Specifies the desired properties to retrieve from Win32_Process instances. The following properties are returned when limited output is desired: ProcessId, ParentProcessId, Name, ExecutablePath, CommandLine
+
+.PARAMETER IncludeAcl
+
+Specifies that the ACL for the service should be returned. -IncludeAcl will append an ACL property to each returned object. The ACL property is a CimSweep.ServiceSecurity object.
+
+.PARAMETER IncludeFileInfo
+
+Specifies that the ACL file hosting the service be returned. -IncludeFileInfo will append a FileInfo property to each returned object. The FileInfo property is a CIM_DataFile instance.
 
 .PARAMETER NoProgressBar
 
@@ -1806,6 +1781,16 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
         $Description,
 
         [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
+        [Switch]
+        $UserModeServices,
+
+        [Parameter(ParameterSetName='DefaultOutput')]
+        [Parameter(ParameterSetName='RestrictOutput')]
+        [Switch]
+        $Drivers,
+
+        [Parameter(ParameterSetName='DefaultOutput')]
         [Switch]
         $LimitOutput,
 
@@ -1835,6 +1820,12 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
             'SystemName',
             'TagId')]
         $Property = @('Name', 'DisplayName', 'Description', 'State', 'ServiceType', 'PathName'),
+
+        [Switch]
+        $IncludeAcl,
+
+        [Switch]
+        $IncludeFileInfo,
 
         [Parameter(ParameterSetName='DefaultOutput')]
         [Parameter(ParameterSetName='RestrictOutput')]
@@ -1869,6 +1860,106 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
 
         $Timeout = @{}
         if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
+
+        if ($IncludeAcl) {
+            <#
+            # This won't compile using Add-Type in Nano Server TP5 due to
+            # a bug where it cannot determine the proper framework dir.
+
+            Add-Type -TypeDefinition @'
+            using System;
+            using System.Security.AccessControl;
+
+            namespace CimSweep
+            {
+                [Flags]
+                public enum ServiceFlags
+                {
+                    QueryConfig =         0x00000001,
+                    ChangeConfig =        0x00000002,
+                    QueryStatus =         0x00000004,
+                    EnumerateDependents = 0x00000008,
+                    Start =               0x00000010,
+                    Stop =                0x00000020,
+                    PauseContinue =       0x00000040,
+                    Interrogate =         0x00000080,
+                    UserDefinedControl =  0x00000100,
+                    Delete =              0x00010000,
+                    ReadControl =         0x00020000,
+                    WriteDac =            0x00040000,
+                    WriteOwner =          0x00080000
+                }
+
+                // I have no clue why this class isn't defined in .NET. Psh
+                public class ServiceSecurity : ObjectSecurity<ServiceFlags>
+	            {
+                    public ServiceSecurity() : base(false, ResourceType.Service)
+		            {
+		            }
+                }
+            }
+            '@ -ReferencedAssemblies ([System.Security.AccessControl.ResourceType].Assembly.Location)
+            #>
+
+            # Helper function code used supply ACL information Get-CSService when Get-CSService is used.
+            # The pure reflection version of the above C# code:
+            function Local:Get-ServiceSecurityType {
+                [OutputType('CimSweep.ServiceSecurity')]
+                param ()
+
+                $AppDomain = [Reflection.Assembly].Assembly.GetType('System.AppDomain').GetProperty('CurrentDomain').GetValue($null)
+                $DynamicAssembly = New-Object Reflection.AssemblyName('CimSweepAssembly')
+                $AssemblyBuilder = $AppDomain.DefineDynamicAssembly($DynamicAssembly, [Reflection.Emit.AssemblyBuilderAccess]::Run)
+                $ModuleBuilder = $AssemblyBuilder.DefineDynamicModule('CimSweepModule', $false)
+
+                $EnumTypeAttributes = [Reflection.TypeAttributes]::Public
+                $EnumBuilder = $ModuleBuilder.DefineEnum('CimSweep.ServiceFlags', $EnumTypeAttributes, [Int])
+                $null = $EnumBuilder.DefineLiteral('QueryConfig', 0x00000001)
+                $null = $EnumBuilder.DefineLiteral('ChangeConfig', 0x00000002)
+                $null = $EnumBuilder.DefineLiteral('QueryStatus', 0x00000004)
+                $null = $EnumBuilder.DefineLiteral('EnumerateDependents', 0x00000008)
+                $null = $EnumBuilder.DefineLiteral('Start', 0x00000010)
+                $null = $EnumBuilder.DefineLiteral('Stop', 0x00000020)
+                $null = $EnumBuilder.DefineLiteral('PauseContinue', 0x00000040)
+                $null = $EnumBuilder.DefineLiteral('Interrogate', 0x00000080)
+                $null = $EnumBuilder.DefineLiteral('UserDefinedControl', 0x00000100)
+                $null = $EnumBuilder.DefineLiteral('AllAccess', 0x000F01FF)
+                $null = $EnumBuilder.DefineLiteral('Delete', 0x00010000)
+                $null = $EnumBuilder.DefineLiteral('ReadControl', 0x00020000)
+                $null = $EnumBuilder.DefineLiteral('WriteDac', 0x00040000)
+                $null = $EnumBuilder.DefineLiteral('WriteOwner', 0x00080000)
+
+                $FlagsConstructor = [FlagsAttribute].GetConstructor([Type[]] @())
+                $FlagsAttribute = New-Object Reflection.Emit.CustomAttributeBuilder -ArgumentList $FlagsConstructor, ([Object[]] @())
+
+                # Reflection version of applying [Flags] to the enum
+                $EnumBuilder.SetCustomAttribute($FlagsAttribute)
+
+                $EnumType = $EnumBuilder.CreateType()
+
+                $BaseType = [Security.AccessControl.ObjectSecurity`1].MakeGenericType([Type[]] @($EnumType))
+                $TypeAttributes = [Reflection.TypeAttributes] 'AutoLayout, AnsiClass, Class, Public, BeforeFieldInit'
+
+                $TypeBuilder = $ModuleBuilder.DefineType('CimSweep.ServiceSecurity', $TypeAttributes, $BaseType)
+
+                $MethodAttributes = [Reflection.MethodAttributes] 'PrivateScope, Public, HideBySig, SpecialName, RTSpecialName'
+                $CallingConvention = [Reflection.CallingConventions] 'Standard, HasThis'
+                $ConstructorBuilder = $TypeBuilder.DefineConstructor($MethodAttributes, $CallingConvention, [Type[]] @())
+                $ILGen = $ConstructorBuilder.GetILGenerator()
+
+                # I got this by building the above C# then disassembling it. When dealing with implementing
+                # methods (in this case, a constructor), you only get to assemble CIL opcodes. No compilation. :(
+                $ILGen.Emit([Reflection.Emit.OpCodes]::Ldarg_0)
+                $ILGen.Emit([Reflection.Emit.OpCodes]::Ldc_I4_0)
+                $ILGen.Emit([Reflection.Emit.OpCodes]::Ldc_I4_2)
+                $ILGen.Emit([Reflection.Emit.OpCodes]::Call, $BaseType.GetConstructor([Reflection.BindingFlags] 'NonPublic, Instance', $null, [Type[]] @([Boolean], [Security.AccessControl.ResourceType]), $null))
+                $ILGen.Emit([Reflection.Emit.OpCodes]::Ret)
+
+                $ServiceSecurityType = $TypeBuilder.CreateType()
+
+                $ServiceSecurityType
+            }
+        }
     }
 
     PROCESS {
@@ -1903,7 +1994,108 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
                 $ServiceEntryArgs['Filter'] = $Filter
             }
 
-            Get-CimInstance -ClassName Win32_BaseService @CommonArgs @ServiceEntryArgs @PropertyList @Timeout
+            $ClassName = 'Win32_BaseService'
+            if ($UserModeServices -and (-not $Drivers)) { $ClassName = 'Win32_Service' }
+            if ($Drivers -and (-not $UserModeServices)) { $ClassName = 'Win32_SystemDriver' }
+
+            Get-CimInstance -ClassName $ClassName @CommonArgs @ServiceEntryArgs @PropertyList @Timeout | ForEach-Object {
+                $CurrentService = $_
+
+                $IsWin32Service = $CurrentService.PSTypeNames -contains 'Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Service'
+
+                if ($IncludeAcl) {
+                    $ServiceSd = $null
+
+                    if ($IsWin32Service) {
+                        $GetSDResult = Invoke-CimMethod -InputObject $CurrentService -MethodName GetSecurityDescriptor @CommonArgs
+
+                        if ($GetSDResult.ReturnValue -eq 0) {
+                            $Win32SDToBinarySDArgs = @{
+                                ClassName = 'Win32_SecurityDescriptorHelper'
+                                MethodName = 'Win32SDToBinarySD'
+                                Arguments = @{
+                                    Descriptor = $GetSDResult.Descriptor
+                                }
+                            }
+
+                            # Convert the WMI security descriptor to a raw byte array.
+                            $ConversionResult = Invoke-CimMethod @Win32SDToBinarySDArgs
+
+                            if ($ConversionResult.ReturnValue -eq 0) {
+                                # Convert to a proper, fully parsed .NET class (using the ServiceSecurity class created with reflection above).
+                                $ServiceSD = [Activator]::CreateInstance((Get-ServiceSecurityType))
+                                $ServiceSD.SetSecurityDescriptorBinaryForm($ConversionResult.BinarySD, 'All')
+                            }
+                        }
+
+                        if ($null -eq $ServiceSd) {
+                            Write-Warning "[$ComputerName] Unable to obtain service ACL for: $($_.DisplayName) ($($_.Name))"
+                        }
+                    }
+
+                    Add-Member -InputObject $CurrentService -NotePropertyName ACL -NotePropertyValue $ServiceSd
+                }
+
+                if ($IncludeFileInfo) {
+                    $FileInfo = $null
+
+                    $RootServicePath = "SYSTEM\CurrentControlSet\Services\$($CurrentService.Name)"
+
+                    $ServicePath = $null
+
+                    if ($IsWin32Service) {
+                        $ServicePath = (Get-CSRegistryValue -Hive HKLM -SubKey "$RootServicePath\Parameters" -ValueName ServiceDll @CommonArgs).ValueContent
+
+                        if (-not $ServicePath) {
+                            $ServicePath = (Get-CSRegistryValue -Hive HKLM -SubKey $RootServicePath -ValueName ServiceDll @CommonArgs).ValueContent
+                        }
+
+                        if (-not $ServicePath) {
+                            $ServicePath = (Get-CSRegistryValue -Hive HKLM -SubKey $RootServicePath -ValueName ImagePath @CommonArgs).ValueContent
+                        }
+                    } else {
+                        $ServicePath = $CurrentService.PathName
+                    }
+
+                    if (-not $ServicePath) {
+                        Write-Error "[$ComputerName] Unable to obtain path for the following service: $($CurrentService.Name)"
+                    } else {
+                        $OriginalPath = $ServicePath
+                        $NormalizedPath = $null
+
+                        if ($IsWin32Service) {
+                            if ($OriginalPath -match '(?<ServicePath>[a-z]:\\.+(\.exe|\.dll))') {
+                                $NormalizedPath = $Matches.ServicePath
+                            }
+                        } else {
+                            # Normalize a driver image path
+                            if ($OriginalPath.StartsWith('\??\')) {
+                                $NormalizedPath = $OriginalPath.Substring(4)
+                            } else {
+                                $NormalizedPath = $OriginalPath
+                            }
+                        }
+                        
+                        if ($null -eq $NormalizedPath) {
+                            Write-Error "[$ComputerName] Unable to normalize path for the following service: $($CurrentService.Name). Path obtained: $OriginalPath. Please submit an issue containing the service path so that the regular expression can be improved."
+                        }
+
+                        # Splitting these up for use by Get-CSDirectoryListing
+                        $Directory = Split-Path -Path $NormalizedPath -Parent
+                        $File = Split-Path -Path $NormalizedPath -Leaf
+
+                        $FileInfo = Get-CSDirectoryListing -DirectoryPath $Directory -FileName $File -IncludeAcl @CommonArgs
+
+                        if ($null -eq $FileInfo) {
+                            Write-Error "[$ComputerName] Unable to obtain file information for the following service: $($CurrentService.Name). Path obtained: $NormalizedPath. It is likely that the file does not exist."
+                        }
+                    }
+
+                    Add-Member -InputObject $CurrentService -NotePropertyName FileInfo -NotePropertyValue $FileInfo
+                }
+
+                $CurrentService
+            }
         }
     }
 }
@@ -2452,6 +2644,220 @@ Outputs objects consisting of the name, value, and scope (user vs. system) of an
                             $EnvVarInfo
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+function Get-CSWmiNamespace {
+<#
+.SYNOPSIS
+
+Returns a list of WMI namespaces present within the specified namespace.
+
+.PARAMETER Namespace
+
+Specifies the WMI repository namespace in which to list sub-namespaces. Get-WmiNamespace defaults to the ROOT namespace.
+
+.PARAMETER Recurse
+
+Specifies that namespaces should be recursed upon starting from the specified root namespace.
+
+.PARAMETER IncludeAcl
+
+Specifies that the ACL for the namespace should be returned. -IncludeAcl will append an ACL property to each returned object. The ACL property is a CimSweep.WmiNamespaceSecurity object.
+
+.PARAMETER CimSession
+
+Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
+
+.PARAMETER OperationTimeoutSec
+
+Specifies the amount of time that the cmdlet waits for a response from the computer.
+
+By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
+
+If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
+
+.EXAMPLE
+
+Get-CSWmiNamespace
+
+.EXAMPLE
+
+Get-CSWmiNamespace -Recurce
+
+.EXAMPLE
+
+Get-CSWmiNamespace -Namespace ROOT/CIMV2
+
+.EXAMPLE
+
+Get-CSWmiNamespace -Namespace ROOT/CIMV2 -Recurse
+
+.EXAMPLE
+
+Get-CSWmiNamespace -Recurse -IncludeAcl -CimSession $CimSession
+
+.EXAMPLE
+
+Get-CSWmiNamespace -Recurse -IncludeAcl
+
+.OUTPUTS
+
+Microsoft.Management.Infrastructure.CimInstance#root/__NAMESPACE
+#>
+
+    [CmdletBinding()]
+    [OutputType('Microsoft.Management.Infrastructure.CimInstance#root/__NAMESPACE')]
+    Param (
+        [String]
+        [ValidateNotNullOrEmpty()]
+        $Namespace = 'ROOT',
+
+        [Switch]
+        $Recurse,
+
+        [Switch]
+        $IncludeAcl,
+
+        [Alias('Session')]
+        [ValidateNotNullOrEmpty()]
+        [Microsoft.Management.Infrastructure.CimSession[]]
+        $CimSession,
+
+        [UInt32]
+        [Alias('OT')]
+        $OperationTimeoutSec
+    )
+
+    BEGIN {
+        # If a CIM session is not provided, trick the function into thinking there is one.
+        if (-not $PSBoundParameters['CimSession']) {
+            $CimSession = ''
+        }
+
+        $Timeout = @{}
+        if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
+
+        $RecurseArg = @{}
+        if ($Recurse) { $RecurseArg['Recurse'] = $True }
+
+        $IncludeAclArg = @{}
+        if ($IncludeAcl) { $IncludeAclArg['IncludeAcl'] = $True }
+
+        function Local:Get-NamespaceSecurityType {
+            [OutputType('CimSweep.ServiceSecurity')]
+            param ()
+
+            $AppDomain = [Reflection.Assembly].Assembly.GetType('System.AppDomain').GetProperty('CurrentDomain').GetValue($null)
+            $DynamicAssembly = New-Object Reflection.AssemblyName('CimSweepAssembly')
+            $AssemblyBuilder = $AppDomain.DefineDynamicAssembly($DynamicAssembly, [Reflection.Emit.AssemblyBuilderAccess]::Run)
+            $ModuleBuilder = $AssemblyBuilder.DefineDynamicModule('CimSweepModule', $false)
+
+            $EnumTypeAttributes = [Reflection.TypeAttributes]::Public
+            $EnumBuilder = $ModuleBuilder.DefineEnum('CimSweep.NamespaceFlags', $EnumTypeAttributes, [Int])
+            $null = $EnumBuilder.DefineLiteral('Enable', 0x00000001)        # Grants the security principal read permissions.
+            $null = $EnumBuilder.DefineLiteral('MethodExecute', 0x00000002) # Grants the security principal to execute methods.
+            $null = $EnumBuilder.DefineLiteral('FullWrite', 0x00000004)     # Grants the security principal to write to classes and instances.
+            $null = $EnumBuilder.DefineLiteral('PartialWrite', 0x00000008)  # Grants the security principal to update or delete CIM instances that are static.
+            $null = $EnumBuilder.DefineLiteral('WriteProvider', 0x00000010) # Grants the security principal to update or delete CIM instances that are dynamic.
+            $null = $EnumBuilder.DefineLiteral('RemoteEnable', 0x00000020)  # Grants the security principal to remotely access the server.
+            $null = $EnumBuilder.DefineLiteral('Subscribe', 0x00000040)     # Specifies that a consumer can subscribe to the events delivered to a sink. Used in IWbemEventSink::SetSinkSecurity
+            $null = $EnumBuilder.DefineLiteral('Publish', 0x00000080)       # Specifies that the account can publish events to the instance of __EventFilter that defines the event filter for a permanent consumer.
+            $null = $EnumBuilder.DefineLiteral('ReadControl', 0x00020000)   # Allows the security principal to read the security descriptor of CIM namespace.
+            $null = $EnumBuilder.DefineLiteral('WriteDac', 0x00040000)      # Allows the security principal to modify the security descriptor of CIM namespace.
+
+            $FlagsConstructor = [FlagsAttribute].GetConstructor([Type[]] @())
+            $FlagsAttribute = New-Object Reflection.Emit.CustomAttributeBuilder -ArgumentList $FlagsConstructor, ([Object[]] @())
+
+            # Reflection version of applying [Flags] to the enum
+            $EnumBuilder.SetCustomAttribute($FlagsAttribute)
+
+            $EnumType = $EnumBuilder.CreateType()
+
+            $BaseType = [Security.AccessControl.ObjectSecurity`1].MakeGenericType([Type[]] @($EnumType))
+            $TypeAttributes = [Reflection.TypeAttributes] 'AutoLayout, AnsiClass, Class, Public, BeforeFieldInit'
+
+            $TypeBuilder = $ModuleBuilder.DefineType('CimSweep.WmiNamespaceSecurity', $TypeAttributes, $BaseType)
+
+            $MethodAttributes = [Reflection.MethodAttributes] 'PrivateScope, Public, HideBySig, SpecialName, RTSpecialName'
+            $CallingConvention = [Reflection.CallingConventions] 'Standard, HasThis'
+            $ConstructorBuilder = $TypeBuilder.DefineConstructor($MethodAttributes, $CallingConvention, [Type[]] @())
+            $ILGen = $ConstructorBuilder.GetILGenerator()
+
+            # I got this by building the above C# then disassembling it. When dealing with implementing
+            # methods (in this case, a constructor), you only get to assemble CIL opcodes. No compilation. :(
+            $ILGen.Emit([Reflection.Emit.OpCodes]::Ldarg_0)
+            $ILGen.Emit([Reflection.Emit.OpCodes]::Ldc_I4_0)
+            $ILGen.Emit([Reflection.Emit.OpCodes]::Ldc_I4_2)
+            $ILGen.Emit([Reflection.Emit.OpCodes]::Call, $BaseType.GetConstructor([Reflection.BindingFlags] 'NonPublic, Instance', $null, [Type[]] @([Boolean], [Security.AccessControl.ResourceType]), $null))
+            $ILGen.Emit([Reflection.Emit.OpCodes]::Ret)
+
+            $ServiceSecurityType = $TypeBuilder.CreateType()
+
+            $ServiceSecurityType
+        }
+    }
+
+    PROCESS {
+        foreach ($Session in $CimSession) {
+            $ComputerName = $Session.ComputerName
+            if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
+
+            $DefaultProperties = 'FullyQualifiedNamespace' -as [Type] 'Collections.Generic.List[String]'
+
+            $CommonArgs = @{}
+            if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
+
+            $TrimmedNamespace = $Namespace.Trim([Char[]] @('/', '\'))
+
+            Get-CimInstance -Namespace $TrimmedNamespace -ClassName __NAMESPACE @CommonArgs | ForEach-Object {
+                $FullyQualifiedNamespace = '{0}/{1}' -f $TrimmedNamespace, $_.Name
+
+                if ($IncludeAcl) {
+                    $NamespaceSD = $null
+
+                    $GetSDArgs = @{
+                        Namespace = $FullyQualifiedNamespace
+                        ClassName = '__SystemSecurity'
+                        MethodName = 'GetSecurityDescriptor'
+                    }
+
+                    $GetSDResult = Invoke-CimMethod @GetSDArgs @CommonArgs @Timeout -ErrorAction SilentlyContinue
+
+                    if ($GetSDResult.ReturnValue -eq 0) {
+                        $Win32SDToBinarySDArgs = @{
+                            ClassName = 'Win32_SecurityDescriptorHelper'
+                            MethodName = 'Win32SDToBinarySD'
+                            Arguments = @{
+                                Descriptor = $GetSDResult.Descriptor
+                            }
+                        }
+
+                        $ConversionResult = Invoke-CimMethod @Win32SDToBinarySDArgs @CommonArgs @Timeout
+
+                        if ($ConversionResult.ReturnValue -eq 0) {
+                            $NamespaceSD = [Activator]::CreateInstance((Get-NamespaceSecurityType))
+                            $NamespaceSD.SetSecurityDescriptorBinaryForm($ConversionResult.BinarySD, 'All')
+                        }
+                    }
+
+                    if ($null -eq $NamespaceSD) {
+                        Write-Warning "[$ComputerName] Unable to obtain WMI namespace ACL for: $FullyQualifiedNamespace"
+                    }
+
+                    Add-Member -InputObject $_ -NotePropertyName ACL -NotePropertyValue $NamespaceSD
+                }
+
+                Add-Member -InputObject $_ -NotePropertyName FullyQualifiedNamespace -NotePropertyValue $FullyQualifiedNamespace
+                Set-DefaultDisplayProperty -InputObject $_ -PropertyNames $DefaultProperties
+
+                $_
+
+                if ($Recurse) {
+                    Get-CSWmiNamespace -Namespace $FullyQualifiedNamespace @CommonArgs @RecurseArg @IncludeAclArg @Timeout
                 }
             }
         }

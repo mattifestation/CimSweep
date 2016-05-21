@@ -626,18 +626,16 @@ By default, the value of this parameter is 0, which means that the cmdlet uses t
 
 If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
 
-.INPUTS
+.OUTPUTS
 
-Microsoft.Management.Infrastructure.CimSession
-
-Get-CSStartMenuEntry accepts established CIM sessions over the pipeline.
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_ShortcutFile
 
 .NOTES
 
 If a shortcut is present in the start menu, an instance of a Win32_ShortcutFile is returned that has a Target property.
 #>
 
-    [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
+    [OutputType('Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_ShortcutFile')]
     [CmdletBinding()]
     param(
         [Switch]
@@ -719,14 +717,15 @@ By default, the value of this parameter is 0, which means that the cmdlet uses t
 
 If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
 
-.INPUTS
+.OUTPUTS
 
-Microsoft.Management.Infrastructure.CimSession
+CimSweep.WmiPersistence
 
-Get-CSWMIPersistence accepts established CIM sessions over the pipeline.
+Outputs objects representing the combination of __EventFilter, __EventConsumer, and __FilterToConsumerBinding.
 #>
 
     [CmdletBinding()]
+    [OutputType('CimSweep.WmiPersistence')]
     param(
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
@@ -774,6 +773,7 @@ Get-CSWMIPersistence accepts established CIM sessions over the pipeline.
                 $Consumer = Get-CimInstance -Namespace root/subscription -ClassName $ConsumerClass -Filter "Name=`"$($_.Consumer.Name)`"" @CommonArgs @Timeout
 
                 [PSCustomObject] @{
+                    PSTypeName = 'CimSweep.WmiPersistence'
                     Filter = $Filter
                     ConsumerClass = $ConsumerClass
                     Consumer = $Consumer
