@@ -1,4 +1,4 @@
-﻿function Enable-Rdp 
+﻿Function Enable-RDP
 {
     <#
     .SYNOPSIS
@@ -11,44 +11,76 @@
 
     .PARAMETER CimSession
     The CIM session to use for this cmdlet
+
+    .EXAMPLE
+
+    Enable RDP locally
+
+    Enable-Rdp 
+
+    Enable RDP via a CimSession for a remote host
+
+    Enable-Rdp -CimSession $RemoteSession
     #>
+
     [CmdletBinding()]
     param
     (
-        [Parameter(Mandatory = $True, ValueFromPipeline = $True)]
+        [parameter(ValueFromPipeline = $True)]
         [Alias("Session")]
         [ValidateNotNullOrEmpty()]
-        [Microsoft.Management.Infrastructure.CimSession[]]
+        [Microsoft.Management.Infrastructure.CimSession]
         $CimSession
     )
 
-    Foreach($Computer in $CimSession)
+    BEGIN 
     {
-        $parameters = @{
-            NameSpace = 'root\CIMV2\TerminalServices'
-            ClassName = 'Win32_TerminalServiceSetting'
-            CimSession = $Computer
-        }
-
-        $args = @{
-            AllowTSConnections = 1
-            ModifyFirewallException = 1
-        }
-
-        $TsInstance = Get-CimInstance @parameters
-
-        $result = $TsInstance | Invoke-CimMethod -MethodName 'AllowTSConnections' -Arguments $args
-
-        if($result.ReturnValue -eq 0)
+        if(-not $PSBoundParameters['CimSession'])
         {
-            $NoForcibleLogoff = $TsInstance | Invoke-CimMethod -MethodName 'SetDisableForcibleLogoff' -Arguments @{DisableForcibleLogoff = 1}
-            if($NoForcibleLogoff.ReturnValue -eq 0)
-            {
-                Write-Host "Enabled RDP and disabled forcible logoff"
-            }
-
-            Write-Host "Enabled RDP"
+            $CimSession = ''
         }
     }
 
+    PROCESS
+    {
+        Foreach ($Session in $CimSession)
+        {
+            $commonArgs = @{}
+
+            $instanceArgs = @{
+                NameSpace = 'root\CIMV2\TerminalServices'
+                ClassName = 'Win32_TerminalServiceSetting'
+            }
+
+            $args = @{
+                AllowTSConnections = [uint32]0x00000001
+                ModifyFirewallException = [uint32]0x00000001
+            }
+
+            if ($Session.Id) {$commonArgs['CimSession'] = $Session}
+            $TsSettings = Get-CimInstance @instanceArgs @commonArgs
+
+            $methodArgs = @{
+                InputObject = $TsSettings
+                MethodName = 'SetAllowTSConnections'
+                Arguments = $args
+            }
+
+            $result = Invoke-CimMethod @methodArgs
+            if($result.ReturnValue -eq 0)
+            {
+                $methodArgs['Arguments'] = @{DisableForcibleLogoff = 1}
+                $methodArgs['MethodName'] = 'SetDisableForcibleLogoff'
+                $result = Invoke-CimMethod @methodArgs
+                if($result.ReturnValue -eq 0)
+                {
+                    Write-Verbose "[+] Enabled RDP and disabled forcible logoff"
+                }
+
+                Write-Verbose "[+] Enabled RDP"
+            }
+
+            Get-CimInstance @instanceArgs @commonArgs
+        }
+    }
 }

@@ -1,62 +1,101 @@
 ﻿Function Get-CSProxyConfig
 {
-    <##>
+    <#
+    .SYNOPSIS 
+    This cmdlet can be used to enumerate the target host's proxy settings.
+
+    .DESCRIPTION
+    This cmdlet can be used to enumerate the target host's proxy settings. Provide a UserName to enumerate the proxy settings through the HKU root key with the specified user's SID. 
+
+    .PARAMETER CimSession
+    CimSession to use for this function
+
+    .PARAMETER UserName
+    UserName to enumerate proxy settings for
+
+    .EXAMPLE
+
+    Get-CSProxyConfig -UserName bob
+
+    Enumerate the proxy settings for bob for the localhost
+
+    Get-CSProxyConfig -CimSession $Session
+
+    Enumerate the proxy settings, in the user context of the specified CimSession. 
+    #>
+
     [CmdletBinding()]
     param
     (
-        [Parameter(mandatory = $True, ValueFromPipeline = $True)]
-        [Alias("Session")]
+        [parameter(ValueFromPipeline = $True)]
         [ValidateNotNullOrEmpty()]
-        [Microsoft.Management.Infrastructure.CimSession[]]
+        [Alias("Session")]
+        [Microsoft.Management.Infrastructure.CimSession]
         $CimSession,
 
-        [Parameter(mandatory = $False, ParameterSetName = 'UserName')]
+        [parameter(Mandatory = $false)]
+        [ValidateNotNullOrEmpty()]
         [string]$UserName
     )
 
-    BEGIN {}
-
-    PROCESS 
+    BEGIN
     {
-        foreach ($Computer in $CimSession)
+        if(-not $PSBoundParameters['CimSession'])
         {
+            $CimSession = ''
+        }
+    }
+
+    PROCESS
+    {
+        foreach ($Session in $CimSession)
+        {
+            $commonArgs = @{}
+            $instanceArgs = @{
+                NameSpace = 'root\cimv2'
+                ClassName = 'Win32_Account'
+            }
             $KeyPath = "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings\Connections\"
 
+            #Set the CimSession common argument if set
+            if($Session.Id) {$commonArgs['CimSession'] = $Session}
+            
+            #If a UserName was given, map the 
             if($PSBoundParameters['UserName'])
             {
-                $parameters = @{
-                    NameSpace = 'root\CIMV2'
-                    ClassName = 'Win32_UserAccount'
-                    Filter = "Name=`'$UserName`'"
-                    CimSession = $Computer
-                }
+                $instanceArgs['Filter'] = "Name=`'$UserName`'"
+                $SID = (Get-CimInstance @instanceArgs @commonArgs).SID 
 
-                $SID = $(Get-CimInstance @parameters).SID
                 $KeyPath = "HKU:\$SID\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings\Connections\"
             }
-               
-            $ProxyConfig = Get-CSRegistryValue -Path $KeyPath -ValueName "DefaultConnectionSettings"
 
-            if($ProxyConfig -and ($([convert]::ToInt32($ProxyConfig.ValueContent[4], 10) % 2) -eq 0))
+            $ProxyConfig = Get-CSRegistryValue -Path $KeyPath -ValueName 'DefaultConnectionSettings' @commonArgs
+
+            $AutoDetectProxy = $False 
+            
+            #If the 5th byte is even, the AutoDetectProxySetting is most likely enabled
+            if ($([convert]::ToInt32($ProxyConfig.ValueContent[4], 10)) % 2 -eq 0)
             {
                 $AutoDetectProxy = $True 
             }
 
-            $returnObject = [PSCustomObject][ordered] @{
-                ComputerName = $ProxyConfig.PSComputerName
-                AutoDetectProxyConfig = $AutoDetectProxy
+            if($ProxyConfig.PSComputerName -eq $null) {$ProxyConfig.PSComputerName = 'localhost'}
+
+            $ProxySettings = [PSCustomObject] [Ordered] @{
+                PSComputerName = $ProxyConfig.PSComputerName
+                AutoDetectProxy = $AutoDetectProxy
             }
 
+            #Get the current Internet Settings from the registry
             $KeyPath = $KeyPath -replace "(Connections\\)",""
-            Get-CSRegistryValue -Path $KeyPath | ForEach-Object {
-                Add-Member -NotePropertyName $_.ValueName -NotePropertyValue $_.ValueContent -InputObject $returnObject
+            $InternetSettings = @{}
+            Get-CSRegistryValue -Path $KeyPath @commonArgs | ForEach-Object {
+                $InternetSettings[$_.ValueName] = $_.ValueContent 
             }
 
-            $returnObject
+            $ProxySettings | Add-Member -NotePropertyName "InternetSettings" -NotePropertyValue $InternetSettings
+
+            $ProxySettings
         }
     }
-
-    END {}
-
-    
 }
