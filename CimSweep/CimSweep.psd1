@@ -35,7 +35,7 @@ FunctionsToExport = @(
     'Get-CSProxyConfig'
     'Get-CSAVInfo'
     'Invoke-CSShadowCopy'
-    'Enable-Rdp'
+    'Enable-RDP'
 )
 
 FormatsToProcess = @(
