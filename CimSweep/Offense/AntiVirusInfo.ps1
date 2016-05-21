@@ -148,7 +148,7 @@
             }
 
 
-            $AntiVirus | Add-Member -NotePropertyName 'ExclusionInfo' -NotePropertyValue $($exclusionInfo)
+            $AntiVirus | Add-Member -NotePropertyName 'ExclusionInfo' -NotePropertyValue $exclusionInfo
             $AntiVirus
         }
     }
