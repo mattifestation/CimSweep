@@ -1,7 +1,7 @@
 ﻿@{
 RootModule = 'CimSweep.psm1'
 
-ModuleVersion = '0.4.1.0'
+ModuleVersion = '0.5.0.0'
 
 GUID = 'f347ef1c-d752-4d07-bf68-3197c0aa661a'
 
@@ -32,7 +32,8 @@ FunctionsToExport = @(
     'Get-CSStartMenuEntry',
     'Get-CSTypedURL',
     'Get-CSWmiPersistence',
-    'Get-CSWmiNamespace'
+    'Get-CSWmiNamespace',
+    'Get-CSVulnerableServicePermissions'
 )
 
 PrivateData = @{
@@ -48,11 +49,15 @@ PrivateData = @{
 0.5.0
 -----
 Enhancements:
-* Added Get-CSWmiNamespace.
+* Added Get-CSWmiNamespace
+* Added Get-CSVulnerableServicePermissions
 * -IncludeACL added to Get-CSRegistryKey, Get-CSDirectoryListing, Get-CSService, and Get-CSWmiNamespace.
 * -IncludeFileInfo added to Get-CSService. The file info returned also includes the file ACL.
 * Functions that accept exact datetimes now mask off milliseconds to enable more flexible time-based sweeps with second granularity.
 * Added optional -UserModeServices and -Drivers switches to Get-CSService. This is helpful if you only want drivers or only want user-mode services.
+
+Removed:
+* Dropped -Drivers and -Services from Get-CSRegistryAutoStart. Get-CSService is the ideal means of obtaining service and driver information.
 
 0.4.1
 -----
