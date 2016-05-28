@@ -2068,7 +2068,7 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
                         $NormalizedPath = $null
 
                         if ($IsWin32Service) {
-                            if ($OriginalPath -match '(?<ServicePath>[a-z]:\\.+(\.exe|\.dll))') {
+                            if ($OriginalPath -match '(?<ServicePath>[a-z]:\\.+?(\.exe|\.dll))') {
                                 $NormalizedPath = $Matches.ServicePath
                             }
                         } else {
