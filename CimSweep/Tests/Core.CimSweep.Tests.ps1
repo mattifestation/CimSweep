@@ -529,10 +529,6 @@ Describe 'Get-CSRegistryValue' {
             $Result.ValueContent | Should Not BeNullOrEmpty
             $Result.PSComputerName | Should BeNullOrEmpty
         }
-
-        It 'should return no results when specifying a key that should not have any values' {
-            Get-CSRegistryValue -Hive HKLM | Should BeNullOrEmpty
-        }
     }
 }
 
@@ -1023,6 +1019,16 @@ Describe 'Get-CSService' {
         $Service.PSComputerName | Should BeNullOrEmpty
     }
 
+    It 'should emit the [CimSweep.ServiceSecurity] dynamic type' {
+        # We have to jump through some hoops to validate dynamic types in PowerShell Core.
+        $AppDomain = [Reflection.Assembly].Assembly.GetType('System.AppDomain').GetProperty('CurrentDomain').GetValue($null)
+        $ServiceSecurityType = $AppDomain.GetAssemblies() | Where-Object {
+                ($_.FullName.StartsWith('CimSweepAssembly')) -and ($_.GetType('CimSweep.ServiceSecurity'))
+            } | Select -First 1
+
+        $ServiceSecurityType | Should Not BeNullOrEmpty
+    }
+
     It 'should return a running service w/ CIM sessions' {
         $Service = Get-CSService -NoProgressBar -State Running -CimSession $TestCimSession1 | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
@@ -1299,6 +1305,90 @@ Describe 'Get-CSEnvironmentVariable' {
         $EnvVar.User -eq '<SYSTEM>' | Should Be $False
         $EnvVar.VariableValue | Should Not BeNullOrEmpty
         $EnvVar.PSComputerName | Should BeExactly 'localhost'
+    }
+}
+
+Describe 'Get-CSWmiNamespace' {
+    Context 'parameter validation' {
+        It 'should not throw when no arguments are provided' {
+            { Get-CSWmiNamespace -ErrorAction Stop } | Should Not Throw
+        }
+
+        It 'should throw upon receiving an invalid namespace' {
+            { Get-CSWmiNamespace -Namespace 'GROOT' -ErrorAction Stop } | Should Throw
+        }
+
+        It 'should throw upon receiving an invalid namespace with -IncludeAcl' {
+            { Get-CSWmiNamespace -Namespace 'GROOT' -IncludeAcl -ErrorAction Stop } | Should Throw
+        }
+
+        It 'should throw upon receiving an invalid namespace with -IncludeAcl and -Recurse' {
+            { Get-CSWmiNamespace -Namespace 'GROOT' -IncludeAcl -Recurse -ErrorAction Stop } | Should Throw
+        }
+
+        It 'should throw upon receiving an empty or null namespace' {
+            { Get-CSWmiNamespace -Namespace '' -ErrorAction Stop } | Should Throw
+            { Get-CSWmiNamespace -Namespace $null -ErrorAction Stop } | Should Throw
+        }
+
+        It 'should accept one or more CIM sessions' {
+            { Get-CSWmiNamespace -CimSession $TestCimSession1 -ErrorAction Stop } | Should Not Throw
+            { Get-CSWmiNamespace -CimSession $TestSessionArray -ErrorAction Stop } | Should Not Throw
+            { Get-CSWmiNamespace -CimSession $TestCimSession1 -ErrorAction Stop } | Should Not BeNullOrEmpty
+            { Get-CSWmiNamespace -CimSession $TestSessionArray -ErrorAction Stop } | Should Not BeNullOrEmpty
+        }
+
+        It 'should accept -OperationTimeoutSec' {
+            { Get-CSWmiNamespace -OperationTimeoutSec 3 -ErrorAction Stop } | Should Not Throw
+            { Get-CSWmiNamespace -OperationTimeoutSec 3 -CimSession $TestCimSession1 -ErrorAction Stop } | Should Not Throw
+        }
+    }
+
+    Context 'expected behavior' {
+        It 'should return output for an expected namespace - ROOT/CIMv2' {
+            $Result = Get-CSWmiNamespace -ErrorAction Stop
+
+            $Result.FullyQualifiedNamespace -contains 'ROOT/CIMV2' | Should Be $True
+            $Result.Name -contains 'CIMV2' | Should Be $True
+
+            $Result2 = Get-CSWmiNamespace -CimSession $TestCimSession1 -ErrorAction Stop
+
+            $Result2.FullyQualifiedNamespace -contains 'ROOT/CIMV2' | Should Be $True
+            $Result2.Name -contains 'CIMV2' | Should Be $True
+        }
+
+        It 'should recurse over namespaces' {
+            # Ignore errors since you may not have permission to retrieve all namespaces as an unprivileged user.
+            $AllNamespaces = Get-CSWmiNamespace -ErrorAction SilentlyContinue -Recurse | Select -First 10
+
+            $CIMv2Namespaces = Get-CSWmiNamespace -Namespace 'ROOT/CIMV2' -ErrorAction Stop
+
+            $CIMv2Namespaces | ForEach-Object {
+                $AllNamespaces.FullyQualifiedNamespace -contains $_.FullyQualifiedNamespace
+            }
+        }
+
+        It 'should emit the [CimSweep.WmiNamespaceSecurity] dynamic type' {
+            # We have to jump through some hoops to validate dynamic types in PowerShell Core.
+            $AppDomain = [Reflection.Assembly].Assembly.GetType('System.AppDomain').GetProperty('CurrentDomain').GetValue($null)
+            $WmiNamespaceSecurityType = $AppDomain.GetAssemblies() | Where-Object {
+                ($_.FullName.StartsWith('CimSweepAssembly')) -and ($_.GetType('CimSweep.WmiNamespaceSecurity'))
+            } | Select -First 1
+
+            $WmiNamespaceSecurityType | Should Not BeNullOrEmpty
+        }
+    }
+
+    Context 'return value validation' {
+        It 'should return a Microsoft.Management.Infrastructure.CimInstance#root/__NAMESPACE object' {
+            $CIMv2Namespace = Get-CSWmiNamespace -Namespace 'ROOT' -ErrorAction Stop | Where-Object { $_.Name -eq 'CIMV2' }
+
+            $CIMv2Namespace.PSObject.TypeNames[0] | Should Be 'Microsoft.Management.Infrastructure.CimInstance#root/__NAMESPACE'
+
+            $CIMv2NamespaceRemote = Get-CSWmiNamespace -Namespace 'ROOT' -CimSession $TestCimSession1 -ErrorAction Stop | Where-Object { $_.Name -eq 'CIMV2' }
+
+            $CIMv2NamespaceRemote.PSObject.TypeNames[0] | Should Be 'Microsoft.Management.Infrastructure.CimInstance#root/__NAMESPACE'
+        }
     }
 }
 

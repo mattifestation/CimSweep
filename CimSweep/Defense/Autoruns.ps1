@@ -39,14 +39,6 @@ Retrieve KnownDLL artifacts
 
 Retrieve winlogon artifacts
 
-.PARAMETER Services
-
-Retrieve service artifacts. Get-CSService is a more efficient means of retrieving service information.
-
-.PARAMETER Drivers
-
-Retrieve service driver artifacts. Get-CSService is a more efficient means of retrieving service information.
-
 .PARAMETER PrintMonitors
 
 Retrieve print monitor artifacts
@@ -111,14 +103,6 @@ Outputs objects representing autoruns entries similar to the output of Sysintern
 
         [Parameter(ParameterSetName = 'SpecificCheck')]
         [Switch]
-        $Services,
-
-        [Parameter(ParameterSetName = 'SpecificCheck')]
-        [Switch]
-        $Drivers,
-
-        [Parameter(ParameterSetName = 'SpecificCheck')]
-        [Switch]
         $PrintMonitors,
 
         [Parameter(ParameterSetName = 'SpecificCheck')]
@@ -166,7 +150,7 @@ Outputs objects representing autoruns entries similar to the output of Sysintern
 
         # All checks want to be performed.
         # There is likely a better way of obtaining the number of params in the 'SpecificCheck' param set
-        if (-not $AutoRunOptionCount) { $AutoRunOptionCount = 11 }
+        if (-not $AutoRunOptionCount) { $AutoRunOptionCount = 9 }
 
         # Helper function that maps a registry autorun artifact roughly to that of autoruns.exe output.
         filter New-AutoRunsEntry {
@@ -363,57 +347,6 @@ Outputs objects representing autoruns entries similar to the output of Sysintern
                         $NetworkOrder | New-AutoRunsEntry -AutoRunEntry $_ -ImagePath $_ -Category $Category
                     }
                 }
-            }
-
-            if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['Services'] -or $PSBoundParameters['Drivers']) {
-                $ServiceKeys = Get-CSRegistryKey -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Services' @CommonArgs @Timeout
-
-                if ($PSBoundParameters['Services']) { $CurrentAutorunCount++ }
-                if ($PSBoundParameters['Drivers']) { $CurrentAutorunCount++ }
-
-                $ServiceKeys | Get-CSRegistryValue -ValueName 'Type' @CommonArgs @Timeout | ForEach-Object {
-                    $SERVICE_KERNEL_DRIVER = 1
-                    $SERVICE_FILE_SYSTEM_DRIVER = 2
-                    $SERVICE_WIN32_OWN_PROCESS = 0x10
-                    $SERVICE_WIN32_SHARE_PROCESS = 0x20
-
-                    $ServiceShortName = $_.SubKey.Split('\')[-1]
-
-                    if ($PSBoundParameters['Drivers'] -and ($_.ValueContent -eq $SERVICE_KERNEL_DRIVER -or $_.ValueContent -eq $SERVICE_FILE_SYSTEM_DRIVER)) {
-                        $Category = 'Drivers'
-
-                        if (-not $PSBoundParameters['NoProgressBar']) {
-                            Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
-                        }
-
-                        $ImagePath = ($_ | Get-CSRegistryValue -ValueName ImagePath @CommonArgs @Timeout).ValueContent
-
-                        New-AutoRunsEntry HKLM 'SYSTEM\CurrentControlSet\Services' $ServiceShortName $ImagePath $Category $_.PSComputerName
-                    }
-
-                    if ($PSBoundParameters['Services']) {
-                        $Category = 'Services'
-
-                        if (-not $PSBoundParameters['NoProgressBar']) {
-                            Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
-                        }
-
-                        if ($_.ValueContent -eq $SERVICE_WIN32_OWN_PROCESS) {
-                            $ImagePath = ($_ | Get-CSRegistryValue -ValueName ImagePath @CommonArgs @Timeout).ValueContent
-
-                            New-AutoRunsEntry HKLM 'SYSTEM\CurrentControlSet\Services' $ServiceShortName $ImagePath $Category $_.PSComputerName
-                        }
-
-                        if ($_.ValueContent -eq $SERVICE_WIN32_SHARE_PROCESS) {
-                            $SubKey = "$($_.SubKey)\Parameters"
-
-                            $ImagePath = ($_ | Get-CSRegistryValue -SubKey $SubKey -ValueName ServiceDll @CommonArgs @Timeout).ValueContent
-
-                            New-AutoRunsEntry HKLM 'SYSTEM\CurrentControlSet\Services' $ServiceShortName $ImagePath $Category $_.PSComputerName
-                        }
-                    }
-                }
-
             }
 
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['LSAProviders']) {
@@ -626,18 +559,16 @@ By default, the value of this parameter is 0, which means that the cmdlet uses t
 
 If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
 
-.INPUTS
+.OUTPUTS
 
-Microsoft.Management.Infrastructure.CimSession
-
-Get-CSStartMenuEntry accepts established CIM sessions over the pipeline.
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_ShortcutFile
 
 .NOTES
 
 If a shortcut is present in the start menu, an instance of a Win32_ShortcutFile is returned that has a Target property.
 #>
 
-    [OutputType([Microsoft.Management.Infrastructure.CimInstance])]
+    [OutputType('Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_ShortcutFile')]
     [CmdletBinding()]
     param(
         [Switch]
@@ -719,14 +650,15 @@ By default, the value of this parameter is 0, which means that the cmdlet uses t
 
 If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
 
-.INPUTS
+.OUTPUTS
 
-Microsoft.Management.Infrastructure.CimSession
+CimSweep.WmiPersistence
 
-Get-CSWMIPersistence accepts established CIM sessions over the pipeline.
+Outputs objects representing the combination of __EventFilter, __EventConsumer, and __FilterToConsumerBinding.
 #>
 
     [CmdletBinding()]
+    [OutputType('CimSweep.WmiPersistence')]
     param(
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
@@ -774,6 +706,7 @@ Get-CSWMIPersistence accepts established CIM sessions over the pipeline.
                 $Consumer = Get-CimInstance -Namespace root/subscription -ClassName $ConsumerClass -Filter "Name=`"$($_.Consumer.Name)`"" @CommonArgs @Timeout
 
                 [PSCustomObject] @{
+                    PSTypeName = 'CimSweep.WmiPersistence'
                     Filter = $Filter
                     ConsumerClass = $ConsumerClass
                     Consumer = $Consumer
