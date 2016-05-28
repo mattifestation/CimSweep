@@ -33,7 +33,7 @@ FunctionsToExport = @(
     'Get-CSTypedURL',
     'Get-CSWmiPersistence',
     'Get-CSWmiNamespace',
-    'Get-CSVulnerableServicePermissions'
+    'Get-CSVulnerableServicePermission'
 )
 
 PrivateData = @{
@@ -50,7 +50,7 @@ PrivateData = @{
 -----
 Enhancements:
 * Added Get-CSWmiNamespace
-* Added Get-CSVulnerableServicePermissions
+* Added Get-CSVulnerableServicePermission
 * -IncludeACL added to Get-CSRegistryKey, Get-CSDirectoryListing, Get-CSService, and Get-CSWmiNamespace.
 * -IncludeFileInfo added to Get-CSService. The file info returned also includes the file ACL.
 * Functions that accept exact datetimes now mask off milliseconds to enable more flexible time-based sweeps with second granularity.

@@ -1,4 +1,4 @@
-﻿function Get-CSVulnerableServicePermissions {
+﻿function Get-CSVulnerableServicePermission {
 <#
 .SYNOPSIS
 
@@ -9,7 +9,7 @@ License: BSD 3-Clause
 
 .DESCRIPTION
 
-Get-CSVulnerableServicePermissions is used to perform service ACL audits at scale. For each computer, it iterates through the service and associated file permissions and groups potentially vulnerable access rights granted to each user. This can be used to quickly identify if members of lower privileged groups can elevate privileges via service misconfigurations.
+Get-CSVulnerableServicePermission is used to perform service ACL audits at scale. For each computer, it iterates through the service and associated file permissions and groups potentially vulnerable access rights granted to each user. This can be used to quickly identify if members of lower privileged groups can elevate privileges via service misconfigurations.
 
 .PARAMETER IncludeDrivers
 
@@ -84,8 +84,6 @@ Service ACL sweep across a large amount of hosts will take a long time.
 
     PROCESS {
         foreach ($Session in $CimSession) {
-            $CurrentAutorunCount = 0
-
             $ComputerName = $Session.ComputerName
             if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
 
@@ -101,7 +99,7 @@ Service ACL sweep across a large amount of hosts will take a long time.
 
             $UserGrouping = @{}
 
-            Get-CSService -NoProgressBar -IncludeAcl -IncludeFileInfo @UserModeServices @CommonArgs @Timeout | % {
+            Get-CSService -NoProgressBar -IncludeAcl -IncludeFileInfo @UserModeServices @CommonArgs @Timeout | ForEach-Object {
                 $ServiceName = $_.Name
 
                 if (-not $PSBoundParameters['NoProgressBar']) {

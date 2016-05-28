@@ -1861,52 +1861,54 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
         $Timeout = @{}
         if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
 
-        if ($IncludeAcl) {
-            <#
-            # This won't compile using Add-Type in Nano Server TP5 due to
-            # a bug where it cannot determine the proper framework dir.
+        <#
+        # This won't compile using Add-Type in Nano Server TP5 due to
+        # a bug where it cannot determine the proper framework dir.
 
-            Add-Type -TypeDefinition @'
-            using System;
-            using System.Security.AccessControl;
+        Add-Type -TypeDefinition @'
+        using System;
+        using System.Security.AccessControl;
 
-            namespace CimSweep
+        namespace CimSweep
+        {
+            [Flags]
+            public enum ServiceFlags
             {
-                [Flags]
-                public enum ServiceFlags
-                {
-                    QueryConfig =         0x00000001,
-                    ChangeConfig =        0x00000002,
-                    QueryStatus =         0x00000004,
-                    EnumerateDependents = 0x00000008,
-                    Start =               0x00000010,
-                    Stop =                0x00000020,
-                    PauseContinue =       0x00000040,
-                    Interrogate =         0x00000080,
-                    UserDefinedControl =  0x00000100,
-                    Delete =              0x00010000,
-                    ReadControl =         0x00020000,
-                    WriteDac =            0x00040000,
-                    WriteOwner =          0x00080000
-                }
-
-                // I have no clue why this class isn't defined in .NET. Psh
-                public class ServiceSecurity : ObjectSecurity<ServiceFlags>
-	            {
-                    public ServiceSecurity() : base(false, ResourceType.Service)
-		            {
-		            }
-                }
+                QueryConfig =         0x00000001,
+                ChangeConfig =        0x00000002,
+                QueryStatus =         0x00000004,
+                EnumerateDependents = 0x00000008,
+                Start =               0x00000010,
+                Stop =                0x00000020,
+                PauseContinue =       0x00000040,
+                Interrogate =         0x00000080,
+                UserDefinedControl =  0x00000100,
+                Delete =              0x00010000,
+                ReadControl =         0x00020000,
+                WriteDac =            0x00040000,
+                WriteOwner =          0x00080000
             }
-            '@ -ReferencedAssemblies ([System.Security.AccessControl.ResourceType].Assembly.Location)
-            #>
 
-            # Helper function code used supply ACL information Get-CSService when Get-CSService is used.
-            # The pure reflection version of the above C# code:
-            function Local:Get-ServiceSecurityType {
-                [OutputType('CimSweep.ServiceSecurity')]
-                param ()
+            // I have no clue why this class isn't defined in .NET. Psh
+            public class ServiceSecurity : ObjectSecurity<ServiceFlags>
+	        {
+                public ServiceSecurity() : base(false, ResourceType.Service)
+		        {
+		        }
+            }
+        }
+        '@ -ReferencedAssemblies ([System.Security.AccessControl.ResourceType].Assembly.Location)
+        #>
 
+        # Helper function code used supply ACL information Get-CSService when Get-CSService -IncludeAcl is used.
+        # The pure reflection version of the above C# code:
+        function Local:Get-ServiceSecurityType {
+            [OutputType('CimSweep.ServiceSecurity')]
+            param ()
+
+            $ServiceSecurityType = 'CimSweep.ServiceSecurity' -as [Type]
+
+            if (-not $ServiceSecurityType) {
                 $AppDomain = [Reflection.Assembly].Assembly.GetType('System.AppDomain').GetProperty('CurrentDomain').GetValue($null)
                 $DynamicAssembly = New-Object Reflection.AssemblyName('CimSweepAssembly')
                 $AssemblyBuilder = $AppDomain.DefineDynamicAssembly($DynamicAssembly, [Reflection.Emit.AssemblyBuilderAccess]::Run)
@@ -1956,10 +1958,12 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
                 $ILGen.Emit([Reflection.Emit.OpCodes]::Ret)
 
                 $ServiceSecurityType = $TypeBuilder.CreateType()
-
-                $ServiceSecurityType
             }
+
+            $ServiceSecurityType
         }
+
+        $ServiceSecurityType = Get-ServiceSecurityType
     }
 
     PROCESS {
@@ -2023,7 +2027,7 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
 
                             if ($ConversionResult.ReturnValue -eq 0) {
                                 # Convert to a proper, fully parsed .NET class (using the ServiceSecurity class created with reflection above).
-                                $ServiceSD = [Activator]::CreateInstance((Get-ServiceSecurityType))
+                                $ServiceSD = [Activator]::CreateInstance($ServiceSecurityType)
                                 $ServiceSD.SetSecurityDescriptorBinaryForm($ConversionResult.BinarySD, 'All')
                             }
                         }
@@ -2748,57 +2752,63 @@ Microsoft.Management.Infrastructure.CimInstance#root/__NAMESPACE
         if ($IncludeAcl) { $IncludeAclArg['IncludeAcl'] = $True }
 
         function Local:Get-NamespaceSecurityType {
-            [OutputType('CimSweep.ServiceSecurity')]
+            [OutputType('CimSweep.WmiNamespaceSecurity')]
             param ()
 
-            $AppDomain = [Reflection.Assembly].Assembly.GetType('System.AppDomain').GetProperty('CurrentDomain').GetValue($null)
-            $DynamicAssembly = New-Object Reflection.AssemblyName('CimSweepAssembly')
-            $AssemblyBuilder = $AppDomain.DefineDynamicAssembly($DynamicAssembly, [Reflection.Emit.AssemblyBuilderAccess]::Run)
-            $ModuleBuilder = $AssemblyBuilder.DefineDynamicModule('CimSweepModule', $false)
+            $NamespaceSecurityType = 'CimSweep.WmiNamespaceSecurity' -as [Type]
 
-            $EnumTypeAttributes = [Reflection.TypeAttributes]::Public
-            $EnumBuilder = $ModuleBuilder.DefineEnum('CimSweep.NamespaceFlags', $EnumTypeAttributes, [Int])
-            $null = $EnumBuilder.DefineLiteral('Enable', 0x00000001)        # Grants the security principal read permissions.
-            $null = $EnumBuilder.DefineLiteral('MethodExecute', 0x00000002) # Grants the security principal to execute methods.
-            $null = $EnumBuilder.DefineLiteral('FullWrite', 0x00000004)     # Grants the security principal to write to classes and instances.
-            $null = $EnumBuilder.DefineLiteral('PartialWrite', 0x00000008)  # Grants the security principal to update or delete CIM instances that are static.
-            $null = $EnumBuilder.DefineLiteral('WriteProvider', 0x00000010) # Grants the security principal to update or delete CIM instances that are dynamic.
-            $null = $EnumBuilder.DefineLiteral('RemoteEnable', 0x00000020)  # Grants the security principal to remotely access the server.
-            $null = $EnumBuilder.DefineLiteral('Subscribe', 0x00000040)     # Specifies that a consumer can subscribe to the events delivered to a sink. Used in IWbemEventSink::SetSinkSecurity
-            $null = $EnumBuilder.DefineLiteral('Publish', 0x00000080)       # Specifies that the account can publish events to the instance of __EventFilter that defines the event filter for a permanent consumer.
-            $null = $EnumBuilder.DefineLiteral('ReadControl', 0x00020000)   # Allows the security principal to read the security descriptor of CIM namespace.
-            $null = $EnumBuilder.DefineLiteral('WriteDac', 0x00040000)      # Allows the security principal to modify the security descriptor of CIM namespace.
+            if (-not $NamespaceSecurityType) {
+                $AppDomain = [Reflection.Assembly].Assembly.GetType('System.AppDomain').GetProperty('CurrentDomain').GetValue($null)
+                $DynamicAssembly = New-Object Reflection.AssemblyName('CimSweepAssembly')
+                $AssemblyBuilder = $AppDomain.DefineDynamicAssembly($DynamicAssembly, [Reflection.Emit.AssemblyBuilderAccess]::Run)
+                $ModuleBuilder = $AssemblyBuilder.DefineDynamicModule('CimSweepModule', $false)
 
-            $FlagsConstructor = [FlagsAttribute].GetConstructor([Type[]] @())
-            $FlagsAttribute = New-Object Reflection.Emit.CustomAttributeBuilder -ArgumentList $FlagsConstructor, ([Object[]] @())
+                $EnumTypeAttributes = [Reflection.TypeAttributes]::Public
+                $EnumBuilder = $ModuleBuilder.DefineEnum('CimSweep.NamespaceFlags', $EnumTypeAttributes, [Int])
+                $null = $EnumBuilder.DefineLiteral('Enable', 0x00000001)        # Grants the security principal read permissions.
+                $null = $EnumBuilder.DefineLiteral('MethodExecute', 0x00000002) # Grants the security principal to execute methods.
+                $null = $EnumBuilder.DefineLiteral('FullWrite', 0x00000004)     # Grants the security principal to write to classes and instances.
+                $null = $EnumBuilder.DefineLiteral('PartialWrite', 0x00000008)  # Grants the security principal to update or delete CIM instances that are static.
+                $null = $EnumBuilder.DefineLiteral('WriteProvider', 0x00000010) # Grants the security principal to update or delete CIM instances that are dynamic.
+                $null = $EnumBuilder.DefineLiteral('RemoteEnable', 0x00000020)  # Grants the security principal to remotely access the server.
+                $null = $EnumBuilder.DefineLiteral('Subscribe', 0x00000040)     # Specifies that a consumer can subscribe to the events delivered to a sink. Used in IWbemEventSink::SetSinkSecurity
+                $null = $EnumBuilder.DefineLiteral('Publish', 0x00000080)       # Specifies that the account can publish events to the instance of __EventFilter that defines the event filter for a permanent consumer.
+                $null = $EnumBuilder.DefineLiteral('ReadControl', 0x00020000)   # Allows the security principal to read the security descriptor of CIM namespace.
+                $null = $EnumBuilder.DefineLiteral('WriteDac', 0x00040000)      # Allows the security principal to modify the security descriptor of CIM namespace.
 
-            # Reflection version of applying [Flags] to the enum
-            $EnumBuilder.SetCustomAttribute($FlagsAttribute)
+                $FlagsConstructor = [FlagsAttribute].GetConstructor([Type[]] @())
+                $FlagsAttribute = New-Object Reflection.Emit.CustomAttributeBuilder -ArgumentList $FlagsConstructor, ([Object[]] @())
 
-            $EnumType = $EnumBuilder.CreateType()
+                # Reflection version of applying [Flags] to the enum
+                $EnumBuilder.SetCustomAttribute($FlagsAttribute)
 
-            $BaseType = [Security.AccessControl.ObjectSecurity`1].MakeGenericType([Type[]] @($EnumType))
-            $TypeAttributes = [Reflection.TypeAttributes] 'AutoLayout, AnsiClass, Class, Public, BeforeFieldInit'
+                $EnumType = $EnumBuilder.CreateType()
 
-            $TypeBuilder = $ModuleBuilder.DefineType('CimSweep.WmiNamespaceSecurity', $TypeAttributes, $BaseType)
+                $BaseType = [Security.AccessControl.ObjectSecurity`1].MakeGenericType([Type[]] @($EnumType))
+                $TypeAttributes = [Reflection.TypeAttributes] 'AutoLayout, AnsiClass, Class, Public, BeforeFieldInit'
 
-            $MethodAttributes = [Reflection.MethodAttributes] 'PrivateScope, Public, HideBySig, SpecialName, RTSpecialName'
-            $CallingConvention = [Reflection.CallingConventions] 'Standard, HasThis'
-            $ConstructorBuilder = $TypeBuilder.DefineConstructor($MethodAttributes, $CallingConvention, [Type[]] @())
-            $ILGen = $ConstructorBuilder.GetILGenerator()
+                $TypeBuilder = $ModuleBuilder.DefineType('CimSweep.WmiNamespaceSecurity', $TypeAttributes, $BaseType)
 
-            # I got this by building the above C# then disassembling it. When dealing with implementing
-            # methods (in this case, a constructor), you only get to assemble CIL opcodes. No compilation. :(
-            $ILGen.Emit([Reflection.Emit.OpCodes]::Ldarg_0)
-            $ILGen.Emit([Reflection.Emit.OpCodes]::Ldc_I4_0)
-            $ILGen.Emit([Reflection.Emit.OpCodes]::Ldc_I4_2)
-            $ILGen.Emit([Reflection.Emit.OpCodes]::Call, $BaseType.GetConstructor([Reflection.BindingFlags] 'NonPublic, Instance', $null, [Type[]] @([Boolean], [Security.AccessControl.ResourceType]), $null))
-            $ILGen.Emit([Reflection.Emit.OpCodes]::Ret)
+                $MethodAttributes = [Reflection.MethodAttributes] 'PrivateScope, Public, HideBySig, SpecialName, RTSpecialName'
+                $CallingConvention = [Reflection.CallingConventions] 'Standard, HasThis'
+                $ConstructorBuilder = $TypeBuilder.DefineConstructor($MethodAttributes, $CallingConvention, [Type[]] @())
+                $ILGen = $ConstructorBuilder.GetILGenerator()
 
-            $ServiceSecurityType = $TypeBuilder.CreateType()
+                # I got this by building the above C# then disassembling it. When dealing with implementing
+                # methods (in this case, a constructor), you only get to assemble CIL opcodes. No compilation. :(
+                $ILGen.Emit([Reflection.Emit.OpCodes]::Ldarg_0)
+                $ILGen.Emit([Reflection.Emit.OpCodes]::Ldc_I4_0)
+                $ILGen.Emit([Reflection.Emit.OpCodes]::Ldc_I4_2)
+                $ILGen.Emit([Reflection.Emit.OpCodes]::Call, $BaseType.GetConstructor([Reflection.BindingFlags] 'NonPublic, Instance', $null, [Type[]] @([Boolean], [Security.AccessControl.ResourceType]), $null))
+                $ILGen.Emit([Reflection.Emit.OpCodes]::Ret)
 
-            $ServiceSecurityType
+                $NamespaceSecurityType = $TypeBuilder.CreateType()
+            }
+
+            $NamespaceSecurityType
         }
+
+        $NamespaceSecurityType = Get-NamespaceSecurityType
     }
 
     PROCESS {
@@ -2839,7 +2849,7 @@ Microsoft.Management.Infrastructure.CimInstance#root/__NAMESPACE
                         $ConversionResult = Invoke-CimMethod @Win32SDToBinarySDArgs @CommonArgs @Timeout
 
                         if ($ConversionResult.ReturnValue -eq 0) {
-                            $NamespaceSD = [Activator]::CreateInstance((Get-NamespaceSecurityType))
+                            $NamespaceSD = [Activator]::CreateInstance($NamespaceSecurityType)
                             $NamespaceSD.SetSecurityDescriptorBinaryForm($ConversionResult.BinarySD, 'All')
                         }
                     }
