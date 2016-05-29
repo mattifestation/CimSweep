@@ -1,0 +1,16 @@
+os: WMF 5
+
+skip_commits:
+  message: /^.*readme.*$/
+  
+install:
+  - cinst pester
+
+build: false
+
+test_script:
+  - ps: |
+    $ErrorActionPreference = 'Stop'
+    $TestResults = Invoke-Pester -Path ".\CimSweep\Tests" -OutputFormat NUnitXml -OutputFile TestsResults.xml -PassThru
+    (New-Object 'System.Net.WebClient').UploadFile("https://ci.appveyor.com/api/testresults/nunit/$($Env:APPVEYOR_JOB_ID)", (Resolve-Path .\TestsResults.xml))
+    if ($TestResults.FailedCount -gt 0) { throw "$($TestResults.FailedCount) tests failed."}
