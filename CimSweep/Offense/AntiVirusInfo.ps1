@@ -20,7 +20,7 @@
     [CmdletBinding()]
     param
     (
-        [Parameter(ValueFromPipeline=$True)]
+        [Parameter()]
         [Alias("Session")]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
@@ -48,12 +48,16 @@
             #Check if a session was specified
             if ($Session.Id) {$commonArgs['CimSession'] = $Session}
 
-            $OS = Get-CimInstance -ClassName CIM_OperatingSystem @commonArgs
-
-            #Select the namespace based on the OS
-            [decimal]$Version = $OS.Version.Split('.')[0..1] -join '.'
-            If($Version -ge 6.0) {$instanceArgs['NameSpace'] = 'root/SecurityCenter2'}
-            else {$instanceArgs['NameSpace'] = 'root/SecurityCenter'}
+            #Determine if the namespace exists
+            if (Get-CimInstance -Namespace root -ClassName __NAMESPACE -Filter 'Name="SecurityCenter2"' @commonArgs) 
+            {
+                $instanceArgs['NameSpace'] = 'root/SecurityCenter2'
+            }
+            elseif (Get-CimInstance -Namespace root -ClassName __NAMESPACE -Filter 'Name="SecurityCenter"' @commonArgs) 
+            {
+                $instanceArgs['NameSpace'] = 'root/SecurityCenter'
+            }
+            else {Write-Verbose "[!] Unable to find SecurityCenter2 or SecurityCenter Namespace instance"; break}
 
             $AV = Get-CimInstance @instanceArgs @commonArgs
 
@@ -133,17 +137,17 @@
 
             if($AntiVirus.Name -match 'Windows Defender')
             {
-                $exclusionInfo = @{}
+                $exclusionInfo = [PSCustomObject] [Ordered]@{}
                 $defenderPaths.GetEnumerator() | ForEach-Object {
-                    $exclusionInfo[$_.Key] = $(Get-CSRegistryValue -Path $($_.Value) @commonArgs).ValueContent
+                    $exclusionInfo | Add-Member -NotePropertyName $_.Key -NotePropertyValue $(Get-CSRegistryValue -Path $($_.Value) @commonArgs).ValueName
                 }
 
             }
             elseif($AntiVirus.Name -match 'McAfee')
             {
-                $exclusionInfo = @{}
-                $defenderPaths.GetEnumerator() | ForEach-Object {
-                    $exclusionInfo[$_.Key] = $(Get-CSRegistryValue -Path $($_.Value) @commonArgs).ValueContent
+                $exclusionInfo = [PSCustomObject] [Ordered]@{}
+                $mcAfeePaths.GetEnumerator() | ForEach-Object {
+                    $exclusionInfo | Add-Member -NotePropertyName $_.Key -NotePropertyValue $(Get-CSRegistryValue -Path $($_.Value) @commonArgs).ValueName
                 }
             }
 

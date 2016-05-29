@@ -39,7 +39,7 @@
     [CmdletBinding()]
     param
     (
-        [parameter(ValueFromPipeline = $True)]
+        [parameter()]
         [ValidateNotNullOrEmpty()]
         [Alias("Session")]
         [Microsoft.Management.Infrastructure.CimSession[]]

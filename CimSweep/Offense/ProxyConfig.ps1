@@ -27,10 +27,10 @@
     [CmdletBinding()]
     param
     (
-        [parameter(ValueFromPipeline = $True)]
+        [parameter()]
         [ValidateNotNullOrEmpty()]
         [Alias("Session")]
-        [Microsoft.Management.Infrastructure.CimSession]
+        [Microsoft.Management.Infrastructure.CimSession[]]
         $CimSession,
 
         [parameter(Mandatory = $false)]
@@ -88,9 +88,9 @@
 
             #Get the current Internet Settings from the registry
             $KeyPath = $KeyPath -replace "(Connections\\)",""
-            $InternetSettings = @{}
+            $InternetSettings = [PSCustomObject] [Ordered]@{}
             Get-CSRegistryValue -Path $KeyPath @commonArgs | ForEach-Object {
-                $InternetSettings[$_.ValueName] = $_.ValueContent 
+                $InternetSettings | Add-Member -NotePropertyName $_.ValueName -NotePropertyValue $_.ValueContent
             }
 
             $ProxySettings | Add-Member -NotePropertyName "InternetSettings" -NotePropertyValue $InternetSettings
