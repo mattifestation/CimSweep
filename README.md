@@ -1,3 +1,7 @@
+|Master   |  Dev |
+|:------:|:------:|:-------:|:-------:|
+[![Build status](https://ci.appveyor.com/api/projects/status/58jy9aie7w6aac0y/branch/master?svg=true)](https://ci.appveyor.com/project/mattifestation/cimsweep/branch/master)|[![Build status](https://ci.appveyor.com/api/projects/status/58jy9aie7w6aac0y/branch/dev?svg=true)](https://ci.appveyor.com/project/mattifestation/cimsweep/branch/dev) |
+
 # CimSweep
 CimSweep is a suite of CIM/WMI-based tools that enable the ability to perform incident response and hunting operations remotely across all versions of Windows. CimSweep may also be used to engage in offensive reconnaisance without the need to drop any payload to disk. Windows Management Instrumentation has been installed and its respective service running by default since Windows XP and Windows 2000 and is fully supported in the latest versions of Windows including Windows 10, Nano Server, and Server 2016.
 
