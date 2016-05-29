@@ -1,15 +1,49 @@
 os: WMF 5
 
+version: 0.5.0.{build}-{branch}
+
 skip_commits:
   message: /^.*readme.*$/
   
 install:
   - cinst pester
+  - ps: Install-PackageProvider -Name NuGet -Force
+  - ps: Install-Module PsScriptAnalyzer -Force
 
 build: false
 
 test_script:
-  - ps: $ErrorActionPreference = 'Stop'
-  - ps: $TestResults = Invoke-Pester -Path '.\CimSweep\Tests' -OutputFormat NUnitXml -OutputFile TestsResults.xml -PassThru
-  - ps: (New-Object 'System.Net.WebClient').UploadFile("https://ci.appveyor.com/api/testresults/nunit/$($Env:APPVEYOR_JOB_ID)", (Resolve-Path .\TestsResults.xml))
-  - ps: if ($TestResults.FailedCount -gt 0) { throw "$($TestResults.FailedCount) tests failed." }
+  - ps: |
+        $ErrorActionPreference = 'Stop'
+        
+        Write-Host 'Adding PsScriptAnalyzer test'
+        # PSScriptAnalyzer template derived from here:
+        # http://theshellnut.com/integrating-psscriptanalyzer-appveyor/
+        Add-AppveyorTest -Name 'PsScriptAnalyzer' -Outcome Running
+        Write-Host 'Performing PSScriptAnalyzer tests'
+        $Results = Get-ChildItem . -Directory -Recurse |
+          Where-Object { $_.Name -ne 'Tests' } |
+            Get-ChildItem -File -Include '*.ps1, *.psm1' |
+              Invoke-ScriptAnalyzer -ErrorAction SilentlyContinue
+        
+        if ($Results) {
+          Write-Host 'PSScriptAnalyzer returned errors/warnings that need to be addressed.'
+          $ResultString = $Results | Out-String
+          Write-Warning $ResultString
+          Add-AppveyorMessage -Message "PSScriptAnalyzer output contained one or more result(s) with 'Error' severity. Check the 'Tests' tab of this build for more details." -Category Error
+          Update-AppveyorTest -Name 'PsScriptAnalyzer' -Outcome Failed -ErrorMessage $ResultString
+          
+          throw 'Build failed'
+        } else {
+          Write-Host 'PSScriptAnalyzer returned nothing that needs to be addressed.'
+          Update-AppveyorTest -Name 'PsScriptAnalyzer' -Outcome Passed
+        }
+        
+        Write-Host 'Performing Pester tests'
+        $TestResults = Invoke-Pester -Path '.\CimSweep\Tests' -OutputFormat NUnitXml -OutputFile TestsResults.xml -PassThru
+        Write-Host 'Uploading build results'
+        (New-Object 'System.Net.WebClient').UploadFile("https://ci.appveyor.com/api/testresults/nunit/$($Env:APPVEYOR_JOB_ID)", (Resolve-Path .\TestsResults.xml))
+        if ($TestResults.FailedCount -gt 0) {
+           throw "$($TestResults.FailedCount) tests failed."
+        }
+        Write-Host 'All tests complete'
