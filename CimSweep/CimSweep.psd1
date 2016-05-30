@@ -32,6 +32,8 @@ FunctionsToExport = @(
     'Get-CSStartMenuEntry',
     'Get-CSTypedURL',
     'Get-CSWmiPersistence'
+    'Get-CSWmiNamespace',
+    'Get-CSVulnerableServicePermission'
     'Get-CSProxyConfig'
     'Get-CSAVInfo'
     'Invoke-CSShadowCopy'
