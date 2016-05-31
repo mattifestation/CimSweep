@@ -90,6 +90,7 @@ I can't do this by myself! I would love to get community contributions.
 
 #### Contribution requirements
 All of the following requirements will have an accompanying Pester test to ensure compliance.
+
 1. All functions must have an OutputType attribute and an accompanying .OUTPUTS block in comment-based help. It is important to know the types of objects that a function outputs including with custom PowerShell objects. You can apply a type name to custom objects by including a PSTypeName property to each object. Custom object type names must start with CimSweep - e.g. CimSweep.RegistryKey.
 2. All functions must support a -CimSession parameter along with respective .PARAMETER documentation.
 3. All functions must support a -OperationTimeoutSec parameter along with respective .PARAMETER documentation.
