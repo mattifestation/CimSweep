@@ -86,7 +86,25 @@ Get-CSRegistryValue -Hive HKLM -SubKey SOFTWARE\Microsoft\Windows\CurrentVersion
 
 ## Contributions and function design
 
-I can't do this by myself! I would love to get community contributions. The only requirement imposed on writing CimSweep functions is that they implement a -CimSession parameter in order to operate on one or more remote systems. I would also like for a progress bar to be implemented with an optional -NoProgressBar parameter. A progress bar can come in very handy when running a sweep across 1000 systems.
+I can't do this by myself! I would love to get community contributions.
+
+#### Contribution requirements
+All of the following requirements will have an accompanying Pester test to ensure compliance.
+1. All functions must have an OutputType attribute and an accompanying .OUTPUTS block in comment-based help. It is important to know the types of objects that a function outputs including with custom PowerShell objects. You can apply a type name to custom objects by including a PSTypeName property to each object. Custom object type names must start with CimSweep - e.g. CimSweep.RegistryKey.
+2. All functions must support a -CimSession parameter along with respective .PARAMETER documentation.
+3. All functions must support a -OperationTimeoutSec parameter along with respective .PARAMETER documentation.
+4. All function names must have a "CS" noun prefix.
+5. All functions must contain a .SYNOPSIS help block.
+6. All functions must contain an author name in .SYNOPSIS.
+7. All functions must contain a BSD license clause in .SYNOPSIS.
+8. All functions must contain a .DESCRIPTION help block.
+9. All functions must contain a .PARAMETER block for each defined parameter.
+10. All functions must contain at lease one .EXAMPLE block.
+
+#### Optional design considerations.
+1. Your function should include a Pester test!!! How else can you be sure it works as designed and that it will be resiliant to refactoring? Without a Pester test, you'll just be left guessing as to whether or not your code will be stable in production.
+2. All defensive or offensive functions should implement a -NoProgressBar parameter and to output a progress bar by default. A progress bar can come in very handy when running a sweep across 1000 systems.
+3. All error or verbose messages should include the computer name for the local or remote session. This is helpful when diagnosing issues on a large number of remote sessions.
 
 #### Additional design considerations
 1. Make as few calls to CimSweep functions/CIM cmdlets as possible! CimSweep functions must be scalable. Many of the core CimSweep functions have many parameters that can minimize WMI method calls so please utilize them. Also, if you find ways in which existing CimSweep functions can be more performant, please submit a pull request or an issue!
