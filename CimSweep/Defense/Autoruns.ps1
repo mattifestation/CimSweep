@@ -67,6 +67,18 @@ By default, the value of this parameter is 0, which means that the cmdlet uses t
 
 If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
 
+.EXAMPLE
+
+Get-CSRegistryAutoStart
+
+Performs all supported autoruns entry category checks.
+
+.EXAMPLE
+
+Get-CSRegistryAutoStart -Logon -LSAProviders
+
+Performs specific autoruns entry category checks.
+
 .OUTPUTS
 
 CimSweep.AutoRunEntry
@@ -543,6 +555,10 @@ List user and common start menu items.
 Author: Matthew Graeber (@mattifestation)
 License: BSD 3-Clause
 
+.DESCRIPTION
+
+Get-CSStartMenuEntry returns file information for all files present (excluding desktop.ini) in user and system-wide start menus.
+
 .PARAMETER NoProgressBar
 
 Do not display a progress bar. This parameter is designed to be used with wrapper functions.
@@ -559,9 +575,23 @@ By default, the value of this parameter is 0, which means that the cmdlet uses t
 
 If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
 
+.EXAMPLE
+
+Get-CSStartMenuEntry
+
+Lists all files present in user and system-level start menus on a local system.
+
+.EXAMPLE
+
+Get-CSStartMenuEntry -CimSession $CimSession
+
+Lists all files present in user and system-level start menus on a remote system.
+
 .OUTPUTS
 
 Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_ShortcutFile
+
+Get-CSStartMenuEntry outputs Win32_ShortcutFile objects representing LNK files present in the start menus.
 
 .NOTES
 
@@ -638,6 +668,10 @@ List registered permanent WMI event subscriptions.
 Author: Matthew Graeber (@mattifestation)
 License: BSD 3-Clause
 
+.DESCRIPTION
+
+Get-CSWmiPersistence lists all registered __FilterToConsumerBinding objects and the __EventFilter and __EventConsumer that the binding corresponds to.
+
 .PARAMETER CimSession
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
@@ -650,11 +684,21 @@ By default, the value of this parameter is 0, which means that the cmdlet uses t
 
 If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
 
+.EXAMPLE
+
+Get-CSWmiPersistence
+
+List all __FilterToConsumerBinding instances with their corresponding __EventFilter and __EventConsumer.
+
 .OUTPUTS
 
 CimSweep.WmiPersistence
 
 Outputs objects representing the combination of __EventFilter, __EventConsumer, and __FilterToConsumerBinding.
+
+.NOTES
+
+Get-CSWmiPersistence only returns output when __FilterToConsumerBinding instances exist which implies installed WMI persistence. You may still want to enumerate __EventConsumer instances which may be remnants of a previous attack (e.g. ActiveScriptEventConsumer and CommandLineEventConsumer).
 #>
 
     [CmdletBinding()]

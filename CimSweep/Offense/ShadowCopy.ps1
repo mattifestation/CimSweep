@@ -1,70 +1,98 @@
-﻿function Invoke-CSShadowCopy
+﻿function Copy-CSShadowCopyItem
 {
-    <#
+<#    
+.SYNOPSIS
 
-    Author: Chris Ross (@xorrior)
-    License: BSD 3-Clause
-    
-    .SYNOPSIS
-    This cmdlet can be used to copy files from a shadow copy. Useful for copying locked files, such as the SAM and SYSTEM hive files or NTDS.dit
+Copies files from a shadow copy.
 
-    .DESCRIPTION
-    This cmdlet is used to copy files from a shadow copy to a local or remote destination. 
+Author: Chris Ross (@xorrior)
+License: BSD 3-Clause
 
-    .PARAMETER Session
+.DESCRIPTION
+Copy-CSShadowCopyItem copies files from a shadow copy to a local or remote destination. Useful for copying locked files, such as the SAM and SYSTEM hive files or NTDS.dit.
 
-    Cim Session to use for this function
+.PARAMETER SymlinkTempPath
 
-    .PARAMETER SymlinkTempPath
+The temporary path that will be used to create the symlink
 
-    The temporary path that will be used to create the symlink
+.PARAMETER SourcePath
 
-    .PARAMETER SourcePath
+The full path to the file to copy.
 
-    The full path to the file to copy.
+.PARAMETER DestinationPath
 
-    .PARAMETER DestinationPath
+The full path to where the file should be copied. 
 
-    The full path to where the file should be copied. 
+.PARAMETER PassThru
 
-    .EXAMPLE
+Instructs Copy-CSShadowCopyItem to return a root/cimv2/CIM_LogicalFile instance representing the file that was copied from the volume shadow copy.
 
-    Invoke-CSShadowCopy -SourcePath 'C:\Windows\System32\SAM' -DestinationPath 'C:\SAM'
+.PARAMETER Force
 
-    Copy the SAM hive file from a local shadow copy to a local location, using the default temporary symlink path.
+Bypasses confirmation dialogs.
 
-    .EXAMPLE
+.PARAMETER CimSession
 
-    Invoke-CSShadowCopy -SymlinkTempPath 'C:\Users\test\AppData' -SourcePath 'C:\Users\test\lockedfile.txt' -DestinationPath 'C:\lockedfile.txt'
+Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
 
-    Copy a locked file from a shadowcopy, using the specified temp symlinkpath, to the destination path.
-    #>
+.PARAMETER OperationTimeoutSec
 
-    [CmdletBinding()]
+Specifies the amount of time that the cmdlet waits for a response from the computer.
+
+.EXAMPLE
+
+Copy-CSShadowCopyItem -SourcePath 'C:\Windows\System32\SAM' -DestinationPath 'C:\SAM'
+
+Copy the SAM hive file from a local shadow copy to a local location, using the default temporary symlink path.
+
+.EXAMPLE
+
+Copy-CSShadowCopyItem -SymlinkTempPath 'C:\Users\test\AppData' -SourcePath 'C:\Users\test\lockedfile.txt' -DestinationPath 'C:\lockedfile.txt'
+
+Copy a locked file from a shadowcopy, using the specified temp symlinkpath, to the destination path.
+
+.OUTPUTS
+
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/CIM_LogicalFile
+
+If -PassThru is specified, Copy-CSShadowCopyItem returns a CIM_LogicalFile instance representing the file that was copied from the created volume shadow copy.
+#>
+
+    [CmdletBinding(SupportsShouldProcess = $True, ConfirmImpact = 'High')]
+    [OutputType('Microsoft.Management.Infrastructure.CimInstance#root/cimv2/CIM_LogicalFile')]
     param
     (
-        [parameter()]
         [ValidateNotNullOrEmpty()]
-        [Alias("Session")]
+        [Alias('LinkPath')]
+        [String]
+        $SymLinkTempPath = 'C:\SC',
+
+        [Parameter(Mandatory = $True)]
+        [ValidateNotNullOrEmpty()]
+        [ValidatePattern('^[a-zA-Z]:\\')]
+        [String]
+        $SourcePath,
+
+        [Parameter(Mandatory = $True)]
+        [ValidateNotNullOrEmpty()]
+        [ValidatePattern('(^[a-zA-Z]:\\)')]
+        [String]
+        $DestinationPath,
+
+        [Switch]
+        $PassThru,
+
+        [Switch]
+        $Force,
+
+        [Alias('Session')]
+        [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
         $CimSession,
 
-        [parameter(Mandatory = $False)]
-        [ValidateNotNullOrEmpty()]
-        [Alias("LinkPath")]
-        [string]$SymLinkTempPath,
-
-        [parameter(Mandatory = $True)]
-        [ValidateNotNullOrEmpty()]
-        [ValidatePattern('^[a-zA-Z]:\\')]
-        [Alias("Source")]
-        [string]$SourcePath,
-
-        [parameter(Mandatory = $True)]
-        [ValidateNotNullOrEmpty()]
-        [ValidatePattern('(^[a-zA-Z]:\\)')]
-        [Alias("Destination")]
-        [string]$DestinationPath
+        [UInt32]
+        [Alias('OT')]
+        $OperationTimeoutSec
     )
 
     BEGIN
@@ -74,103 +102,128 @@
             $CimSession = ''
         }
 
-        if (-not $PSBoundParameters['SymLinkTempPath'])
-        {
-            $SymLinkTempPath = 'C:\SC'
-        }
+        $Timeout = @{}
+        if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
+
+        $ConfirmArg = @{}
+        if ($PSBoundParameters['Force']) { $ConfirmArg['Confirm'] = $False }
     }
 
     PROCESS
     {
         foreach($Session in $CimSession)
         {
-            $methodArgs = @{
+            $MethodArgs = @{
                 ClassName = 'Win32_ShadowCopy'
                 Namespace = 'root\cimv2'
                 MethodName = 'Create'
             }
-            $commonArgs = @{}
 
-            $drive = $SourcePath.Split('\')[0]
-            $drive += '\'
+            $CommonArgs = @{}
 
-            $Args = @{
-                Context = 'ClientAccessible'
-                Volume = $drive + '\'
-            }
-            
             #check for CimSession
-            if($Session.Id) {$commonArgs['CimSession'] = $Session}
+            if($Session.Id) {$CommonArgs['CimSession'] = $Session}
 
-            $methodArgs['Arguments'] = $Args
+            $ComputerName = $Session.ComputerName
+            if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
+
+            $Drive = $SourcePath.Split('\')[0]
+            $Drive += '\'
+
+            $MethodArgs['Arguments'] = @{
+                Context = 'ClientAccessible'
+                Volume = $Drive + '\'
+            }
 
             #create a shadow copy
-            $result = Invoke-CimMethod @methodArgs @commonArgs
+            if ($Force -or $PSCmdlet.ShouldProcess($Drive, 'Create a shadow copy')) {
+                $Result = Invoke-CimMethod @MethodArgs @CommonArgs @Timeout @ConfirmArg
+            }
 
-            if ($result.ReturnValue -eq 0)
+            if ($Result.ReturnValue -eq 0)
             {
-                $ShadowID = $result.ShadowID
+                $ShadowID = $Result.ShadowID
             }
             else
             {
-                Write-Verbose "[!] Unable to create shadow copy"
-                break
-            }
-
-            $DeviceObject = (Get-CimInstance -ClassName Win32_ShadowCopy -Namespace root/CIMV2 -Filter "ID=`'$ShadowID`'" @commonArgs).DeviceObject
-
-            $symlinkpath = $SymLinkTempPath + ($SourcePath -replace '^[a-zA-Z]:',"")
-            $symlinkpath = $symlinkpath.Replace('\','\\')
-            
-            #create a Symlink to the shadowcopy's deviceobject path
-            $command = "cmd.exe /C MKLINK /D $SymLinkTempPath $DeviceObject\"
-
-            $methodArgs['ClassName'] = 'Win32_Process'
-            $methodArgs['Namespace'] = 'root\cimv2'
-            $methodArgs['MethodName'] = 'Create'
-            $methodArgs['Arguments'] = @{commandline = $command}
-
-            $result = Invoke-CimMethod @methodArgs @commonArgs
-
-            if($result.ReturnValue -ne 0)
-            {
-                Write-Verbose "[!] The command $command `n[!] Did not execute successfully!"
-                break
-            }
-            $DestinationPath = $DestinationPath.Replace('\','\\')
-            #Get an instance of the file to be copied and then copy it to the destinationPath
-            $instance = Get-CimInstance -ClassName CIM_LogicalFile -Namespace root/CIMV2 -Filter "Name=`'$symlinkPath`'" @commonArgs
-            if ($instance)
-            {
-                $result = Invoke-CimMethod -InputObject $instance -MethodName 'Copy' -Arguments @{Filename = $DestinationPath} @commonArgs
-                if ($result.ReturnValue -ne 0)
-                {
-                    Write-Verbose "[!] Unable to copy file from $symlinkpath to $DestinationPath"
+                if (-not $PSBoundParameters['WhatIf']) {
+                    Write-Error "[$ComputerName] Unable to create shadow copy from the $Drive drive."
                     break
                 }
             }
 
-            $command = "cmd.exe /C rmdir $SymLinkTempPath"
+            $DeviceObject = (Get-CimInstance -ClassName Win32_ShadowCopy -Filter "ID='$ShadowID'" @CommonArgs @Timeout -ErrorAction SilentlyContinue).DeviceObject
 
-            $methodArgs['Arguments'] = @{commandline = $command}
+            if ($DeviceObject -and (-not $PSBoundParameters['WhatIf'])) {
+                Write-Error "[$ComputerName] Unable to retrive shadow copy instance for the following ShadowID: $ShadowID"
+            }
 
-            $result = Invoke-CimMethod @methodArgs @commonArgs
+            $Symlinkpath = $SymLinkTempPath + $SourcePath.Substring(2)
+            $Symlinkpath = $Symlinkpath.Replace('\','\\')
+            
+            #create a Symlink to the shadowcopy's deviceobject path
+            $Command = "cmd.exe /C MKLINK /D $SymLinkTempPath $DeviceObject\"
 
-            if ($result.ReturnValue -ne 0)
+            $MethodArgs['ClassName'] = 'Win32_Process'
+            $MethodArgs['Namespace'] = 'root\cimv2'
+            $MethodArgs['MethodName'] = 'Create'
+            $MethodArgs['Arguments'] = @{commandline = $command}
+
+            if ($Force -or $PSCmdlet.ShouldProcess($ComputerName, $Command)) {
+                $Result = Invoke-CimMethod @MethodArgs @CommonArgs @Timeout @ConfirmArg
+            }
+
+            if(($Result.ReturnValue -ne 0) -and (-not $PSBoundParameters['WhatIf']))
             {
-                Write-Verbose "[!] Unable to remove the symlink directory"
+                Write-Error "[$ComputerName] The following command did not execute: $command"
+                break
+            }
+
+            $DestinationPath = $DestinationPath.Replace('\','\\')
+
+            #Get an instance of the file to be copied and then copy it to the destinationPath
+            $Instance = Get-CimInstance -ClassName CIM_LogicalFile -Namespace root/CIMV2 -Filter "Name=`'$symlinkPath`'" @CommonArgs @Timeout
+
+            if ($Instance)
+            {
+                $Result = Invoke-CimMethod -InputObject $Instance -MethodName 'Copy' -Arguments @{Filename = $DestinationPath} @CommonArgs @Timeout
+                
+                if (($Result.ReturnValue -ne 0) -and (-not $PSBoundParameters['WhatIf']))
+                {
+                    Write-Error "[$ComputerName] Unable to copy file from $Symlinkpath to $DestinationPath"
+                    break
+                }
+            }
+
+            $Command = "cmd.exe /C rmdir $SymLinkTempPath"
+
+            $MethodArgs['Arguments'] = @{commandline = $Command}
+
+            if ($Force -or $PSCmdlet.ShouldProcess($ComputerName, $Command)) {
+                $Result = Invoke-CimMethod @MethodArgs @CommonArgs @Timeout @ConfirmArg
+            }
+
+            if (($Result.ReturnValue -ne 0) -and (-not $PSBoundParameters['WhatIf']))
+            {
+                Write-Error "[$ComputerName] Unable to remove the symlink directory"
                 break
             }
 
             #Cleanup the shadowcopy 
-            $instance = Get-CimInstance -ClassName Win32_ShadowCopy -Namespace root/CIMV2 -Filter "ID=`'$ShadowID`'" @commonArgs
-            if ($instance)
+            $Instance = Get-CimInstance -ClassName Win32_ShadowCopy -Namespace root/CIMV2 -Filter "ID=`'$ShadowID`'" -ErrorAction SilentlyContinue @CommonArgs @Timeout
+            
+            if ($Instance)
             {
-                Remove-CimInstance -InputObject $instance @commonArgs
+                Remove-CimInstance -InputObject $Instance @CommonArgs @Timeout
+            } else {
+                if (-not $PSBoundParameters['WhatIf']) {
+                    Write-Error "[$ComputerName] Unable to retrive shadow copy instance for the following ShadowID: $ShadowID"
+                }
             }
             
-            Get-CimInstance -ClassName CIM_LogicalFile -Namespace root/CIMV2 -Filter "Name=`'$DestinationPath`'" @commonArgs
+            if ($PassThru) {
+                Get-CimInstance -ClassName CIM_LogicalFile -Namespace root/CIMV2 -Filter "Name=`'$DestinationPath`'" @CommonArgs @Timeout
+            }
         }
     }
-    END{}
 }

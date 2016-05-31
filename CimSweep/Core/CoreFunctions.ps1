@@ -700,6 +700,10 @@ Gets a list of event logs on the computer.
 Author: Matthew Graeber (@mattifestation)
 License: BSD 3-Clause
 
+.DESCRIPTION
+
+Get-CSEventLog lists the available event logs from which event entries can be retrieved via WMI. 
+
 .PARAMETER NoProgressBar
 
 Do not display a progress bar. This parameter is designed to be used with wrapper functions.
@@ -719,6 +723,18 @@ If the OperationTimeoutSec parameter is set to a value less than the robust conn
 .NOTES
 
 Get-CSEventLog is useful for determining which event log to filter off of in Get-CSEventLogEntry.
+
+.EXAMPLE
+
+Get-CSEventLog
+
+List all available event logs queryable via WMI.
+
+.EXAMPLE
+
+Get-CSEventLog | Get-CSEventLogEntry
+
+List event log entries from all available event logs. Note: Get-CSEventLogEntry without any additional arguments will return entries from all event logs by default.
 
 .OUTPUTS
 
@@ -866,6 +882,10 @@ Specifies the desired properties to retrieve from Win32_Process instances. The f
 .PARAMETER CimSession
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
+
+.PARAMETER NoProgressBar
+
+Do not display a progress bar. This parameter is designed to be used with wrapper functions.
 
 .PARAMETER OperationTimeoutSec
 
@@ -1078,10 +1098,14 @@ function Get-CSMountedVolumeDriveLetter {
 <#
 .SYNOPSIS
 
-Lists the mounted drive letters present. This is primarily used as a helper for Get-CSDirectoryListing when no parameters are provided.
+Lists mounted drive letters present.
 
 Author: Matthew Graeber (@mattifestation)
 License: BSD 3-Clause
+
+.DESCRIPTION
+
+Get-CSMountedVolumeDriveLetter lists the drive letters of mounted drives. This is primarily used as a helper for Get-CSDirectoryListing when no parameters are provided.
 
 .PARAMETER CimSession
 
@@ -1094,6 +1118,18 @@ Specifies the amount of time that the cmdlet waits for a response from the compu
 By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
 
 If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
+
+.EXAMPLE
+
+Get-CSMountedVolumeDriveLetter
+
+Lists mounted drive letters on a local system.
+
+.EXAMPLE
+
+Get-CSMountedVolumeDriveLetter -CimSession $CimSession
+
+Lists mounted drive letters on a remote system.
 
 .OUTPUTS
 
@@ -2387,6 +2423,30 @@ By default, the value of this parameter is 0, which means that the cmdlet uses t
 
 If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
 
+.EXAMPLE
+
+Get-CSEnvironmentVariable
+
+Lists all local user-scope and system-scope environment variables.
+
+.EXAMPLE
+
+Get-CSEnvironmentVariable -SystemVariable
+
+Lists only local, system-scope environment variables.
+
+.EXAMPLE
+
+Get-CSEnvironmentVariable -VariableName Path
+
+Lists all local user-scope and system-scope "Path" environment variables.
+
+.EXAMPLE
+
+Get-CSEnvironmentVariable -CimSession $CimSession
+
+Lists all user-scope and system-scope environment variables from a remote CIM session.
+
 .OUTPUTS
 
 CimSweep.EnvironmentVariable
@@ -2659,6 +2719,13 @@ function Get-CSWmiNamespace {
 .SYNOPSIS
 
 Returns a list of WMI namespaces present within the specified namespace.
+
+Author: Matthew Graeber (@mattifestation)
+License: BSD 3-Clause
+
+.DESCRIPTION
+
+Get-CSWmiNamespace returns all child namespaces for the specified WMI namespace and optionally includes the ACL for each namespace. An attacker can use WMI namespaces as a C2 mechanism as well as backdoor a system by modifying ACLs.
 
 .PARAMETER Namespace
 

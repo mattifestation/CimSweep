@@ -2,10 +2,14 @@
 <#
 .SYNOPSIS
 
-Lists URLs typed into Internet Explorer URL bar.
+Lists URLs typed into the Internet Explorer URL bar.
 
 Author: Matthew Graeber (@mattifestation)
 License: BSD 3-Clause
+
+.DESCRIPTION
+
+Get-CSTypedURL retrieves URLs that were typed into the Internet Explorer URL bar.
 
 .PARAMETER NoProgressBar
 
@@ -22,6 +26,18 @@ Specifies the amount of time that the cmdlet waits for a response from the compu
 By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
 
 If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
+
+.EXAMPLE
+
+Get-CSTypedURL
+
+Returns all URLs typed into the Internet Explorer URL bar on a local system.
+
+.EXAMPLE
+
+Get-CSTypedURL -CimSession $CimSession
+
+Returns all URLs typed into the Internet Explorer URL bar on a remote system.
 
 .OUTPUTS
 

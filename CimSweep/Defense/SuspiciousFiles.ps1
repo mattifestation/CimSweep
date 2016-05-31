@@ -27,6 +27,18 @@ By default, the value of this parameter is 0, which means that the cmdlet uses t
 
 If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
 
+.EXAMPLE
+
+Get-CSScheduledTaskFile
+
+Retrieves all scheduled task file information on a local system.
+
+.EXAMPLE
+
+Get-CSScheduledTaskFile -CimSession $CimSession
+
+Retrieves all scheduled task file information on a remote system.
+
 .OUTPUTS
 
 Microsoft.Management.Infrastructure.CimInstance#root/cimv2/CIM_DataFile
@@ -326,6 +338,10 @@ Lists files present in all user and system temp paths.
 Author: Matthew Graeber (@mattifestation)
 License: BSD 3-Clause
 
+.DESCRIPTION
+
+Get-CSTempFile returns a list of files and directories within user and system-wide %TEMP% directories.
+
 .PARAMETER Extension
 
 Specifies that only files of a certain extension should be returned. When specifying extensions, do not include a dot - e.g. 'exe', 'dll', 'sys'.
@@ -357,6 +373,24 @@ Specifies the amount of time that the cmdlet waits for a response from the compu
 By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
 
 If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
+
+.EXAMPLE
+
+Get-CSTempFile
+
+Lists all files present in user and system temp directories.
+
+.EXAMPLE
+
+Get-CSTempFile -Extension exe, dll, sys, ps1, vbs, bat
+
+Lists executable files present in user and system temp directories.
+
+.EXAMPLE
+
+Get-CSTempFile -UserFolder -Extension exe, dll, sys, ps1, vbs, bat
+
+Lists executable files present in user temp directories.
 
 .OUTPUTS
 
@@ -522,10 +556,14 @@ function Get-CSLowILPathFile {
 <#
 .SYNOPSIS
 
-Lists executable files and scripts present in all user low integrity paths - %LOCALAPPDATA%Low
+Lists files present in all user low integrity paths - %LOCALAPPDATA%Low
 
 Author: Matthew Graeber (@mattifestation)
 License: BSD 3-Clause
+
+.DESCRIPTION
+
+Get-CSLowILPathFile lists files present in user low-integrity folders. This can be useful for finding executable files that were dropped in conjunction with remote exploits. By default, Get-CSLowILPathFile returns all files but -Extension can be used to filter on specific extensions.
 
 .PARAMETER Extension
 
@@ -550,6 +588,18 @@ Specifies the amount of time that the cmdlet waits for a response from the compu
 By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
 
 If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
+
+.EXAMPLE
+
+Get-CSLowILPathFile
+
+Lists all files present in user low-integrity folders.
+
+.EXAMPLE
+
+Get-CSLowILPathFile -Extension exe, dll, sys, ps1, vbs, bat
+
+Lists executable files containing the specified extensions present in user low-integrity folders.
 
 .OUTPUTS
 

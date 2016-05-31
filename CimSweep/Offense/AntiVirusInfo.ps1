@@ -1,34 +1,52 @@
 ﻿Function Get-CSAVInfo
 {
+<#    
+.SYNOPSIS
 
-    <#
+This function enumerates the Anti Virus installed on a remote host and any helpful registry keys.
 
-    Author: Chris Ross (@xorrior)
-    License: BSD 3-Clause
-    
-    .SYNOPSIS
-    This function enumerates the Anti Virus installed on a remote host and any helpful registry keys.
+Author: Chris Ross (@xorrior)
+License: BSD 3-Clause
 
-    .DESCRIPTION
-    This function uses the AntiVirusProduct class to enumerate Anti Virus on a remote host. The name, executable, state, and registry keys are returned in a custom psobject. 
+.DESCRIPTION
 
-    .PARAMETER Session
-    The CimSession to use for Anti-Virus enumeration
+Get-CSAVInfo uses the AntiVirusProduct WMI class to enumerate Anti Virus on a local or remote host. The name, executable, state, and registry keys are returned in a custom psobject. 
 
-    .EXAMPLE
+.PARAMETER CimSession
 
-    Get-CimAVInfo -Session $CimSession
+Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
 
-    #>
+.PARAMETER OperationTimeoutSec
+
+Specifies the amount of time that the cmdlet waits for a response from the computer.
+
+.EXAMPLE
+
+Get-CimAVInfo
+
+.EXAMPLE
+
+Get-CimAVInfo -Session $CimSession
+
+.OUTPUTS
+
+CimSweep.AVInfo
+
+Outputs custom objects representing the current AV configuration.
+#>
 
     [CmdletBinding()]
+    [OutputType('CimSweep.AVInfo')]
     param
     (
-        [Parameter()]
-        [Alias("Session")]
+        [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession
+        $CimSession,
+
+        [UInt32]
+        [Alias('OT')]
+        $OperationTimeoutSec
     )
 
 
@@ -38,48 +56,54 @@
         {
             $CimSession = ''
         }
+
+        $Timeout = @{}
+        if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
     }
 
     PROCESS
     {
         foreach ($Session in $CimSession)
         {
-            
-            $commonArgs = @{}
-            $instanceArgs = @{}
-            $instanceArgs['ClassName'] = 'AntiVirusProduct'
+            $ComputerName = $Session.ComputerName
+            if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
+
+            $CommonArgs = @{}
+            $InstanceArgs = @{}
+            $InstanceArgs['ClassName'] = 'AntiVirusProduct'
             
             #Check if a session was specified
-            if ($Session.Id) {$commonArgs['CimSession'] = $Session}
+            if ($Session.Id) {$CommonArgs['CimSession'] = $Session}
 
             #Determine if the namespace exists
-            if (Get-CimInstance -Namespace root -ClassName __NAMESPACE -Filter 'Name="SecurityCenter2"' @commonArgs) 
+            if (Get-CimInstance -Namespace root -ClassName __NAMESPACE -Filter 'Name="SecurityCenter2"' @CommonArgs @Timeout) 
             {
-                $instanceArgs['NameSpace'] = 'root/SecurityCenter2'
+                $InstanceArgs['Namespace'] = 'root/SecurityCenter2'
             }
-            elseif (Get-CimInstance -Namespace root -ClassName __NAMESPACE -Filter 'Name="SecurityCenter"' @commonArgs) 
+            elseif (Get-CimInstance -Namespace root -ClassName __NAMESPACE -Filter 'Name="SecurityCenter"' @CommonArgs @Timeout) 
             {
-                $instanceArgs['NameSpace'] = 'root/SecurityCenter'
+                $InstanceArgs['Namespace'] = 'root/SecurityCenter'
             }
-            else {Write-Verbose "[!] Unable to find SecurityCenter2 or SecurityCenter Namespace instance"; break}
+            else {
+                Write-Error "[$ComputerName] Neither the SecurityCenter2 nor the SecurityCenter namespaces do not exist."
+                break    
+            }
 
-            $AV = Get-CimInstance @instanceArgs @commonArgs
+            $AV = Get-CimInstance @InstanceArgs @CommonArgs @Timeout
 
-            if ($instanceArgs['NameSpace'] -eq 'root/SecurityCenter2')
+            if ($InstanceArgs['NameSpace'] -eq 'root/SecurityCenter2')
             {
-                $AntiVirus = [pscustomobject] [ordered]@{
+                $AntiVirus = [PSCustomObject] @{
+                    PSTypeName = 'CimSweep.AVInfo'
                     Name = $AV.displayName
                     Executable = $AV.pathToSignedProductExe
                     InstanceGUID = $AV.instanceGuid
-                    PSComputerName = $AV.PSComputerName
+                    ScannerEnabled = $null
+                    Updated = $null
+                    ExclusionInfo = $null
+                    PSComputerName = $Session.ComputerName
                 }
 
-                #Add localhost if PSComputerName is empty
-
-                if($AntiVirus.PSComputerName -eq $null)
-                {
-                    $AntiVirus.PSComputerName = 'localhost'
-                }
                 #parse the byte value of productstate
                 $state = '{0:X6}' -f $AV.productState
                 $scanner = $state[2,3] -join '' -as [byte]
@@ -87,76 +111,67 @@
                 
                 if($scanner -ge (10 -as [byte]))
                 {
-                    $AntiVirus | Add-Member -NotePropertyName 'ScannerEnabled' -NotePropertyValue $True
+                    $AntiVirus.ScannerEnabled = $True
                 }
                 elseif($scanner -eq (00 -as [byte]) -or $scanner -eq (01 -as [byte]))
                 {
-                    $AntiVirus | Add-Member -NotePropertyName 'ScannerEnabled' -NotePropertyValue $False
-                }
-                else
-                {
-                    $AntiVirus | Add-Member -NotePropertyName 'ScannerEnabled' -NotePropertyValue '???'
+                    $AntiVirus.ScannerEnabled = $False
                 }
 
                 #Determine if the AV definitions are up to date
                 if($updated -eq (00 -as [byte]))
                 {
-                    $AntiVirus | Add-Member -NotePropertyName 'Updated' -NotePropertyValue $True
+                    $AntiVirus.Updated = $True
                 }
                 elseif($updated -eq (10 -as [byte]))
                 {
-                    $AntiVirus | Add-Member -NotePropertyName 'Updated' -NotePropertyValue $False
-                }
-                else
-                {
-                    $AntiVirus | Add-Member -NotePropertyName 'Updated' -NotePropertyValue '???'
-                }   
+                    $AntiVirus.Updated = $False
+                }  
             }
             else
             {
-                $AntiVirus = [pscustomobject] [ordered]@{
+                $AntiVirus = [PSCustomObject] @{
                     Name = $AV.displayName
                     Executable = $AV.pathToEnableOnAccessUI
                     InstanceGUID =  $AV.instanceGuid
-                    PSComputerName = $AV.PSComputerName
+                    ScannerEnabled = $AV.onAccessScanningEnabled
+                    Updated = $AV.productUptoDate
+                    ExclusionInfo = $null
+                    PSComputerName = $Session.ComputerName
                 }
-
-                $AntiVirus | Add-Member -NotePropertyName 'ScannerEnabled' -NotePropertyValue $($AV.onAccessScanningEnabled)
-                $AntiVirus | Add-Member -NotePropertyName 'Updated' -NotePropertyValue $($AV.productUptoDate) 
             }
 
 
             #Get the exclusions if available
-            $defenderPaths = @{
-                ExcludedPaths = 'HKLM:\SOFTWARE\Microsoft\Windows Defender\Exclusions\Paths\'
-                ExcludedExtensions = 'HKLM:\SOFTWARE\Microsoft\Windows Defender\Exclusions\Extensions\'
-                ExcludedProcesses = 'HKLM:\SOFTWARE\Microsoft\Windows Defender\Exclusions\Processes\'
+            $DefenderPaths = @{
+                ExcludedPaths = 'SOFTWARE\Microsoft\Windows Defender\Exclusions\Paths\'
+                ExcludedExtensions = 'SOFTWARE\Microsoft\Windows Defender\Exclusions\Extensions\'
+                ExcludedProcesses = 'SOFTWARE\Microsoft\Windows Defender\Exclusions\Processes\'
             }
 
-            $mcAfeePaths = @{
-                Exclusions = 'HKLM:\SOFTWARE\McAfee\AVSolution\OAS\DEFAULT\'
-                EmailIncludedProcesses = 'HKLM:\SOFTWARE\McAfee\AVSolution\OAS\EMAIL\'
-                ProcessStartupExclusions = 'HKLM:\SOFTWARE\McAfee\AVSolution\HIP\'
+            $McAfeePaths = @{
+                Exclusions = 'SOFTWARE\McAfee\AVSolution\OAS\DEFAULT\'
+                EmailIncludedProcesses = 'SOFTWARE\McAfee\AVSolution\OAS\EMAIL\'
+                ProcessStartupExclusions = 'SOFTWARE\McAfee\AVSolution\HIP\'
             }
 
             if($AntiVirus.Name -match 'Windows Defender')
             {
-                $exclusionInfo = [PSCustomObject] [Ordered]@{}
-                $defenderPaths.GetEnumerator() | ForEach-Object {
-                    $exclusionInfo | Add-Member -NotePropertyName $_.Key -NotePropertyValue $(Get-CSRegistryValue -Path $($_.Value) @commonArgs).ValueName
+                $ExclusionInfo = [PSCustomObject] @{}
+                $DefenderPaths.GetEnumerator() | ForEach-Object {
+                    $ExclusionInfo | Add-Member -NotePropertyName $_.Key -NotePropertyValue $(Get-CSRegistryValue -Hive HKLM -SubKey $($_.Value) @CommonArgs @Timeout).ValueName
                 }
 
             }
             elseif($AntiVirus.Name -match 'McAfee')
             {
-                $exclusionInfo = [PSCustomObject] [Ordered]@{}
-                $mcAfeePaths.GetEnumerator() | ForEach-Object {
-                    $exclusionInfo | Add-Member -NotePropertyName $_.Key -NotePropertyValue $(Get-CSRegistryValue -Path $($_.Value) @commonArgs).ValueName
+                $ExclusionInfo = [PSCustomObject] @{}
+                $McAfeePaths.GetEnumerator() | ForEach-Object {
+                    $ExclusionInfo | Add-Member -NotePropertyName $_.Key -NotePropertyValue $(Get-CSRegistryValue -Hive HKLM -SubKey $($_.Value) @CommonArgs @Timeout).ValueName
                 }
             }
 
-
-            $AntiVirus | Add-Member -NotePropertyName 'ExclusionInfo' -NotePropertyValue $exclusionInfo
+            $AntiVirus.ExclusionInfo = $ExclusionInfo
             $AntiVirus
         }
     }

@@ -1,40 +1,69 @@
-﻿Function Enable-RDP
+﻿Function Enable-CSRdp
 {
-    <#
+<#
+.SYNOPSIS
 
-    Author: Chris Ross (@xorrior)
-    License: BSD 3-Clause
+Enables RDP locally or via one or more remote CIM sessions.
 
-    .SYNOPSIS
-    This cmdlet uses the root\CIMV2\TerminalServices Namespace to Enable RDP through a Cim Session.
+Author: Chris Ross (@xorrior)
+License: BSD 3-Clause
 
-    Author: Chris Ross (@xorrior)
+.DESCRIPTION
 
-    .DESCRIPTION
-    Enable RDP via an active Cim Session
+Enable-CSRdp uses the root\CIMV2\TerminalServices namespace to enable RDP locally or via one or more remote CIM sessions.
 
-    .PARAMETER CimSession
-    The CIM session to use for this cmdlet
+.PARAMETER CimSession
 
-    .EXAMPLE
+Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
 
-    Enable RDP locally
+.PARAMETER OperationTimeoutSec
 
-    Enable-Rdp 
+Specifies the amount of time that the cmdlet waits for a response from the computer.
 
-    Enable RDP via a CimSession for a remote host
+.PARAMETER PassThru
 
-    Enable-Rdp -CimSession $RemoteSession
-    #>
+Instructs Enable-CSRdp to return a root/CIMV2/TerminalServices/Win32_TerminalServiceSetting which can be used to confirm configured settings.
 
-    [CmdletBinding()]
-    param
-    (
-        [parameter()]
-        [Alias("Session")]
+.PARAMETER Force
+
+Bypasses confirmation dialogs.
+
+.EXAMPLE
+
+Enable-CSRdp
+
+Enable RDP locally
+
+.EXAMPLE
+
+Enable-CSRdp -CimSession $RemoteSession
+
+Enable RDP via a CimSession for a remote host
+
+.OUTPUTS
+
+Microsoft.Management.Infrastructure.CimInstance#root/CIMV2/TerminalServices/Win32_TerminalServiceSetting
+
+If -PassThru is specified, Enable-CSRdp returns a Win32_TerminalServiceSetting instance which can be used to confirm configured settings.
+#>
+
+    [CmdletBinding(SupportsShouldProcess = $True, ConfirmImpact = 'High')]
+    [OutputType('Microsoft.Management.Infrastructure.CimInstance#root/CIMV2/TerminalServices/Win32_TerminalServiceSetting')]
+    param (
+        [Switch]
+        $PassThru,
+
+        [Switch]
+        $Force,
+
+        [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession
+        $CimSession,
+
+        [UInt32]
+        [Alias('OT')]
+        $OperationTimeoutSec
     )
 
     BEGIN 
@@ -43,48 +72,70 @@
         {
             $CimSession = ''
         }
+
+        $Timeout = @{}
+        if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
+
+        $ConfirmArg = @{}
+        if ($PSBoundParameters['Force']) { $ConfirmArg['Confirm'] = $False }
     }
 
     PROCESS
     {
         Foreach ($Session in $CimSession)
         {
-            $commonArgs = @{}
+            $CommonArgs = @{}
+            if ($Session.Id) {$CommonArgs['CimSession'] = $Session}
 
-            $instanceArgs = @{
-                NameSpace = 'root\CIMV2\TerminalServices'
+            $ComputerName = $Session.ComputerName
+            if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
+
+            $InstanceArgs = @{
+                Namespace = 'root\CIMV2\TerminalServices'
                 ClassName = 'Win32_TerminalServiceSetting'
             }
+            
+            $TsSettings = Get-CimInstance @InstanceArgs @CommonArgs @Timeout
 
-            $args = @{
-                AllowTSConnections = [uint32]0x00000001
-                ModifyFirewallException = [uint32]0x00000001
+            $MethodArgs = @{
+                AllowTSConnections = [UInt32] 1
+                ModifyFirewallException = [UInt32] 1
             }
 
-            if ($Session.Id) {$commonArgs['CimSession'] = $Session}
-            $TsSettings = Get-CimInstance @instanceArgs @commonArgs
-
-            $methodArgs = @{
+            $MethodArgs = @{
                 InputObject = $TsSettings
                 MethodName = 'SetAllowTSConnections'
-                Arguments = $args
+                Arguments = $MethodArgs
             }
 
-            $result = Invoke-CimMethod @methodArgs
-            if($result.ReturnValue -eq 0)
+            if ($Force -or $PSCmdlet.ShouldProcess($ComputerName, 'Modify Terminal Services firewall settings by calling SetAllowTSConnections')) {
+                $Result = Invoke-CimMethod @MethodArgs @CommonArgs @Timeout @ConfirmArg
+            }
+
+            if($Result.ReturnValue -eq 0 -or $PSBoundParameters['WhatIf'])
             {
-                $methodArgs['Arguments'] = @{DisableForcibleLogoff = 1}
-                $methodArgs['MethodName'] = 'SetDisableForcibleLogoff'
-                $result = Invoke-CimMethod @methodArgs
-                if($result.ReturnValue -eq 0)
-                {
-                    Write-Verbose "[+] Enabled RDP and disabled forcible logoff"
+                $MethodArgs['Arguments'] = @{DisableForcibleLogoff = 1}
+                $MethodArgs['MethodName'] = 'SetDisableForcibleLogoff'
+
+                if ($Force -or $PSCmdlet.ShouldProcess($ComputerName, 'Disable forcible logoff by calling SetDisableForcibleLogoff')) {
+                    $Result = Invoke-CimMethod @MethodArgs @CommonArgs @Timeout @ConfirmArg
                 }
 
-                Write-Verbose "[+] Enabled RDP"
+                if($Result.ReturnValue -eq 0)
+                {
+                    Write-Verbose "[$ComputerName] Enabled RDP and disabled forcible logoff"
+                } else {
+                    if (-not $PSBoundParameters['WhatIf']) {
+                        Write-Error "[$ComputerName] SetDisableForcibleLogoff method invocation failed."
+                    }
+                }
+            } else {
+                Write-Error "[$ComputerName] SetAllowTSConnections method invocation failed."
             }
 
-            Get-CimInstance @instanceArgs @commonArgs
+            if ($PassThru -and (-not $PSBoundParameters['WhatIf'])) {
+                Get-CimInstance @InstanceArgs @CommonArgs @Timeout
+            }
         }
     }
 }
