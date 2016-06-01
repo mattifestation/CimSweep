@@ -19,10 +19,6 @@ Specifies the registry hive. WMI only supports registry operations on the follow
 
 Specifies the path that contains the subkeys to be enumerated. The absense of this argument will list the root keys for the specified hive.
 
-.PARAMETER Path
-
-Specifies the desired registry hive and path in the standard PSDrive format. e.g. HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion. This parameter enables local tab expansion of key paths. Note: the tab expansion expands based on local registry paths not remote paths.
-
 .PARAMETER IncludeAcl
 
 Specifies that the ACL for the key should be returned. -IncludeAcl will append an ACL property to each returned CimSweep.RegistryKey object. The ACL property is a System.Security.AccessControl.RegistrySecurity object. It is not recommended to use -IncludeAcl with -Recurse as it will significantly increase execution time and network bandwidth if used with CIM sessions.
@@ -53,10 +49,6 @@ Get-CSRegistryKey -Hive HKCU -SubKey SOFTWARE\Microsoft\Windows\CurrentVersion\
 
 .EXAMPLE
 
-Get-CSRegistryKey -Path HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\
-
-.EXAMPLE
-
 Get-CSRegistryKey -Hive HKLM -Recurse -CimSession $CimSession
 
 Lists all registry keys on a remote system in the HKLM hive.
@@ -82,7 +74,6 @@ Outputs a list of objects representing registry keys.
 .NOTES
 
 It is not recommended to recursively list all registry keys from most parent keys as obtaining the results can be time consuming. It is recommended to use Get-CSRegistryKey with targeted subkey paths.
-
 #>
 
     [CmdletBinding()]
@@ -96,11 +87,6 @@ It is not recommended to recursively list all registry keys from most parent key
         [Parameter(ValueFromPipelineByPropertyName = $True, ParameterSetName = 'ExplicitPath')]
         [String]
         $SubKey = '',
-
-        [Parameter(Mandatory = $True, ParameterSetName = 'PSDrivePath')]
-        [String]
-        [ValidatePattern('^(HKLM|HKCU|HKU|HKCR|HKCC):\\.*$')]
-        $Path,
 
         [Switch]
         $IncludeAcl,
@@ -135,15 +121,6 @@ It is not recommended to recursively list all registry keys from most parent key
         foreach ($Session in $CimSession) {
             $ComputerName = $Session.ComputerName
             if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
-
-            # Note: -Path is not guaranteed to expand if the PSDrive doesn't exist. e.g. HKCR doesn't exist by default.
-            # The point of -Path is to speed up your workflow.
-            if ($PSBoundParameters['Path']) {
-                $Result = $Path -match '^(?<Hive>HKLM|HKCU|HKU|HKCR|HKCC):\\(?<SubKey>.*)$'
-
-                $Hive = $Matches.Hive
-                $SubKey = $Matches.SubKey
-            }
 
             # These values are defined in WinReg.h and here:
             # https://msdn.microsoft.com/en-us/library/windows/desktop/aa390387.aspx
@@ -278,10 +255,6 @@ Specifies the registry hive. WMI only supports registry operations on the follow
 
 Specifies the path that contains the subkeys to be enumerated. The absense of this argument will list the root keys for the specified hive.
 
-.PARAMETER Path
-
-Specifies the desired registry hive and path in the standard PSDrive format. e.g. HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion. This parameter enables local tab expansion of key paths. Note: the tab expansion expands based on local registry paths not remote paths.
-
 .PARAMETER ValueName
 
 Specifies the registry value name.
@@ -314,17 +287,17 @@ Lists all value names present in the current user Run key.
 
 .EXAMPLE
 
-Get-CSRegistryKey -Path HKLM:\SYSTEM\CurrentControlSet\Services\ -CimSession $CimSession | Get-CSRegistryValue
+Get-CSRegistryKey -Hive HKLM -Subkey SYSTEM\CurrentControlSet\Services -CimSession $CimSession | Get-CSRegistryValue
 
 Get the value names and types for all services on a remote system.
 
 .EXAMPLE
 
-Get-CSRegistryValue -Path HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run
+Get-CSRegistryValue -Hive HKLM -Subkey SOFTWARE\Microsoft\Windows\CurrentVersion\Run
 
 .EXAMPLE
 
-Get-CSRegistryValue -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\' -ValueName CurrentVersion
+Get-CSRegistryValue -Hive HKLM -Subkey 'SOFTWARE\Microsoft\Windows NT\CurrentVersion' -ValueName CurrentVersion
 
 .INPUTS
 
@@ -355,13 +328,6 @@ Outputs a list of objects representing registry value names, their respective ty
         [Parameter(ValueFromPipelineByPropertyName = $True, ParameterSetName = 'HiveValueNameWithType')]
         [String]
         $SubKey = '',
-
-        [Parameter(Mandatory = $True, ParameterSetName = 'PathValueNameNoType')]
-        [Parameter(Mandatory = $True, ParameterSetName = 'PathValues')]
-        [Parameter(Mandatory = $True, ParameterSetName = 'PathValueNameWithType')]
-        [String]
-        [ValidatePattern('^(HKLM|HKCU|HKU|HKCR|HKCC):\\.*$')]
-        $Path,
 
         [Parameter(ValueFromPipelineByPropertyName = $True, ParameterSetName = 'HiveValueNameNoType')]
         [Parameter(ValueFromPipelineByPropertyName = $True, ParameterSetName = 'HiveValueNameWithType')]
@@ -429,15 +395,6 @@ Outputs a list of objects representing registry value names, their respective ty
         foreach ($Session in $CimSession) {
             $ComputerName = $Session.ComputerName
             if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
-
-            # Note: -Path is not guaranteed to expand if the PSDrive doesn't exist. e.g. HKCR doesn't exist by default.
-            # The point of -Path is to speed up your workflow.
-            if ($PSBoundParameters['Path']) {
-                $Result = $Path -match '^(?<Hive>HKLM|HKCU|HKU|HKCR|HKCC):\\(?<SubKey>.*)$'
-
-                $Hive = $Matches.Hive
-                $SubKey = $Matches.SubKey
-            }
 
             switch ($Hive) {
                 'HKLM' { $HiveVal = [UInt32] 2147483650 }

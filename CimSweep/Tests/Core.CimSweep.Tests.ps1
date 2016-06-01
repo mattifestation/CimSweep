@@ -14,25 +14,6 @@ $TestSessionArray = @( $TestCimSession1, $TestCimSession2 )
 
 Describe 'Get-CSRegistryKey' {
     Context 'parameter validation' {
-        It 'should throw upon not specifying a hive' {
-            { Get-CSRegistryKey } | Should Throw
-        }
-
-        It 'should throw upon only specifying a CIM session' {
-            { Get-CSRegistryKey -CimSession $TestCimSession1 } | Should Throw
-        }
-
-        It 'should accept a valid -Path' {
-            { Get-CSRegistryKey -Path HKLM:\SOFTWARE\ } | Should Not Throw
-            { Get-CSRegistryKey -Path HKLM:\SOFTWARE\ } | Should Not BeNullOrEmpty
-        }
-
-        It 'should not accept a invalid -Path' {
-            { Get-CSRegistryKey -Path FOO:\SOFTWARE\ } | Should Throw
-            { Get-CSRegistryKey -Path HKLM\SOFTWARE\ } | Should Throw
-            { Get-CSRegistryKey -Path HKLM:SOFTWARE\ } | Should Throw
-        }
-
         It 'should accept a valid hive and subkey' {
             { Get-CSRegistryKey -Hive HKLM -SubKey SOFTWARE } | Should Not Throw
             { Get-CSRegistryKey -Hive HKLM -SubKey SOFTWARE } | Should Not BeNullOrEmpty
@@ -82,18 +63,18 @@ Describe 'Get-CSRegistryKey' {
             $SubKeys1 = $RootKeys | Get-CSRegistryKey
             $SubKeys2 = $SubKeys1 | Get-CSRegistryKey
 
-            $SubKeys1.Count -gt $RootKeyCount | Should Be $True
-            $SubKeys2.Count -gt $SubKeys1.Count | Should Be $True
+            $SubKeys1.Count | Should BeGreaterThan $RootKeyCount
+            $SubKeys2.Count | Should BeGreaterThan $SubKeys1.Count
         }
 
         It 'should recurse with the -Recurse flag' {
             $Results = Get-CSRegistryKey -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Services' -Recurse |
                 Select-Object -First 20
 
-            $Results.Count -gt 1 | Should Be $True
+            $Results.Count | Should BeGreaterThan 1
 
             # Validate that a subkey was retrieved
-            $Results[0].SubKey.EndsWith('Services') | Should Be $False
+            $Results[0].SubKey.Split('\')[-1] | Should Not Be 'Services'
         }
 
         It 'should accept multiple CIM sessions' {
@@ -101,7 +82,7 @@ Describe 'Get-CSRegistryKey' {
             $Results2 = Get-CSRegistryKey -Hive HKLM -CimSession $TestCimSession2
             $Results3 = Get-CSRegistryKey -Hive HKLM -CimSession $TestSessionArray
 
-            $Results3.Count -eq ($Results1.Count + $Results2.Count) | Should Be $True
+            $Results3.Count | Should Be ($Results1.Count + $Results2.Count)
         }
     }
 
@@ -130,15 +111,6 @@ Describe 'Get-CSRegistryKey' {
         It 'should return nothing upon querying a nonexistent key' {
             Get-CSRegistryKey -Hive HKCU -SubKey 'nonexistentkey' | Should BeNullOrEmpty
         }
-
-        It 'should return the same output for -SubKey and -Path' {
-            $Result1 = Get-CSRegistryKey -Hive HKLM
-            $Result2 = Get-CSRegistryKey -Path HKLM:\
-
-            for ($i = 0; $i -lt $Result1.Count; $i++) {
-                $Result1[$i].SubKey -eq $Result2[$i].SubKey | Should Be $True
-            }
-        }
     }
 }
 
@@ -146,17 +118,6 @@ Describe 'Get-CSRegistryValue' {
     $CurrentVersionPath = 'SOFTWARE\Microsoft\Windows NT\CurrentVersion'
 
     Context 'parameter validation' {
-        It 'should accept a valid -Path' {
-            { Get-CSRegistryValue -Path "HKLM:\$CurrentVersionPath" } | Should Not Throw
-            { Get-CSRegistryValue -Path "HKLM:\$CurrentVersionPath" } | Should Not BeNullOrEmpty
-        }
-
-        It 'should not accept a invalid -Path' {
-            { Get-CSRegistryValue -Path "FOO:\$CurrentVersionPath" } | Should Throw
-            { Get-CSRegistryValue -Path "HKLM\$CurrentVersionPath" } | Should Throw
-            { Get-CSRegistryValue -Path "HKLM:$CurrentVersionPath" } | Should Throw
-        }
-
         It 'should accept a valid hive and subkey' {
             { Get-CSRegistryValue -Hive HKLM -SubKey $CurrentVersionPath } | Should Not Throw
             { Get-CSRegistryValue -Hive HKLM -SubKey $CurrentVersionPath } | Should Not BeNullOrEmpty
@@ -191,30 +152,8 @@ Describe 'Get-CSRegistryValue' {
             $CurrentVersion.PSComputerName | Should BeNullOrEmpty
         }
 
-        It 'should return value contents for an entire subkey: using -Path w/ no CIM Session' {
-            $Result = Get-CSRegistryValue -Path "HKLM:\$CurrentVersionPath"
-
-            $CurrentVersion = $Result | Where-Object { $_.ValueName -eq 'CurrentVersion' }
-
-            $CurrentVersion | Should Not BeNullOrEmpty
-            $CurrentVersion.ValueContent | Should Not BeNullOrEmpty
-
-            $CurrentVersion.PSComputerName | Should BeNullOrEmpty
-        }
-
         It 'should return value contents for an entire subkey: using -Hive and -SubKey w/ CIM Sessions' {
             $Result = Get-CSRegistryValue -Hive HKLM -SubKey $CurrentVersionPath -CimSession $TestCimSession1
-
-            $CurrentVersion = $Result | Where-Object { $_.ValueName -eq 'CurrentVersion' }
-
-            $CurrentVersion | Should Not BeNullOrEmpty
-            $CurrentVersion.ValueContent | Should Not BeNullOrEmpty
-
-            $CurrentVersion.PSComputerName | Should BeExactly 'localhost'
-        }
-
-        It 'should return value contents for an entire subkey: using -Path w/ CIM Sessions' {
-            $Result = Get-CSRegistryValue -Path "HKLM:\$CurrentVersionPath" -CimSession $TestCimSession1
 
             $CurrentVersion = $Result | Where-Object { $_.ValueName -eq 'CurrentVersion' }
 
@@ -234,16 +173,6 @@ Describe 'Get-CSRegistryValue' {
             $CurrentVersion.PSComputerName | Should BeNullOrEmpty
         }
 
-        It 'should return value contents for a specific subkey value: using -Path w/ no CIM Session' {
-            $CurrentVersion = Get-CSRegistryValue -Path "HKLM:\$CurrentVersionPath" -ValueName CurrentVersion -ValueType REG_SZ
-
-            $CurrentVersion | Should Not BeNullOrEmpty
-
-            $CurrentVersion.ValueContent | Should Not BeNullOrEmpty
-
-            $CurrentVersion.PSComputerName | Should BeNullOrEmpty
-        }
-
         It 'should return value contents for a specific subkey value: using -Hive and -SubKey w/ CIM Sessions' {
             $CurrentVersion = Get-CSRegistryValue -Hive HKLM -SubKey $CurrentVersionPath -ValueName CurrentVersion -ValueType REG_SZ -CimSession $TestCimSession1
 
@@ -254,29 +183,8 @@ Describe 'Get-CSRegistryValue' {
             $CurrentVersion.PSComputerName | Should BeExactly 'localhost'
         }
 
-        It 'should return value contents for a specific subkey value: using -Path w/ CIM Sessions' {
-            $CurrentVersion = Get-CSRegistryValue -Path "HKLM:\$CurrentVersionPath" -ValueName CurrentVersion -ValueType REG_SZ -CimSession $TestCimSession1
-
-            $CurrentVersion | Should Not BeNullOrEmpty
-
-            $CurrentVersion.ValueContent | Should Not BeNullOrEmpty
-
-            $CurrentVersion.PSComputerName | Should BeExactly 'localhost'
-        }
-
         It 'should return only value names for an entire subkey: using -Hive and -SubKey w/ no CIM Session' {
             $Result = Get-CSRegistryValue -Hive HKLM -SubKey $CurrentVersionPath -ValueNameOnly
-
-            $CurrentVersion = $Result | Where-Object { $_.ValueName -eq 'CurrentVersion' }
-
-            $CurrentVersion | Should Not BeNullOrEmpty
-            $CurrentVersion.ValueContent | Should BeNullOrEmpty
-
-            $CurrentVersion.PSComputerName | Should BeNullOrEmpty
-        }
-
-        It 'should return only value names for an entire subkey: using -Path w/ no CIM Session' {
-            $Result = Get-CSRegistryValue -Path "HKLM:\$CurrentVersionPath" -ValueNameOnly
 
             $CurrentVersion = $Result | Where-Object { $_.ValueName -eq 'CurrentVersion' }
 
@@ -297,30 +205,8 @@ Describe 'Get-CSRegistryValue' {
             $CurrentVersion.PSComputerName | Should BeExactly 'localhost'
         }
 
-        It 'should return only value names for an entire subkey: using -Path w/ CIM Sessions' {
-            $Result = Get-CSRegistryValue -Path "HKLM:\$CurrentVersionPath" -ValueNameOnly -CimSession $TestCimSession1
-
-            $CurrentVersion = $Result | Where-Object { $_.ValueName -eq 'CurrentVersion' }
-
-            $CurrentVersion | Should Not BeNullOrEmpty
-            $CurrentVersion.ValueContent | Should BeNullOrEmpty
-
-            $CurrentVersion.PSComputerName | Should BeExactly 'localhost'
-        }
-
         It 'should return value contents via receiving value names over the pipeline (from Get-CSRegistryValue) for an entire subkey: using -Hive and -SubKey w/ no CIM Session' {
             $Result = Get-CSRegistryValue -Hive HKLM -SubKey $CurrentVersionPath -ValueNameOnly | Get-CSRegistryValue
-
-            $CurrentVersion = $Result | Where-Object { $_.ValueName -eq 'CurrentVersion' }
-
-            $CurrentVersion | Should Not BeNullOrEmpty
-            $CurrentVersion.ValueContent | Should Not BeNullOrEmpty
-
-            $CurrentVersion.PSComputerName | Should BeNullOrEmpty
-        }
-
-        It 'should return value contents via receiving value names over the pipeline (from Get-CSRegistryValue) for an entire subkey: using -Path w/ no CIM Session' {
-            $Result = Get-CSRegistryValue -Path "HKLM:\$CurrentVersionPath" -ValueNameOnly | Get-CSRegistryValue
 
             $CurrentVersion = $Result | Where-Object { $_.ValueName -eq 'CurrentVersion' }
 
@@ -341,28 +227,8 @@ Describe 'Get-CSRegistryValue' {
             $CurrentVersion.PSComputerName | Should BeExactly 'localhost'
         }
 
-        It 'should return value contents via receiving value names over the pipeline (from Get-CSRegistryValue) for an entire subkey: using -Path w/ CIM Sessions' {
-            $Result = Get-CSRegistryValue -Path "HKLM:\$CurrentVersionPath" -ValueNameOnly -CimSession $TestCimSession1 | Get-CSRegistryValue
-
-            $CurrentVersion = $Result | Where-Object { $_.ValueName -eq 'CurrentVersion' }
-
-            $CurrentVersion | Should Not BeNullOrEmpty
-            $CurrentVersion.ValueContent | Should Not BeNullOrEmpty
-
-            $CurrentVersion.PSComputerName | Should BeExactly 'localhost'
-        }
-
         It 'should return value contents via receiving a value name over the pipeline (from Get-CSRegistryValue) for a specific subkey value: using -Hive and -SubKey w/ no CIM Session' {
             $CurrentVersion = Get-CSRegistryValue -Hive HKLM -SubKey $CurrentVersionPath -ValueName CurrentVersion | Get-CSRegistryValue
-
-            $CurrentVersion | Should Not BeNullOrEmpty
-            $CurrentVersion.ValueContent | Should Not BeNullOrEmpty
-
-            $CurrentVersion.PSComputerName | Should BeNullOrEmpty
-        }
-
-        It 'should return value contents via receiving a value name over the pipeline (from Get-CSRegistryValue) for a specific subkey value: using -Path w/ no CIM Session' {
-            $CurrentVersion = Get-CSRegistryValue -Path "HKLM:\$CurrentVersionPath" -ValueName CurrentVersion | Get-CSRegistryValue
 
             $CurrentVersion | Should Not BeNullOrEmpty
             $CurrentVersion.ValueContent | Should Not BeNullOrEmpty
@@ -379,28 +245,8 @@ Describe 'Get-CSRegistryValue' {
             $CurrentVersion.PSComputerName | Should BeExactly 'localhost'
         }
 
-        It 'should return value contents via receiving a value name over the pipeline (from Get-CSRegistryValue) for a specific subkey value: using -Path w/ CIM Sessions' {
-            $CurrentVersion = Get-CSRegistryValue -Path "HKLM:\$CurrentVersionPath" -ValueName CurrentVersion -CimSession $TestCimSession1 | Get-CSRegistryValue
-
-            $CurrentVersion | Should Not BeNullOrEmpty
-            $CurrentVersion.ValueContent | Should Not BeNullOrEmpty
-
-            $CurrentVersion.PSComputerName | Should BeExactly 'localhost'
-        }
-
         It 'should return value contents via receiving subkeys over the pipeline (from Get-CSRegistryKey) for an entire subkey: using -Hive and -SubKey w/ no CIM Session' {
             $Result = Get-CSRegistryKey -Hive HKLM -SubKey 'SOFTWARE\Microsoft\Windows NT' | Get-CSRegistryValue
-
-            $CurrentVersion = $Result | Where-Object { $_.ValueName -eq 'CurrentVersion' }
-
-            $CurrentVersion | Should Not BeNullOrEmpty
-            $CurrentVersion.ValueContent | Should Not BeNullOrEmpty
-
-            $CurrentVersion.PSComputerName | Should BeNullOrEmpty
-        }
-
-        It 'should return value contents via receiving subkeys over the pipeline (from Get-CSRegistryKey) for an entire subkey: using -Path w/ no CIM Session' {
-            $Result = Get-CSRegistryKey -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT' | Get-CSRegistryValue
 
             $CurrentVersion = $Result | Where-Object { $_.ValueName -eq 'CurrentVersion' }
 
@@ -421,17 +267,6 @@ Describe 'Get-CSRegistryValue' {
             $CurrentVersion.PSComputerName | Should BeExactly 'localhost'
         }
 
-        It 'should return value contents via receiving subkeys over the pipeline (from Get-CSRegistryKey) for an entire subkey: using -Path w/ CIM Sessions' {
-            $Result = Get-CSRegistryKey -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT' -CimSession $TestCimSession1 | Get-CSRegistryValue
-
-            $CurrentVersion = $Result | Where-Object { $_.ValueName -eq 'CurrentVersion' }
-
-            $CurrentVersion | Should Not BeNullOrEmpty
-            $CurrentVersion.ValueContent | Should Not BeNullOrEmpty
-
-            $CurrentVersion.PSComputerName | Should BeExactly 'localhost'
-        }
-
         It 'should return value contents via receiving subkeys over the pipeline (from Get-CSRegistryKey) for a specific subkey value: using -Hive and -SubKey w/ no CIM Session' {
             $CurrentVersion = Get-CSRegistryKey -Hive HKLM -SubKey 'SOFTWARE\Microsoft\Windows NT' | Get-CSRegistryValue -ValueName CurrentVersion
 
@@ -441,26 +276,8 @@ Describe 'Get-CSRegistryValue' {
             $CurrentVersion.PSComputerName | Should BeNullOrEmpty
         }
 
-        It 'should return value contents via receiving subkeys over the pipeline (from Get-CSRegistryKey) for a specific subkey value: using -Path w/ no CIM Session' {
-            $CurrentVersion = Get-CSRegistryKey -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT' | Get-CSRegistryValue -ValueName CurrentVersion
-
-            $CurrentVersion | Should Not BeNullOrEmpty
-            $CurrentVersion.ValueContent | Should Not BeNullOrEmpty
-
-            $CurrentVersion.PSComputerName | Should BeNullOrEmpty
-        }
-
         It 'should return value contents via receiving subkeys over the pipeline (from Get-CSRegistryKey) for a specific subkey value: using -Hive and -SubKey w/ CIM Sessions' {
             $CurrentVersion = Get-CSRegistryKey -Hive HKLM -SubKey 'SOFTWARE\Microsoft\Windows NT' -CimSession $TestCimSession1 | Get-CSRegistryValue -ValueName CurrentVersion
-
-            $CurrentVersion | Should Not BeNullOrEmpty
-            $CurrentVersion.ValueContent | Should Not BeNullOrEmpty
-
-            $CurrentVersion.PSComputerName | Should BeExactly 'localhost'
-        }
-
-        It 'should return value contents via receiving subkeys over the pipeline (from Get-CSRegistryKey) for a specific subkey value: using -Path w/ CIM Sessions' {
-            $CurrentVersion = Get-CSRegistryKey -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT' -CimSession $TestCimSession1 | Get-CSRegistryValue -ValueName CurrentVersion
 
             $CurrentVersion | Should Not BeNullOrEmpty
             $CurrentVersion.ValueContent | Should Not BeNullOrEmpty
@@ -479,30 +296,8 @@ Describe 'Get-CSRegistryValue' {
             $CurrentVersion.PSComputerName | Should BeNullOrEmpty
         }
 
-        It 'should return value names only via receiving subkeys over the pipeline (from Get-CSRegistryKey) for an entire subkey: using -Path w/ no CIM Session' {
-            $Result = Get-CSRegistryKey -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT' | Get-CSRegistryValue -ValueNameOnly
-
-            $CurrentVersion = $Result | Where-Object { $_.ValueName -eq 'CurrentVersion' }
-
-            $CurrentVersion | Should Not BeNullOrEmpty
-            $CurrentVersion.ValueContent | Should BeNullOrEmpty
-
-            $CurrentVersion.PSComputerName | Should BeNullOrEmpty
-        }
-
         It 'should return value names only via receiving subkeys over the pipeline (from Get-CSRegistryKey) for an entire subkey: using -Hive and -SubKey w/ CIM Sessions' {
             $Result = Get-CSRegistryKey -Hive HKLM -SubKey 'SOFTWARE\Microsoft\Windows NT' -CimSession $TestCimSession1 | Get-CSRegistryValue -ValueNameOnly
-
-            $CurrentVersion = $Result | Where-Object { $_.ValueName -eq 'CurrentVersion' }
-
-            $CurrentVersion | Should Not BeNullOrEmpty
-            $CurrentVersion.ValueContent | Should BeNullOrEmpty
-
-            $CurrentVersion.PSComputerName | Should BeExactly 'localhost'
-        }
-
-        It 'should return value names only via receiving subkeys over the pipeline (from Get-CSRegistryKey) for an entire subkey: using -Path w/ CIM Sessions' {
-            $Result = Get-CSRegistryKey -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT' -CimSession $TestCimSession1 | Get-CSRegistryValue -ValueNameOnly
 
             $CurrentVersion = $Result | Where-Object { $_.ValueName -eq 'CurrentVersion' }
 
@@ -574,7 +369,7 @@ Describe 'Get-CSEventLogEntry' {
 
     It 'should return Win32_NtLogEvent instances' {
         $Event = Get-CSEventLogEntry -NoProgressBar | Select-Object -First 1
-        $Event.PSObject.TypeNames[0].Contains('Win32_NTLogEvent') | Should Be $True
+        $Event.PSObject.TypeNames[0] | Should BeExactly 'Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_NTLogEvent'
     }
 
     It 'should return nothing when it receives a non-existent LogName' {
@@ -720,56 +515,56 @@ Describe 'Get-CSDirectoryListing' {
     It 'should perform a file/directory listing of all mounted partitions with no arguments provided' {
         $Listing = Get-CSDirectoryListing | Select-Object -First 1
         $Listing | Should Not BeNullOrEmpty
-        $Listing.PSObject.TypeNames -contains $WMIBaseType | Should Be $True
+        $Listing.PSObject.TypeNames | Where-Object { $_ -eq $WMIBaseType } | Should BeExactly $WMIBaseType
         $Listing.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should perform a file/directory listing of all mounted partitions with no arguments provided w/ CIM sessions' {
         $Listing = Get-CSDirectoryListing -CimSession $TestCimSession1 | Select-Object -First 1
         $Listing | Should Not BeNullOrEmpty
-        $Listing.PSObject.TypeNames -contains $WMIBaseType | Should Be $True
+        $Listing.PSObject.TypeNames | Where-Object { $_ -eq $WMIBaseType } | Should Be $WMIBaseType
         $Listing.PSComputerName | Should BeExactly 'localhost'
     }
 
     It 'should accept input from Get-CSMountedVolumeDriveLetter' {
         $Listing = Get-CSMountedVolumeDriveLetter | Get-CSDirectoryListing | Select-Object -First 1
         $Listing | Should Not BeNullOrEmpty
-        $Listing.PSObject.TypeNames -contains $WMIBaseType | Should Be $True
+        $Listing.PSObject.TypeNames | Where-Object { $_ -eq $WMIBaseType } | Should Be $WMIBaseType
         $Listing.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should accept input from Get-CSMountedVolumeDriveLetter w/ CIM sessions' {
         $Listing = Get-CSMountedVolumeDriveLetter -CimSession $TestCimSession1 | Get-CSDirectoryListing | Select-Object -First 1
         $Listing | Should Not BeNullOrEmpty
-        $Listing.PSObject.TypeNames -contains $WMIBaseType | Should Be $True
+        $Listing.PSObject.TypeNames | Where-Object { $_ -eq $WMIBaseType } | Should Be $WMIBaseType
         $Listing.PSComputerName | Should BeExactly 'localhost'
     }
 
     It 'should list files/directories from the primary boot partition' {
         $Listing = Get-CSDirectoryListing -DirectoryPath $BootPartitionRoot | Select-Object -First 1
         $Listing | Should Not BeNullOrEmpty
-        $Listing.PSObject.TypeNames -contains $WMIBaseType | Should Be $True
+        $Listing.PSObject.TypeNames | Where-Object { $_ -eq $WMIBaseType } | Should Be $WMIBaseType
         $Listing.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should list files/directories from the primary boot partition w/ CIM sessions' {
         $Listing = Get-CSDirectoryListing -DirectoryPath $BootPartitionRoot -CimSession $TestCimSession1 | Select-Object -First 1
         $Listing | Should Not BeNullOrEmpty
-        $Listing.PSObject.TypeNames -contains $WMIBaseType | Should Be $True
+        $Listing.PSObject.TypeNames | Where-Object { $_ -eq $WMIBaseType } | Should Be $WMIBaseType
         $Listing.PSComputerName | Should BeExactly 'localhost'
     }
 
     It 'should list only directories from the primary boot partition' {
         $Listing = Get-CSDirectoryListing -DirectoryPath $BootPartitionRoot -Directory | Select-Object -First 1
         $Listing | Should Not BeNullOrEmpty
-        $Listing.PSObject.TypeNames -contains $DirectoryType | Should Be $True
+        $Listing.PSObject.TypeNames | Where-Object { $_ -eq $WMIBaseType } | Should Be $WMIBaseType
         $Listing.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should list only directories from the primary boot partition w/ CIM sessions' {
         $Listing = Get-CSDirectoryListing -DirectoryPath $BootPartitionRoot -CimSession $TestCimSession1 -Directory | Select-Object -First 1
         $Listing | Should Not BeNullOrEmpty
-        $Listing.PSObject.TypeNames -contains $DirectoryType | Should Be $True
+        $Listing.PSObject.TypeNames[0] | Should BeExactly $DirectoryType
         $Listing.PSComputerName | Should BeExactly 'localhost'
     }
 
@@ -778,7 +573,7 @@ Describe 'Get-CSDirectoryListing' {
         $ConfigDirListing = $ConfigDir | Get-CSDirectoryListing | Select-Object -First 1
 
         $ConfigDirListing | Should Not BeNullOrEmpty
-        $ConfigDirListing.PSObject.TypeNames -contains $WMIBaseType | Should Be $True
+        $ConfigDirListing.PSObject.TypeNames | Where-Object { $_ -eq $WMIBaseType } | Should Be $WMIBaseType
         $ConfigDirListing.PSComputerName | Should BeNullOrEmpty
     }
 
@@ -787,21 +582,21 @@ Describe 'Get-CSDirectoryListing' {
         $ConfigDirListing = $ConfigDir | Get-CSDirectoryListing | Select-Object -First 1
 
         $ConfigDirListing | Should Not BeNullOrEmpty
-        $ConfigDirListing.PSObject.TypeNames -contains $WMIBaseType | Should Be $True
+        $ConfigDirListing.PSObject.TypeNames | Where-Object { $_ -eq $WMIBaseType } | Should Be $WMIBaseType
         $ConfigDirListing.PSComputerName | Should BeExactly 'localhost'
     }
 
     It 'should recurse' {
         $Listing = Get-CSDirectoryListing -DirectoryPath $BootPartitionRoot -Recurse | Select-Object -First 1
         $Listing | Should Not BeNullOrEmpty
-        $Listing.PSObject.TypeNames -contains $WMIBaseType | Should Be $True
+        $Listing.PSObject.TypeNames | Where-Object { $_ -eq $WMIBaseType } | Should Be $WMIBaseType
         $Listing.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should recurse w/ CIM sessions' {
         $Listing = Get-CSDirectoryListing -DirectoryPath $BootPartitionRoot -Recurse -CimSession $TestCimSession1 | Select-Object -First 1
         $Listing | Should Not BeNullOrEmpty
-        $Listing.PSObject.TypeNames -contains $WMIBaseType | Should Be $True
+        $Listing.PSObject.TypeNames | Where-Object { $_ -eq $WMIBaseType } | Should Be $WMIBaseType
         $Listing.PSComputerName | Should BeExactly 'localhost'
     }
 
@@ -809,7 +604,7 @@ Describe 'Get-CSDirectoryListing' {
         $Listing = Get-CSDirectoryListing $SystemDirectory -Extension dll | Select-Object -First 1
         $Listing | Should Not BeNullOrEmpty
         $Listing.Extension | Should BeExactly 'dll'
-        $Listing.PSObject.TypeNames -contains $FileType | Should Be $True
+        $Listing.PSObject.TypeNames[0] | Should BeExactly $FileType
         $Listing.PSComputerName | Should BeNullOrEmpty
     }
 
@@ -817,14 +612,14 @@ Describe 'Get-CSDirectoryListing' {
         $Listing = Get-CSDirectoryListing $SystemDirectory -Extension dll -CimSession $TestCimSession1 | Select-Object -First 1
         $Listing | Should Not BeNullOrEmpty
         $Listing.Extension | Should BeExactly 'dll'
-        $Listing.PSObject.TypeNames -contains $FileType | Should Be $True
+        $Listing.PSObject.TypeNames[0] | Should BeExactly $FileType
         $Listing.PSComputerName | Should BeExactly 'localhost'
     }
 
     It 'should return output for a known DLL - ntdll.dll' {
         $Listing = Get-CSDirectoryListing $SystemDirectory -FileName ntdll.dll
         $Listing | Should Not BeNullOrEmpty
-        $Listing.PSObject.TypeNames -contains $FileType | Should Be $True
+        $Listing.PSObject.TypeNames[0] | Should BeExactly $FileType
         $Listing.Extension | Should BeExactly 'dll'
         $Listing.FileName | Should BeExactly 'ntdll'
         $Listing.Name.ToLower() | Should BeExactly "$SystemDirectory\ntdll.dll".ToLower()
@@ -834,7 +629,7 @@ Describe 'Get-CSDirectoryListing' {
     It 'should return output for a known DLL - ntdll.dll w/ CIM sessions' {
         $Listing = Get-CSDirectoryListing $SystemDirectory -FileName ntdll.dll -CimSession $TestCimSession1
         $Listing | Should Not BeNullOrEmpty
-        $Listing.PSObject.TypeNames -contains $FileType | Should Be $True
+        $Listing.PSObject.TypeNames[0] | Should BeExactly $FileType
         $Listing.Extension | Should BeExactly 'dll'
         $Listing.FileName | Should BeExactly 'ntdll'
         $Listing.Name.ToLower() | Should BeExactly "$SystemDirectory\ntdll.dll".ToLower()
@@ -844,14 +639,14 @@ Describe 'Get-CSDirectoryListing' {
     It 'should return only files with -File' {
         $Listing = Get-CSDirectoryListing -DirectoryPath $SystemDirectory -File | Select-Object -First 1
         $Listing | Should Not BeNullOrEmpty
-        $Listing.PSObject.TypeNames -contains $FileType | Should Be $True
+        $Listing.PSObject.TypeNames[0] | Should BeExactly $FileType
         $Listing.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should return only files with -File w\ CIM sessions' {
         $Listing = Get-CSDirectoryListing -DirectoryPath $SystemDirectory -File -CimSession $TestCimSession1 | Select-Object -First 1
         $Listing | Should Not BeNullOrEmpty
-        $Listing.PSObject.TypeNames -contains $FileType | Should Be $True
+        $Listing.PSObject.TypeNames[0] | Should BeExactly $FileType
         $Listing.PSComputerName | Should BeExactly 'localhost'
     }
 
@@ -972,49 +767,49 @@ Describe 'Get-CSService' {
     It 'should return Win32_BaseService instances' {
         $Service = Get-CSService -NoProgressBar | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
-        $Service.PSObject.TypeNames -contains $BaseServiceWMIType | Should Be $True
+        $Service.PSObject.TypeNames | Where-Object { $_ -eq $BaseServiceWMIType } | Should BeExactly $BaseServiceWMIType
         $Service.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should return Win32_BaseService instances w/ CIM sessions' {
         $Service = Get-CSService -NoProgressBar -CimSession $TestCimSession1 | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
-        $Service.PSObject.TypeNames -contains $BaseServiceWMIType | Should Be $True
+        $Service.PSObject.TypeNames | Where-Object { $_ -eq $BaseServiceWMIType } | Should Be $BaseServiceWMIType
         $Service.PSComputerName | Should BeExactly 'localhost'
     }
 
     It 'should return kernel driver instances' {
         $Service = Get-CSService -NoProgressBar -ServiceType 'Kernel Driver' | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
-        $Service.PSObject.TypeNames -contains $Win32SystemDriverType | Should Be $True
+        $Service.PSObject.TypeNames[0] | Should BeExactly $Win32SystemDriverType
         $Service.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should return kernel driver instances w/ CIM sessions' {
         $Service = Get-CSService -NoProgressBar -ServiceType 'Kernel Driver' -CimSession $TestCimSession1 | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
-        $Service.PSObject.TypeNames -contains $Win32SystemDriverType | Should Be $True
+        $Service.PSObject.TypeNames[0] | Should BeExactly $Win32SystemDriverType
         $Service.PSComputerName | Should BeExactly 'localhost'
     }
 
     It 'should return user mode service instances' {
         $Service = Get-CSService -NoProgressBar -ServiceType 'Share Process' | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
-        $Service.PSObject.TypeNames -contains $Win32ServiceType | Should Be $True
+        $Service.PSObject.TypeNames[0] | Should BeExactly $Win32ServiceType
         $Service.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should return user mode service instances w/ CIM sessions' {
         $Service = Get-CSService -NoProgressBar -ServiceType 'Share Process' -CimSession $TestCimSession1 | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
-        $Service.PSObject.TypeNames -contains $Win32ServiceType | Should Be $True
+        $Service.PSObject.TypeNames[0] | Should BeExactly $Win32ServiceType
         $Service.PSComputerName | Should BeExactly 'localhost'
     }
 
     It 'should return a running service' {
         $Service = Get-CSService -NoProgressBar -State Running | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
-        $Service.PSObject.TypeNames -contains $BaseServiceWMIType | Should Be $True
+        $Service.PSObject.TypeNames | Where-Object { $_ -eq $BaseServiceWMIType } | Should BeExactly $BaseServiceWMIType
         $Service.State | Should BeExactly 'Running'
         $Service.PSComputerName | Should BeNullOrEmpty
     }
@@ -1032,7 +827,7 @@ Describe 'Get-CSService' {
     It 'should return a running service w/ CIM sessions' {
         $Service = Get-CSService -NoProgressBar -State Running -CimSession $TestCimSession1 | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
-        $Service.PSObject.TypeNames -contains $BaseServiceWMIType | Should Be $True
+        $Service.PSObject.TypeNames | Where-Object { $_ -eq $BaseServiceWMIType } | Should Be $BaseServiceWMIType
         $Service.State | Should BeExactly 'Running'
         $Service.PSComputerName | Should BeExactly 'localhost'
     }
@@ -1040,13 +835,13 @@ Describe 'Get-CSService' {
     It 'should limit the output of its properties to a default set' {
         $Service = Get-CSService -NoProgressBar -LimitOutput | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
-        $Service.PSObject.TypeNames -contains $BaseServiceWMIType | Should Be $True
+        $Service.PSObject.TypeNames | Where-Object { $_ -eq $BaseServiceWMIType } | Should Be $BaseServiceWMIType
         $Service.StartMode | Should BeNullOrEmpty
         $Service.PSComputerName | Should BeNullOrEmpty
 
         $Service = Get-CSService -NoProgressBar | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
-        $Service.PSObject.TypeNames -contains $BaseServiceWMIType | Should Be $True
+        $Service.PSObject.TypeNames | Where-Object { $_ -eq $BaseServiceWMIType } | Should Be $BaseServiceWMIType
         $Service.StartMode | Should Not BeNullOrEmpty
         $Service.PSComputerName | Should BeNullOrEmpty
     }
@@ -1054,13 +849,13 @@ Describe 'Get-CSService' {
     It 'should limit the output of its properties to a default set w/ CIM sessions' {
         $Service = Get-CSService -NoProgressBar -LimitOutput -CimSession $TestCimSession1 | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
-        $Service.PSObject.TypeNames -contains $BaseServiceWMIType | Should Be $True
+        $Service.PSObject.TypeNames | Where-Object { $_ -eq $BaseServiceWMIType } | Should Be $BaseServiceWMIType
         $Service.StartMode | Should BeNullOrEmpty
         $Service.PSComputerName | Should BeExactly 'localhost'
 
         $Service = Get-CSService -NoProgressBar -CimSession $TestCimSession1 | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
-        $Service.PSObject.TypeNames -contains $BaseServiceWMIType | Should Be $True
+        $Service.PSObject.TypeNames | Where-Object { $_ -eq $BaseServiceWMIType } | Should Be $BaseServiceWMIType
         $Service.StartMode | Should Not BeNullOrEmpty
         $Service.PSComputerName | Should BeExactly 'localhost'
     }
@@ -1068,7 +863,7 @@ Describe 'Get-CSService' {
     It 'should only include the specified property' {
         $Service = Get-CSService -NoProgressBar -Property Name | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
-        $Service.PSObject.TypeNames -contains $BaseServiceWMIType | Should Be $True
+        $Service.PSObject.TypeNames | Where-Object { $_ -eq $BaseServiceWMIType } | Should Be $BaseServiceWMIType
         $Service.Name | Should Not BeNullOrEmpty
         $Service.StartMode | Should BeNullOrEmpty
         $Service.PSComputerName | Should BeNullOrEmpty
@@ -1077,7 +872,7 @@ Describe 'Get-CSService' {
     It 'should only include the specified property w/ CIM sessions' {
         $Service = Get-CSService -NoProgressBar -Property Name -CimSession $TestCimSession1 | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
-        $Service.PSObject.TypeNames -contains $BaseServiceWMIType | Should Be $True
+        $Service.PSObject.TypeNames | Where-Object { $_ -eq $BaseServiceWMIType } | Should Be $BaseServiceWMIType
         $Service.Name | Should Not BeNullOrEmpty
         $Service.StartMode | Should BeNullOrEmpty
         $Service.PSComputerName | Should BeExactly 'localhost'
@@ -1098,7 +893,7 @@ Describe 'Get-CSProcess' {
     It 'should return the system process' {
         $Process = Get-CSProcess -NoProgressBar -Name System -ProcessID 4 | Select-Object -First 1
         $Process | Should Not BeNullOrEmpty
-        $Process.PSObject.TypeNames -contains $ProcessWMIType | Should Be $True
+        $Process.PSObject.TypeNames[0] | Should Be $ProcessWMIType
         $Process.Name | Should BeExactly 'System'
         $Process.ProcessId | Should BeExactly 4
         $Process.PSComputerName | Should BeNullOrEmpty
@@ -1107,7 +902,7 @@ Describe 'Get-CSProcess' {
     It 'should return the system process w/ CIM sessions' {
         $Process = Get-CSProcess -NoProgressBar -Name System -ProcessID 4 -CimSession $TestCimSession1 | Select-Object -First 1
         $Process | Should Not BeNullOrEmpty
-        $Process.PSObject.TypeNames -contains $ProcessWMIType | Should Be $True
+        $Process.PSObject.TypeNames[0] | Should Be $ProcessWMIType
         $Process.Name | Should BeExactly 'System'
         $Process.ProcessId | Should BeExactly 4
         $Process.PSComputerName | Should BeExactly 'localhost'
@@ -1117,7 +912,7 @@ Describe 'Get-CSProcess' {
         # This should always be smss.exe
         $Process = Get-CSProcess -NoProgressBar -ParentProcessId 4 | Select-Object -First 1
         $Process | Should Not BeNullOrEmpty
-        $Process.PSObject.TypeNames -contains $ProcessWMIType | Should Be $True
+        $Process.PSObject.TypeNames[0] | Should Be $ProcessWMIType
         $Process.PSComputerName | Should BeNullOrEmpty
     }
 
@@ -1125,21 +920,21 @@ Describe 'Get-CSProcess' {
         # This should always be smss.exe
         $Process = Get-CSProcess -NoProgressBar -ParentProcessId 4 -CimSession $TestCimSession1 | Select-Object -First 1
         $Process | Should Not BeNullOrEmpty
-        $Process.PSObject.TypeNames -contains $ProcessWMIType | Should Be $True
+        $Process.PSObject.TypeNames[0] | Should Be $ProcessWMIType
         $Process.PSComputerName | Should BeExactly 'localhost'
     }
 
     It 'should return a process instance' {
         $Process = Get-CSProcess -NoProgressBar | Select-Object -First 1
         $Process | Should Not BeNullOrEmpty
-        $Process.PSObject.TypeNames -contains $ProcessWMIType | Should Be $True
+        $Process.PSObject.TypeNames[0] | Should Be $ProcessWMIType
         $Process.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should return a process instance w/ CIM sessions' {
         $Process = Get-CSProcess -NoProgressBar -CimSession $TestCimSession1 | Select-Object -First 1
         $Process | Should Not BeNullOrEmpty
-        $Process.PSObject.TypeNames -contains $ProcessWMIType | Should Be $True
+        $Process.PSObject.TypeNames[0] | Should Be $ProcessWMIType
         $Process.PSComputerName | Should BeExactly 'localhost'
     }
 
@@ -1236,7 +1031,7 @@ Describe 'Get-CSEnvironmentVariable' {
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should Not BeNullOrEmpty
         $EnvVar.User | Should Not BeNullOrEmpty
-        $EnvVar.User -eq '<SYSTEM>' | Should Be $False
+        $EnvVar.User | Should Not Be '<SYSTEM>'
         $EnvVar.VariableValue | Should Not BeNullOrEmpty
         $EnvVar.PSComputerName | Should BeNullOrEmpty
     }
@@ -1246,7 +1041,7 @@ Describe 'Get-CSEnvironmentVariable' {
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should Not BeNullOrEmpty
         $EnvVar.User | Should Not BeNullOrEmpty
-        $EnvVar.User -eq '<SYSTEM>' | Should Be $False
+        $EnvVar.User | Should Not Be '<SYSTEM>'
         $EnvVar.VariableValue | Should Not BeNullOrEmpty
         $EnvVar.PSComputerName | Should BeExactly 'localhost'
     }
@@ -1292,7 +1087,7 @@ Describe 'Get-CSEnvironmentVariable' {
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should BeExactly 'TEMP'
         $EnvVar.User | Should Not BeNullOrEmpty
-        $EnvVar.User -eq '<SYSTEM>' | Should Be $False
+        $EnvVar.User | Should Not Be '<SYSTEM>'
         $EnvVar.VariableValue | Should Not BeNullOrEmpty
         $EnvVar.PSComputerName | Should BeNullOrEmpty
     }
@@ -1302,7 +1097,7 @@ Describe 'Get-CSEnvironmentVariable' {
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should BeExactly 'TEMP'
         $EnvVar.User | Should Not BeNullOrEmpty
-        $EnvVar.User -eq '<SYSTEM>' | Should Be $False
+        $EnvVar.User | Should Not Be '<SYSTEM>'
         $EnvVar.VariableValue | Should Not BeNullOrEmpty
         $EnvVar.PSComputerName | Should BeExactly 'localhost'
     }
@@ -1349,12 +1144,10 @@ Describe 'Get-CSWmiNamespace' {
             $Result = Get-CSWmiNamespace -ErrorAction Stop
 
             $Result.FullyQualifiedNamespace -contains 'ROOT/CIMV2' | Should Be $True
-            $Result.Name -contains 'CIMV2' | Should Be $True
 
             $Result2 = Get-CSWmiNamespace -CimSession $TestCimSession1 -ErrorAction Stop
 
             $Result2.FullyQualifiedNamespace -contains 'ROOT/CIMV2' | Should Be $True
-            $Result2.Name -contains 'CIMV2' | Should Be $True
         }
 
         It 'should recurse over namespaces' {
