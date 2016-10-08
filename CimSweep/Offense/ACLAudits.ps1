@@ -31,6 +31,12 @@ By default, the value of this parameter is 0, which means that the cmdlet uses t
 
 If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
 
+.EXAMPLE
+
+Get-CSVulnerableServicePermission
+
+Returns a list of groups and the services to which they are granted access to perform potentially vulnerable actions.
+
 .OUTPUTS
 
 CimSweep.ServiceACLAudit

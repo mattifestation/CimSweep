@@ -10,8 +10,11 @@ only if a function was performed against a remote computer.
 
 Technique described here: https://poshoholic.com/2008/07/05/essential-powershell-define-default-properties-for-custom-objects/
 Thanks Kirk Munro (@Poshoholic)!
+
+Ignore PsScriptAnalyzer rule for this verb name. It is a helper function that doesn't modify system state.
 #>
 function Set-DefaultDisplayProperty {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     Param (
         [Parameter(Mandatory = $True, ValueFromPipeline = $True)]
         [Object]

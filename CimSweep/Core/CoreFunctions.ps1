@@ -19,10 +19,6 @@ Specifies the registry hive. WMI only supports registry operations on the follow
 
 Specifies the path that contains the subkeys to be enumerated. The absense of this argument will list the root keys for the specified hive.
 
-.PARAMETER Path
-
-Specifies the desired registry hive and path in the standard PSDrive format. e.g. HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion. This parameter enables local tab expansion of key paths. Note: the tab expansion expands based on local registry paths not remote paths.
-
 .PARAMETER IncludeAcl
 
 Specifies that the ACL for the key should be returned. -IncludeAcl will append an ACL property to each returned CimSweep.RegistryKey object. The ACL property is a System.Security.AccessControl.RegistrySecurity object. It is not recommended to use -IncludeAcl with -Recurse as it will significantly increase execution time and network bandwidth if used with CIM sessions.
@@ -53,10 +49,6 @@ Get-CSRegistryKey -Hive HKCU -SubKey SOFTWARE\Microsoft\Windows\CurrentVersion\
 
 .EXAMPLE
 
-Get-CSRegistryKey -Path HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\
-
-.EXAMPLE
-
 Get-CSRegistryKey -Hive HKLM -Recurse -CimSession $CimSession
 
 Lists all registry keys on a remote system in the HKLM hive.
@@ -82,7 +74,6 @@ Outputs a list of objects representing registry keys.
 .NOTES
 
 It is not recommended to recursively list all registry keys from most parent keys as obtaining the results can be time consuming. It is recommended to use Get-CSRegistryKey with targeted subkey paths.
-
 #>
 
     [CmdletBinding()]
@@ -96,11 +87,6 @@ It is not recommended to recursively list all registry keys from most parent key
         [Parameter(ValueFromPipelineByPropertyName = $True, ParameterSetName = 'ExplicitPath')]
         [String]
         $SubKey = '',
-
-        [Parameter(Mandatory = $True, ParameterSetName = 'PSDrivePath')]
-        [String]
-        [ValidatePattern('^(HKLM|HKCU|HKU|HKCR|HKCC):\\.*$')]
-        $Path,
 
         [Switch]
         $IncludeAcl,
@@ -135,15 +121,6 @@ It is not recommended to recursively list all registry keys from most parent key
         foreach ($Session in $CimSession) {
             $ComputerName = $Session.ComputerName
             if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
-
-            # Note: -Path is not guaranteed to expand if the PSDrive doesn't exist. e.g. HKCR doesn't exist by default.
-            # The point of -Path is to speed up your workflow.
-            if ($PSBoundParameters['Path']) {
-                $Result = $Path -match '^(?<Hive>HKLM|HKCU|HKU|HKCR|HKCC):\\(?<SubKey>.*)$'
-
-                $Hive = $Matches.Hive
-                $SubKey = $Matches.SubKey
-            }
 
             # These values are defined in WinReg.h and here:
             # https://msdn.microsoft.com/en-us/library/windows/desktop/aa390387.aspx
@@ -278,10 +255,6 @@ Specifies the registry hive. WMI only supports registry operations on the follow
 
 Specifies the path that contains the subkeys to be enumerated. The absense of this argument will list the root keys for the specified hive.
 
-.PARAMETER Path
-
-Specifies the desired registry hive and path in the standard PSDrive format. e.g. HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion. This parameter enables local tab expansion of key paths. Note: the tab expansion expands based on local registry paths not remote paths.
-
 .PARAMETER ValueName
 
 Specifies the registry value name.
@@ -314,17 +287,17 @@ Lists all value names present in the current user Run key.
 
 .EXAMPLE
 
-Get-CSRegistryKey -Path HKLM:\SYSTEM\CurrentControlSet\Services\ -CimSession $CimSession | Get-CSRegistryValue
+Get-CSRegistryKey -Hive HKLM -Subkey SYSTEM\CurrentControlSet\Services -CimSession $CimSession | Get-CSRegistryValue
 
 Get the value names and types for all services on a remote system.
 
 .EXAMPLE
 
-Get-CSRegistryValue -Path HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run
+Get-CSRegistryValue -Hive HKLM -Subkey SOFTWARE\Microsoft\Windows\CurrentVersion\Run
 
 .EXAMPLE
 
-Get-CSRegistryValue -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\' -ValueName CurrentVersion
+Get-CSRegistryValue -Hive HKLM -Subkey 'SOFTWARE\Microsoft\Windows NT\CurrentVersion' -ValueName CurrentVersion
 
 .INPUTS
 
@@ -355,13 +328,6 @@ Outputs a list of objects representing registry value names, their respective ty
         [Parameter(ValueFromPipelineByPropertyName = $True, ParameterSetName = 'HiveValueNameWithType')]
         [String]
         $SubKey = '',
-
-        [Parameter(Mandatory = $True, ParameterSetName = 'PathValueNameNoType')]
-        [Parameter(Mandatory = $True, ParameterSetName = 'PathValues')]
-        [Parameter(Mandatory = $True, ParameterSetName = 'PathValueNameWithType')]
-        [String]
-        [ValidatePattern('^(HKLM|HKCU|HKU|HKCR|HKCC):\\.*$')]
-        $Path,
 
         [Parameter(ValueFromPipelineByPropertyName = $True, ParameterSetName = 'HiveValueNameNoType')]
         [Parameter(ValueFromPipelineByPropertyName = $True, ParameterSetName = 'HiveValueNameWithType')]
@@ -429,15 +395,6 @@ Outputs a list of objects representing registry value names, their respective ty
         foreach ($Session in $CimSession) {
             $ComputerName = $Session.ComputerName
             if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
-
-            # Note: -Path is not guaranteed to expand if the PSDrive doesn't exist. e.g. HKCR doesn't exist by default.
-            # The point of -Path is to speed up your workflow.
-            if ($PSBoundParameters['Path']) {
-                $Result = $Path -match '^(?<Hive>HKLM|HKCU|HKU|HKCR|HKCC):\\(?<SubKey>.*)$'
-
-                $Hive = $Matches.Hive
-                $SubKey = $Matches.SubKey
-            }
 
             switch ($Hive) {
                 'HKLM' { $HiveVal = [UInt32] 2147483650 }
@@ -700,6 +657,10 @@ Gets a list of event logs on the computer.
 Author: Matthew Graeber (@mattifestation)
 License: BSD 3-Clause
 
+.DESCRIPTION
+
+Get-CSEventLog lists the available event logs from which event entries can be retrieved via WMI. 
+
 .PARAMETER NoProgressBar
 
 Do not display a progress bar. This parameter is designed to be used with wrapper functions.
@@ -719,6 +680,18 @@ If the OperationTimeoutSec parameter is set to a value less than the robust conn
 .NOTES
 
 Get-CSEventLog is useful for determining which event log to filter off of in Get-CSEventLogEntry.
+
+.EXAMPLE
+
+Get-CSEventLog
+
+List all available event logs queryable via WMI.
+
+.EXAMPLE
+
+Get-CSEventLog | Get-CSEventLogEntry
+
+List event log entries from all available event logs. Note: Get-CSEventLogEntry without any additional arguments will return entries from all event logs by default.
 
 .OUTPUTS
 
@@ -866,6 +839,10 @@ Specifies the desired properties to retrieve from Win32_Process instances. The f
 .PARAMETER CimSession
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
+
+.PARAMETER NoProgressBar
+
+Do not display a progress bar. This parameter is designed to be used with wrapper functions.
 
 .PARAMETER OperationTimeoutSec
 
@@ -1078,10 +1055,14 @@ function Get-CSMountedVolumeDriveLetter {
 <#
 .SYNOPSIS
 
-Lists the mounted drive letters present. This is primarily used as a helper for Get-CSDirectoryListing when no parameters are provided.
+Lists mounted drive letters present.
 
 Author: Matthew Graeber (@mattifestation)
 License: BSD 3-Clause
+
+.DESCRIPTION
+
+Get-CSMountedVolumeDriveLetter lists the drive letters of mounted drives. This is primarily used as a helper for Get-CSDirectoryListing when no parameters are provided.
 
 .PARAMETER CimSession
 
@@ -1094,6 +1075,18 @@ Specifies the amount of time that the cmdlet waits for a response from the compu
 By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
 
 If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
+
+.EXAMPLE
+
+Get-CSMountedVolumeDriveLetter
+
+Lists mounted drive letters on a local system.
+
+.EXAMPLE
+
+Get-CSMountedVolumeDriveLetter -CimSession $CimSession
+
+Lists mounted drive letters on a remote system.
 
 .OUTPUTS
 
@@ -2387,6 +2380,30 @@ By default, the value of this parameter is 0, which means that the cmdlet uses t
 
 If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
 
+.EXAMPLE
+
+Get-CSEnvironmentVariable
+
+Lists all local user-scope and system-scope environment variables.
+
+.EXAMPLE
+
+Get-CSEnvironmentVariable -SystemVariable
+
+Lists only local, system-scope environment variables.
+
+.EXAMPLE
+
+Get-CSEnvironmentVariable -VariableName Path
+
+Lists all local user-scope and system-scope "Path" environment variables.
+
+.EXAMPLE
+
+Get-CSEnvironmentVariable -CimSession $CimSession
+
+Lists all user-scope and system-scope environment variables from a remote CIM session.
+
 .OUTPUTS
 
 CimSweep.EnvironmentVariable
@@ -2659,6 +2676,13 @@ function Get-CSWmiNamespace {
 .SYNOPSIS
 
 Returns a list of WMI namespaces present within the specified namespace.
+
+Author: Matthew Graeber (@mattifestation)
+License: BSD 3-Clause
+
+.DESCRIPTION
+
+Get-CSWmiNamespace returns all child namespaces for the specified WMI namespace and optionally includes the ACL for each namespace. An attacker can use WMI namespaces as a C2 mechanism as well as backdoor a system by modifying ACLs.
 
 .PARAMETER Namespace
 
