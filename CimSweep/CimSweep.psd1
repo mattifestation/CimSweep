@@ -1,7 +1,7 @@
 ﻿@{
 RootModule = 'CimSweep.psm1'
 
-ModuleVersion = '0.5.0.0'
+ModuleVersion = '0.5.1.0'
 
 GUID = 'f347ef1c-d752-4d07-bf68-3197c0aa661a'
 
@@ -48,6 +48,16 @@ PrivateData = @{
         ProjectUri = 'https://github.com/PowerShellMafia/CimSweep'
 
         ReleaseNotes = @'
+0.5.1
+-----
+Enhancements:
+* Added Get-CSAVInfo (written by @xorrior)
+* Added Get-CSProxyConfig (written by @xorrior)
+* Added module-wide Pester tests to ensure consistency across functions.
+
+Removed:
+* Removed the -Path parameter from Get-CSRegistryKey and Get-CSRegistryValue. -Hive should be used.
+
 0.5.0
 -----
 Enhancements:
