@@ -35,9 +35,7 @@ FunctionsToExport = @(
     'Get-CSWmiNamespace',
     'Get-CSVulnerableServicePermission',
     'Get-CSAVInfo',
-    'Enable-CSRdp',
-    'Get-CSProxyConfig',
-    'Copy-CSShadowCopyItem'
+    'Get-CSProxyConfig'
 )
 
 PrivateData = @{
