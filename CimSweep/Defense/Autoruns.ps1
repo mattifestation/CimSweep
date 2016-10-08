@@ -185,7 +185,7 @@ Outputs objects representing autoruns entries similar to the output of Sysintern
                 [String]
                 $ImagePath,
 
-                [Parameter(Position = 4)]
+                [Parameter(Position = 4, Mandatory = $True)]
                 [String]
                 $Category,
 
@@ -254,7 +254,7 @@ Outputs objects representing autoruns entries similar to the output of Sysintern
                     $CurrentAutorunCount++
                 }
 
-                Get-CSRegistryValue -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\Wds\rdpwd' -ValueName StartupPrograms @CommonArgs @Timeout |
+                Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\Terminal Server\Wds\rdpwd' -ValueName StartupPrograms @CommonArgs @Timeout |
                     New-AutoRunsEntry -Category $Category
 
                 Get-CSRegistryValue -Hive HKLM -SubKey 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon' -ValueNameOnly @CommonArgs @Timeout |
@@ -536,10 +536,10 @@ Outputs objects representing autoruns entries similar to the output of Sysintern
 
                 foreach ($SID in $HKUSIDs) {
                     $Scrnsave = Get-CSRegistryValue -Hive HKU -SubKey "$SID\SOFTWARE\Policies\Microsoft\Windows\Control Panel\Desktop" -ValueName 'Scrnsave.exe' @CommonArgs @Timeout
-                    if ($Scrnsave) { $Scrnsave | New-AutoRunsEntry }
+                    if ($Scrnsave) { $Scrnsave | New-AutoRunsEntry -Category $Category }
 
                     $Scrnsave = Get-CSRegistryValue -Hive HKU -SubKey "$SID\Control Panel\Desktop" -ValueName 'Scrnsave.exe' @CommonArgs @Timeout
-                    if ($Scrnsave) { $Scrnsave | New-AutoRunsEntry }
+                    if ($Scrnsave) { $Scrnsave | New-AutoRunsEntry -Category $Category }
                 }
             }
         }
