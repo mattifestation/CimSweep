@@ -24,7 +24,7 @@ test_script:
         $Results = Get-ChildItem . -Directory -Recurse |
           Where-Object { $_.Name -ne 'Tests' } |
             Get-ChildItem -File -Include '*.ps1, *.psm1' |
-              Invoke-ScriptAnalyzer -ErrorAction SilentlyContinue
+              % { Invoke-ScriptAnalyzer -ErrorAction SilentlyContinue -Path $_.FullName -ExcludeRule PSShouldProcess }
         
         if ($Results) {
           Write-Host 'PSScriptAnalyzer returned errors/warnings that need to be addressed.'

@@ -165,7 +165,10 @@ Outputs objects representing autoruns entries similar to the output of Sysintern
         if (-not $AutoRunOptionCount) { $AutoRunOptionCount = 9 }
 
         # Helper function that maps a registry autorun artifact roughly to that of autoruns.exe output.
+        # Ignore PsScriptAnalyzer rule for this verb name. It is a helper function that doesn't
+        # modify system state.
         filter New-AutoRunsEntry {
+        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
             Param (
                 [Parameter(Position = 0, ValueFromPipelineByPropertyName = $True)]
                 [String]
