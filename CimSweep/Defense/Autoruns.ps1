@@ -51,10 +51,6 @@ Retrieve network provider artifacts
 
 Retrieve boot execute artifacts
 
-.PARAMETER NoProgressBar
-
-Do not display a progress bar. This parameter is designed to be used with wrapper functions.
-
 .PARAMETER CimSession
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
@@ -125,9 +121,6 @@ Outputs objects representing autoruns entries similar to the output of Sysintern
         [Switch]
         $BootExecute,
 
-        [Switch]
-        $NoProgressBar,
-
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
@@ -154,7 +147,6 @@ Outputs objects representing autoruns entries similar to the output of Sysintern
 
         $ParamCopy = $PSBoundParameters
         $null = $ParamCopy.Remove('CimSession')
-        $null = $ParamCopy.Remove('NoProgressBar')
         $null = $ParamCopy.Remove('OperationTimeoutSec')
 
         # Count the number of options provided for use of displaying a progress bar
@@ -236,11 +228,9 @@ Outputs objects representing autoruns entries similar to the output of Sysintern
             $ComputerName = $Session.ComputerName
             if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
 
-            if (-not $PSBoundParameters['NoProgressBar']) {
-                # Display a progress activity for each CIM session
-                Write-Progress -Id 1 -Activity 'CimSweep - Registry autoruns sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
-                $CurrentCIMSession++
-            }
+            # Display a progress activity for each CIM session
+            Write-Progress -Id 1 -Activity 'CimSweep - Registry autoruns sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+            $CurrentCIMSession++
 
             $CommonArgs = @{}
 
@@ -252,10 +242,8 @@ Outputs objects representing autoruns entries similar to the output of Sysintern
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['Logon']) {
                 $Category = 'Logon'
 
-                if (-not $PSBoundParameters['NoProgressBar']) {
-                    Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
-                    $CurrentAutorunCount++
-                }
+                Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
+                $CurrentAutorunCount++
 
                 Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\Terminal Server\Wds\rdpwd' -ValueName StartupPrograms @CommonArgs @Timeout |
                     New-AutoRunsEntry -Category $Category
@@ -318,10 +306,8 @@ Outputs objects representing autoruns entries similar to the output of Sysintern
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['BootExecute']) {
                 $Category = 'BootExecute'
 
-                if (-not $PSBoundParameters['NoProgressBar']) {
-                    Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
-                    $CurrentAutorunCount++
-                }
+                Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
+                $CurrentAutorunCount++
 
                 Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\Session Manager' -ValueNameOnly @CommonArgs @Timeout |
                     Where-Object { ('BootExecute','SetupExecute','Execute','S0InitialCommand') -contains $_.ValueName } | ForEach-Object {
@@ -336,10 +322,8 @@ Outputs objects representing autoruns entries similar to the output of Sysintern
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['PrintMonitors']) {
                 $Category = 'PrintMonitors'
 
-                if (-not $PSBoundParameters['NoProgressBar']) {
-                    Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
-                    $CurrentAutorunCount++
-                }
+                Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
+                $CurrentAutorunCount++
 
                 Get-CSRegistryKey -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\Print\Monitors' @CommonArgs @Timeout |
                     Get-CSRegistryValue -ValueName Driver @Timeout | ForEach-Object {
@@ -350,10 +334,8 @@ Outputs objects representing autoruns entries similar to the output of Sysintern
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['NetworkProviders']) {
                 $Category = 'NetworkProviders'
 
-                if (-not $PSBoundParameters['NoProgressBar']) {
-                    Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
-                    $CurrentAutorunCount++
-                }
+                Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
+                $CurrentAutorunCount++
 
                 $NetworkOrder = Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\NetworkProvider\Order' -ValueName ProviderOrder @CommonArgs @Timeout
 
@@ -367,10 +349,8 @@ Outputs objects representing autoruns entries similar to the output of Sysintern
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['LSAProviders']) {
                 $Category = 'LSAProviders'
 
-                if (-not $PSBoundParameters['NoProgressBar']) {
-                    Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
-                    $CurrentAutorunCount++
-                }
+                Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
+                $CurrentAutorunCount++
 
                 $SecProviders = Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\SecurityProviders' @CommonArgs @Timeout
                 $SecProviders | New-AutoRunsEntry -ImagePath "$($SecProviders.ValueContent)" -Category $Category
@@ -388,10 +368,8 @@ Outputs objects representing autoruns entries similar to the output of Sysintern
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['ImageHijacks']) {
                 $Category = 'ImageHijacks'
 
-                if (-not $PSBoundParameters['NoProgressBar']) {
-                    Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
-                    $CurrentAutorunCount++
-                }
+                Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
+                $CurrentAutorunCount++
 
                 $CommonKeys = @(
                     'SOFTWARE\Classes\htmlfile\shell\open\command',
@@ -475,10 +453,8 @@ Outputs objects representing autoruns entries similar to the output of Sysintern
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['AppInit']) {
                 $Category = 'AppInit'
 
-                if (-not $PSBoundParameters['NoProgressBar']) {
-                    Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
-                    $CurrentAutorunCount++
-                }
+                Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
+                $CurrentAutorunCount++
 
                 $null,'Wow6432Node\' | ForEach-Object {
                     Get-CSRegistryValue -Hive HKLM -SubKey "SOFTWARE\$($_)Microsoft\Windows NT\CurrentVersion\Windows" -ValueName 'AppInit_DLLs' @CommonArgs @Timeout |
@@ -494,10 +470,8 @@ Outputs objects representing autoruns entries similar to the output of Sysintern
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['KnownDLLs']) {
                 $Category = 'KnownDLLs'
 
-                if (-not $PSBoundParameters['NoProgressBar']) {
-                    Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
-                    $CurrentAutorunCount++
-                }
+                Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
+                $CurrentAutorunCount++
 
                 Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\CurrentControlSet\Control\Session Manager\KnownDLLs' @CommonArgs @Timeout |
                     New-AutoRunsEntry -Category $Category
@@ -506,10 +480,8 @@ Outputs objects representing autoruns entries similar to the output of Sysintern
             if (($PSCmdlet.ParameterSetName -ne 'SpecificCheck') -or $PSBoundParameters['Winlogon']) {
                 $Category = 'Winlogon'
 
-                if (-not $PSBoundParameters['NoProgressBar']) {
-                    Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
-                    $CurrentAutorunCount++
-                }
+                Write-Progress -Id 2 -ParentId 1 -Activity "   ($($CurrentAutorunCount+1)/$($AutoRunOptionCount)) Current autoruns type:" -Status $Category -PercentComplete (($CurrentAutorunCount / $AutoRunOptionCount) * 100)
+                $CurrentAutorunCount++
 
                 $CmdLine = Get-CSRegistryValue -Hive HKLM -SubKey 'SYSTEM\Setup' -ValueName 'CmdLine' @CommonArgs @Timeout
 
@@ -562,10 +534,6 @@ License: BSD 3-Clause
 
 Get-CSStartMenuEntry returns file information for all files present (excluding desktop.ini) in user and system-wide start menus.
 
-.PARAMETER NoProgressBar
-
-Do not display a progress bar. This parameter is designed to be used with wrapper functions.
-
 .PARAMETER CimSession
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
@@ -604,9 +572,6 @@ If a shortcut is present in the start menu, an instance of a Win32_ShortcutFile 
     [OutputType('Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_ShortcutFile')]
     [CmdletBinding()]
     param(
-        [Switch]
-        $NoProgressBar,
-        
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
@@ -637,23 +602,21 @@ If a shortcut is present in the start menu, an instance of a Win32_ShortcutFile 
             $ComputerName = $Session.ComputerName
             if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
 
-            if (-not $PSBoundParameters['NoProgressBar']) {
-                # Display a progress activity for each CIM session
-                Write-Progress -Id 1 -Activity 'CimSweep - Temp directory sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
-                $CurrentCIMSession++
-            }
+            # Display a progress activity for each CIM session
+            Write-Progress -Id 1 -Activity 'CimSweep - Temp directory sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+            $CurrentCIMSession++
 
             $CommonArgs = @{}
 
             if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
-            Get-CSShellFolderPath -SystemFolder -FolderName 'Common Startup' -NoProgressBar @CommonArgs @Timeout | ForEach-Object {
+            Get-CSShellFolderPath -SystemFolder -FolderName 'Common Startup' @CommonArgs @Timeout | ForEach-Object {
                 Get-CSDirectoryListing -DirectoryPath $_.ValueContent -File @CommonArgs @Timeout | Where-Object {
                     $_.FileName -ne 'desktop' -and $_.Extension -ne 'ini'
                 }
             }
 
-            Get-CSShellFolderPath -UserFolder -FolderName 'Startup' -NoProgressBar @CommonArgs @Timeout | ForEach-Object {
+            Get-CSShellFolderPath -UserFolder -FolderName 'Startup' @CommonArgs @Timeout | ForEach-Object {
                 Get-CSDirectoryListing -DirectoryPath $_.ValueContent -File @CommonArgs @Timeout | Where-Object {
                     $_.FileName -ne 'desktop' -and $_.Extension -ne 'ini'
                 }

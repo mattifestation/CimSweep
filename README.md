@@ -104,7 +104,7 @@ All of the following requirements will have an accompanying Pester test to ensur
 
 #### Optional design considerations.
 1. Your function should include a Pester test!!! How else can you be sure it works as designed and that it will be resiliant to refactoring? Without a Pester test, you'll just be left guessing as to whether or not your code will be stable in production.
-2. All defensive or offensive functions should implement a -NoProgressBar parameter and to output a progress bar by default. A progress bar can come in very handy when running a sweep across 1000 systems.
+2. All functions should utilize Write-Progress. A progress bar can come in very handy when running a sweep across 1000 systems.
 3. All error or verbose messages should include the computer name for the local or remote session. This is helpful when diagnosing issues on a large number of remote sessions.
 
 #### Additional design considerations

@@ -11,10 +11,6 @@ License: BSD 3-Clause
 
 Get-CSTypedURL retrieves URLs that were typed into the Internet Explorer URL bar.
 
-.PARAMETER NoProgressBar
-
-Do not display a progress bar. This parameter is designed to be used with wrapper functions.
-
 .PARAMETER CimSession
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
@@ -49,9 +45,6 @@ Outputs the registry values consisting of typed IE URLs.
     [CmdletBinding()]
     [OutputType('CimSweep.RegistryValue')]
     param(
-        [Switch]
-        $NoProgressBar,
-
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
@@ -82,11 +75,9 @@ Outputs the registry values consisting of typed IE URLs.
             $ComputerName = $Session.ComputerName
             if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
 
-            if (-not $PSBoundParameters['NoProgressBar']) {
-                # Display a progress activity for each CIM session
-                Write-Progress -Id 1 -Activity 'CimSweep - Internet Explorer typed URL sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
-                $CurrentCIMSession++
-            }
+            # Display a progress activity for each CIM session
+            Write-Progress -Id 1 -Activity 'CimSweep - Internet Explorer typed URL sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+            $CurrentCIMSession++
 
             $CommonArgs = @{}
 

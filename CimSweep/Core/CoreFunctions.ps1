@@ -661,10 +661,6 @@ License: BSD 3-Clause
 
 Get-CSEventLog lists the available event logs from which event entries can be retrieved via WMI. 
 
-.PARAMETER NoProgressBar
-
-Do not display a progress bar. This parameter is designed to be used with wrapper functions.
-
 .PARAMETER CimSession
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
@@ -703,9 +699,6 @@ Outputs objects representing the available event logs which can be piped to Get-
     [CmdletBinding()]
     [OutputType('CimSweep.EventLog')]
     param(
-        [Switch]
-        $NoProgressBar,
-
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
@@ -736,11 +729,9 @@ Outputs objects representing the available event logs which can be piped to Get-
             $ComputerName = $Session.ComputerName
             if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
 
-            if (-not $PSBoundParameters['NoProgressBar']) {
-                # Display a progress activity for each CIM session
-                Write-Progress -Id 1 -Activity 'CimSweep - Event log sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
-                $CurrentCIMSession++
-            }
+            # Display a progress activity for each CIM session
+            Write-Progress -Id 1 -Activity 'CimSweep - Event log sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+            $CurrentCIMSession++
 
             $CommonArgs = @{}
 
@@ -839,10 +830,6 @@ Specifies the desired properties to retrieve from Win32_Process instances. The f
 .PARAMETER CimSession
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
-
-.PARAMETER NoProgressBar
-
-Do not display a progress bar. This parameter is designed to be used with wrapper functions.
 
 .PARAMETER OperationTimeoutSec
 
@@ -963,11 +950,6 @@ Outputs Win32_NtLogEvent instances.
             'User')]
         $Property = @('LogFile', 'CategoryString', 'EventCode', 'EventIdentifier', 'Message', 'SourceName', 'TimeGenerated', 'Type'),
 
-        [Parameter(ParameterSetName='DefaultOutput')]
-        [Parameter(ParameterSetName='RestrictOutput')]
-        [Switch]
-        $NoProgressBar,
-
         [Parameter(ValueFromPipelineByPropertyName = $True, ParameterSetName='DefaultOutput')]
         [Parameter(ValueFromPipelineByPropertyName = $True, ParameterSetName='RestrictOutput')]
         [Alias('Session')]
@@ -1003,11 +985,9 @@ Outputs Win32_NtLogEvent instances.
             $ComputerName = $Session.ComputerName
             if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
 
-            if (-not $PSBoundParameters['NoProgressBar']) {
-                # Display a progress activity for each CIM session
-                Write-Progress -Id 1 -Activity 'CimSweep - Event log entry sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
-                $CurrentCIMSession++
-            }
+            # Display a progress activity for each CIM session
+            Write-Progress -Id 1 -Activity 'CimSweep - Event log entry sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+            $CurrentCIMSession++
 
             $CommonArgs = @{}
 
@@ -1687,10 +1667,6 @@ Specifies that the ACL for the service should be returned. -IncludeAcl will appe
 
 Specifies that the ACL file hosting the service be returned. -IncludeFileInfo will append a FileInfo property to each returned object. The FileInfo property is a CIM_DataFile instance.
 
-.PARAMETER NoProgressBar
-
-Do not display a progress bar. This parameter is designed to be used with wrapper functions.
-
 .PARAMETER CimSession
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
@@ -1819,11 +1795,6 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
 
         [Switch]
         $IncludeFileInfo,
-
-        [Parameter(ParameterSetName='DefaultOutput')]
-        [Parameter(ParameterSetName='RestrictOutput')]
-        [Switch]
-        $NoProgressBar,
 
         [Parameter(ParameterSetName='DefaultOutput')]
         [Parameter(ParameterSetName='RestrictOutput')]
@@ -1964,11 +1935,9 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
             $ComputerName = $Session.ComputerName
             if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
 
-            if (-not $PSBoundParameters['NoProgressBar']) {
-                # Display a progress activity for each CIM session
-                Write-Progress -Id 1 -Activity 'CimSweep - Service sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
-                $CurrentCIMSession++
-            }
+            # Display a progress activity for each CIM session
+            Write-Progress -Id 1 -Activity 'CimSweep - Service sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+            $CurrentCIMSession++
 
             $CommonArgs = @{}
 
@@ -2138,10 +2107,6 @@ Specifies that an explicit list of Win32_Process properties should be returned. 
 
 Specifies the desired properties to retrieve from Win32_Process instances. The following properties are returned when limited output is desired: ProcessId, ParentProcessId, Name, ExecutablePath, CommandLine
 
-.PARAMETER NoProgressBar
-
-Do not display a progress bar. This parameter is designed to be used with wrapper functions.
-
 .PARAMETER CimSession
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
@@ -2271,11 +2236,6 @@ Outputs Win32_Process instances.
 
         [Parameter(ParameterSetName='DefaultOutput')]
         [Parameter(ParameterSetName='RestrictOutput')]
-        [Switch]
-        $NoProgressBar,
-
-        [Parameter(ParameterSetName='DefaultOutput')]
-        [Parameter(ParameterSetName='RestrictOutput')]
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
@@ -2309,11 +2269,9 @@ Outputs Win32_Process instances.
             $ComputerName = $Session.ComputerName
             if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
 
-            if (-not $PSBoundParameters['NoProgressBar']) {
-                # Display a progress activity for each CIM session
-                Write-Progress -Id 1 -Activity 'CimSweep - Process sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
-                $CurrentCIMSession++
-            }
+            # Display a progress activity for each CIM session
+            Write-Progress -Id 1 -Activity 'CimSweep - Process sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+            $CurrentCIMSession++
 
             $CommonArgs = @{}
 
@@ -2363,10 +2321,6 @@ Specifies that only system-scope environment variables should be returned.
 .PARAMETER UserVariable
 
 Specifies that only user-scope environment variables should be returned.
-
-.PARAMETER NoProgressBar
-
-Do not display a progress bar. This parameter is designed to be used with wrapper functions.
 
 .PARAMETER CimSession
 
@@ -2432,9 +2386,6 @@ Outputs objects consisting of the name, value, and scope (user vs. system) of an
         [Switch]
         $UserVariable,
 
-        [Switch]
-        $NoProgressBar,
-
         [Parameter(ParameterSetName = 'Default')]
         [Parameter(ParameterSetName = 'System')]
         [Parameter(ParameterSetName = 'User')]
@@ -2473,11 +2424,9 @@ Outputs objects consisting of the name, value, and scope (user vs. system) of an
             $ComputerName = $Session.ComputerName
             if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
 
-            if (-not $PSBoundParameters['NoProgressBar']) {
-                # Display a progress activity for each CIM session
-                Write-Progress -Id 1 -Activity 'CimSweep - environment variable sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
-                $CurrentCIMSession++
-            }
+            # Display a progress activity for each CIM session
+            Write-Progress -Id 1 -Activity 'CimSweep - environment variable sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+            $CurrentCIMSession++
 
             $CommonArgs = @{}
 

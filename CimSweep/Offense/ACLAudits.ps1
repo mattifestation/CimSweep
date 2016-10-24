@@ -15,10 +15,6 @@ Get-CSVulnerableServicePermission is used to perform service ACL audits at scale
 
 Specifies that driver file permissions should be queried in addition to user-mode services. Read the notes section for more information about the limitations of driver audits.
 
-.PARAMETER NoProgressBar
-
-Do not display a progress bar. This parameter is designed to be used with wrapper functions.
-
 .PARAMETER CimSession
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
@@ -56,9 +52,6 @@ Service ACL sweep across a large amount of hosts will take a long time.
         [Switch]
         $IncludeDrivers,
 
-        [Switch]
-        $NoProgressBar,
-
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
@@ -93,11 +86,9 @@ Service ACL sweep across a large amount of hosts will take a long time.
             $ComputerName = $Session.ComputerName
             if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
 
-            if (-not $PSBoundParameters['NoProgressBar']) {
-                # Display a progress activity for each CIM session
-                Write-Progress -Id 1 -Activity 'CimSweep - Service ACL sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
-                $CurrentCIMSession++
-            }
+            # Display a progress activity for each CIM session
+            Write-Progress -Id 1 -Activity 'CimSweep - Service ACL sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+            $CurrentCIMSession++
 
             $CommonArgs = @{}
 
@@ -105,12 +96,10 @@ Service ACL sweep across a large amount of hosts will take a long time.
 
             $UserGrouping = @{}
 
-            Get-CSService -NoProgressBar -IncludeAcl -IncludeFileInfo @UserModeServices @CommonArgs @Timeout | ForEach-Object {
+            Get-CSService -IncludeAcl -IncludeFileInfo @UserModeServices @CommonArgs @Timeout | ForEach-Object {
                 $ServiceName = $_.Name
 
-                if (-not $PSBoundParameters['NoProgressBar']) {
-                    Write-Progress -Id 2 -ParentId 1 -Activity "   Current service:" -Status $ServiceName
-                }
+                Write-Progress -Id 2 -ParentId 1 -Activity "   Current service:" -Status $ServiceName
 
                 foreach ($FileDACL in $_.FileInfo.ACL.Access) {
                         $GroupName = $FileDACL.IdentityReference.ToString()

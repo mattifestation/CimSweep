@@ -1,5 +1,7 @@
 ﻿Set-StrictMode -Version Latest
 
+$ProgressPreference = 'Continue'
+
 $TestScriptRoot = Split-Path $MyInvocation.MyCommand.Path -Parent
 $ModuleRoot = Resolve-Path "$TestScriptRoot\.."
 $ModuleManifest = "$ModuleRoot\CimSweep.psd1"
@@ -329,28 +331,28 @@ Describe 'Get-CSRegistryValue' {
 
 Describe 'Get-CSEventLog' {
     It 'should return output' {
-        $Result = Get-CSEventLog -NoProgressBar | Select -First 1
+        $Result = Get-CSEventLog | Select -First 1
 
         $Result.LogName | Should Not BeNullOrEmpty
         $Result.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should return output with CIM sessions' {
-        $Result = Get-CSEventLog -NoProgressBar -CimSession $TestSessionArray | Select -First 1
+        $Result = Get-CSEventLog -CimSession $TestSessionArray | Select -First 1
 
         $Result.LogName | Should Not BeNullOrEmpty
         $Result.PSComputerName | Should BeExactly 'localhost'
     }
 
     It 'should return output and accept -OperationTimeoutSec' {
-        $Result = Get-CSEventLog -NoProgressBar -OperationTimeoutSec 3 | Select -First 1
+        $Result = Get-CSEventLog -OperationTimeoutSec 3 | Select -First 1
 
         $Result.LogName | Should Not BeNullOrEmpty
         $Result.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should return output with CIM sessions and accept -OperationTimeoutSec' {
-        $Result = Get-CSEventLog -NoProgressBar -CimSession $TestSessionArray -OperationTimeoutSec 3 | Select -First 1
+        $Result = Get-CSEventLog -CimSession $TestSessionArray -OperationTimeoutSec 3 | Select -First 1
 
         $Result.LogName | Should Not BeNullOrEmpty
         $Result.PSComputerName | Should BeExactly 'localhost'
@@ -359,39 +361,39 @@ Describe 'Get-CSEventLog' {
 
 Describe 'Get-CSEventLogEntry' {
     It 'should return nothing upon receiving an undefined entry type' {
-        { Get-CSEventLogEntry -EntryType Undefined -NoProgressBar } | Should Throw
+        { Get-CSEventLogEntry -EntryType Undefined } | Should Throw
     }
 
     It 'should accept all valid event entry types' {
-        { Get-CSEventLogEntry -EntryType Error -NoProgressBar | Select-Object -First 1 } | Should Not Throw
-        { Get-CSEventLogEntry -EntryType Warning -CimSession $TestCimSession1 -NoProgressBar | Select-Object -First 1 } | Should Not Throw
+        { Get-CSEventLogEntry -EntryType Error | Select-Object -First 1 } | Should Not Throw
+        { Get-CSEventLogEntry -EntryType Warning -CimSession $TestCimSession1 | Select-Object -First 1 } | Should Not Throw
     }
 
     It 'should return Win32_NtLogEvent instances' {
-        $Event = Get-CSEventLogEntry -NoProgressBar | Select-Object -First 1
+        $Event = Get-CSEventLogEntry | Select-Object -First 1
         $Event.PSObject.TypeNames[0] | Should BeExactly 'Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_NTLogEvent'
     }
 
     It 'should return nothing when it receives a non-existent LogName' {
-        Get-CSEventLogEntry -LogName NonExistentLog -NoProgressBar | Should BeNullOrEmpty
+        Get-CSEventLogEntry -LogName NonExistentLog | Should BeNullOrEmpty
     }
 
     It 'should return results when no LogName is specified (i.e. all logs implied)' {
-        $SystemEvent = Get-CSEventLogEntry -NoProgressBar | Select-Object -First 1
+        $SystemEvent = Get-CSEventLogEntry | Select-Object -First 1
         $SystemEvent | Should Not BeNullOrEmpty
         $SystemEvent.LogFile | Should Not BeNullOrEmpty
         $SystemEvent.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should return results when no LogName is specified (i.e. all logs implied) w/ CIM sessions' {
-        $SystemEvent = Get-CSEventLogEntry -CimSession $TestCimSession1 -NoProgressBar | Select-Object -First 1
+        $SystemEvent = Get-CSEventLogEntry -CimSession $TestCimSession1 | Select-Object -First 1
         $SystemEvent | Should Not BeNullOrEmpty
         $SystemEvent.LogFile | Should Not BeNullOrEmpty
         $SystemEvent.PSComputerName | Should BeExactly 'localhost'
     }
 
     It 'should return a System log entry' {
-        $SystemEvent = Get-CSEventLogEntry -LogName System -NoProgressBar | Select-Object -First 1
+        $SystemEvent = Get-CSEventLogEntry -LogName System | Select-Object -First 1
 
         $SystemEvent | Should Not BeNullOrEmpty
         $SystemEvent.LogFile | Should BeExactly 'System'
@@ -399,9 +401,9 @@ Describe 'Get-CSEventLogEntry' {
     }
 
     It 'should accept output from Get-CSEventLog' {
-        $SystemEvent = Get-CSEventLog -NoProgressBar |
+        $SystemEvent = Get-CSEventLog |
             Where-Object { $_.LogName -eq 'System' } |
-                Get-CSEventLogEntry -NoProgressBar | Select-Object -First 1
+                Get-CSEventLogEntry | Select-Object -First 1
 
         $SystemEvent | Should Not BeNullOrEmpty
         $SystemEvent.LogFile | Should BeExactly 'System'
@@ -409,7 +411,7 @@ Describe 'Get-CSEventLogEntry' {
     }
 
     It 'should return a System log entry w/ CIM sessions' {
-        $SystemEvent = Get-CSEventLogEntry -LogName System -CimSession $TestCimSession1 -NoProgressBar |
+        $SystemEvent = Get-CSEventLogEntry -LogName System -CimSession $TestCimSession1 |
             Select-Object -First 1
 
         $SystemEvent | Should Not BeNullOrEmpty
@@ -418,9 +420,9 @@ Describe 'Get-CSEventLogEntry' {
     }
 
     It 'should accept output from Get-CSEventLog w/ CIM sessions' {
-        $SystemEvent = Get-CSEventLog -CimSession $TestCimSession1 -NoProgressBar |
+        $SystemEvent = Get-CSEventLog -CimSession $TestCimSession1 |
             Where-Object { $_.LogName -eq 'System' } |
-                Get-CSEventLogEntry -NoProgressBar | Select-Object -First 1
+                Get-CSEventLogEntry | Select-Object -First 1
 
         $SystemEvent | Should Not BeNullOrEmpty
         $SystemEvent.LogFile | Should BeExactly 'System'
@@ -428,7 +430,7 @@ Describe 'Get-CSEventLogEntry' {
     }
 
     It 'should return a System log entry with stripped properties when -LimitOutput is provided' {
-        $SystemEvent = Get-CSEventLogEntry -LogName System -LimitOutput -NoProgressBar |
+        $SystemEvent = Get-CSEventLogEntry -LogName System -LimitOutput |
             Select-Object -First 1
 
         $SystemEvent | Should Not BeNullOrEmpty
@@ -439,7 +441,7 @@ Describe 'Get-CSEventLogEntry' {
     }
 
     It 'should return a log entry with only the LogFile property present' {
-        $SystemEvent = Get-CSEventLogEntry -Property Logfile -NoProgressBar |
+        $SystemEvent = Get-CSEventLogEntry -Property Logfile |
             Select-Object -First 1
 
         $SystemEvent | Should Not BeNullOrEmpty
@@ -450,7 +452,7 @@ Describe 'Get-CSEventLogEntry' {
     }
 
     It 'should return a log entry with only the LogFile property present w/ CIM sessions' {
-        $SystemEvent = Get-CSEventLogEntry -Property Logfile -CimSession $TestCimSession1 -NoProgressBar |
+        $SystemEvent = Get-CSEventLogEntry -Property Logfile -CimSession $TestCimSession1 |
             Select-Object -First 1
 
         $SystemEvent | Should Not BeNullOrEmpty
@@ -461,7 +463,7 @@ Describe 'Get-CSEventLogEntry' {
     }
 
     It 'should return a System log entry with stripped properties when -LimitOutput is provided w/ CIM sessions' {
-        $SystemEvent = Get-CSEventLogEntry -LogName System -CimSession $TestCimSession1 -LimitOutput -NoProgressBar |
+        $SystemEvent = Get-CSEventLogEntry -LogName System -CimSession $TestCimSession1 -LimitOutput |
             Select-Object -First 1
 
         $SystemEvent | Should Not BeNullOrEmpty
@@ -765,49 +767,49 @@ Describe 'Get-CSService' {
     $Win32SystemDriverType = 'Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_SystemDriver'
 
     It 'should return Win32_BaseService instances' {
-        $Service = Get-CSService -NoProgressBar | Select-Object -First 1
+        $Service = Get-CSService | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
         $Service.PSObject.TypeNames | Where-Object { $_ -eq $BaseServiceWMIType } | Should BeExactly $BaseServiceWMIType
         $Service.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should return Win32_BaseService instances w/ CIM sessions' {
-        $Service = Get-CSService -NoProgressBar -CimSession $TestCimSession1 | Select-Object -First 1
+        $Service = Get-CSService -CimSession $TestCimSession1 | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
         $Service.PSObject.TypeNames | Where-Object { $_ -eq $BaseServiceWMIType } | Should Be $BaseServiceWMIType
         $Service.PSComputerName | Should BeExactly 'localhost'
     }
 
     It 'should return kernel driver instances' {
-        $Service = Get-CSService -NoProgressBar -ServiceType 'Kernel Driver' | Select-Object -First 1
+        $Service = Get-CSService -ServiceType 'Kernel Driver' | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
         $Service.PSObject.TypeNames[0] | Should BeExactly $Win32SystemDriverType
         $Service.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should return kernel driver instances w/ CIM sessions' {
-        $Service = Get-CSService -NoProgressBar -ServiceType 'Kernel Driver' -CimSession $TestCimSession1 | Select-Object -First 1
+        $Service = Get-CSService -ServiceType 'Kernel Driver' -CimSession $TestCimSession1 | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
         $Service.PSObject.TypeNames[0] | Should BeExactly $Win32SystemDriverType
         $Service.PSComputerName | Should BeExactly 'localhost'
     }
 
     It 'should return user mode service instances' {
-        $Service = Get-CSService -NoProgressBar -ServiceType 'Share Process' | Select-Object -First 1
+        $Service = Get-CSService -ServiceType 'Share Process' | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
         $Service.PSObject.TypeNames[0] | Should BeExactly $Win32ServiceType
         $Service.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should return user mode service instances w/ CIM sessions' {
-        $Service = Get-CSService -NoProgressBar -ServiceType 'Share Process' -CimSession $TestCimSession1 | Select-Object -First 1
+        $Service = Get-CSService -ServiceType 'Share Process' -CimSession $TestCimSession1 | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
         $Service.PSObject.TypeNames[0] | Should BeExactly $Win32ServiceType
         $Service.PSComputerName | Should BeExactly 'localhost'
     }
 
     It 'should return a running service' {
-        $Service = Get-CSService -NoProgressBar -State Running | Select-Object -First 1
+        $Service = Get-CSService -State Running | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
         $Service.PSObject.TypeNames | Where-Object { $_ -eq $BaseServiceWMIType } | Should BeExactly $BaseServiceWMIType
         $Service.State | Should BeExactly 'Running'
@@ -825,7 +827,7 @@ Describe 'Get-CSService' {
     }
 
     It 'should return a running service w/ CIM sessions' {
-        $Service = Get-CSService -NoProgressBar -State Running -CimSession $TestCimSession1 | Select-Object -First 1
+        $Service = Get-CSService -State Running -CimSession $TestCimSession1 | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
         $Service.PSObject.TypeNames | Where-Object { $_ -eq $BaseServiceWMIType } | Should Be $BaseServiceWMIType
         $Service.State | Should BeExactly 'Running'
@@ -833,13 +835,13 @@ Describe 'Get-CSService' {
     }
 
     It 'should limit the output of its properties to a default set' {
-        $Service = Get-CSService -NoProgressBar -LimitOutput | Select-Object -First 1
+        $Service = Get-CSService -LimitOutput | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
         $Service.PSObject.TypeNames | Where-Object { $_ -eq $BaseServiceWMIType } | Should Be $BaseServiceWMIType
         $Service.StartMode | Should BeNullOrEmpty
         $Service.PSComputerName | Should BeNullOrEmpty
 
-        $Service = Get-CSService -NoProgressBar | Select-Object -First 1
+        $Service = Get-CSService | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
         $Service.PSObject.TypeNames | Where-Object { $_ -eq $BaseServiceWMIType } | Should Be $BaseServiceWMIType
         $Service.StartMode | Should Not BeNullOrEmpty
@@ -847,13 +849,13 @@ Describe 'Get-CSService' {
     }
 
     It 'should limit the output of its properties to a default set w/ CIM sessions' {
-        $Service = Get-CSService -NoProgressBar -LimitOutput -CimSession $TestCimSession1 | Select-Object -First 1
+        $Service = Get-CSService -LimitOutput -CimSession $TestCimSession1 | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
         $Service.PSObject.TypeNames | Where-Object { $_ -eq $BaseServiceWMIType } | Should Be $BaseServiceWMIType
         $Service.StartMode | Should BeNullOrEmpty
         $Service.PSComputerName | Should BeExactly 'localhost'
 
-        $Service = Get-CSService -NoProgressBar -CimSession $TestCimSession1 | Select-Object -First 1
+        $Service = Get-CSService -CimSession $TestCimSession1 | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
         $Service.PSObject.TypeNames | Where-Object { $_ -eq $BaseServiceWMIType } | Should Be $BaseServiceWMIType
         $Service.StartMode | Should Not BeNullOrEmpty
@@ -861,7 +863,7 @@ Describe 'Get-CSService' {
     }
 
     It 'should only include the specified property' {
-        $Service = Get-CSService -NoProgressBar -Property Name | Select-Object -First 1
+        $Service = Get-CSService -Property Name | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
         $Service.PSObject.TypeNames | Where-Object { $_ -eq $BaseServiceWMIType } | Should Be $BaseServiceWMIType
         $Service.Name | Should Not BeNullOrEmpty
@@ -870,7 +872,7 @@ Describe 'Get-CSService' {
     }
 
     It 'should only include the specified property w/ CIM sessions' {
-        $Service = Get-CSService -NoProgressBar -Property Name -CimSession $TestCimSession1 | Select-Object -First 1
+        $Service = Get-CSService -Property Name -CimSession $TestCimSession1 | Select-Object -First 1
         $Service | Should Not BeNullOrEmpty
         $Service.PSObject.TypeNames | Where-Object { $_ -eq $BaseServiceWMIType } | Should Be $BaseServiceWMIType
         $Service.Name | Should Not BeNullOrEmpty
@@ -883,15 +885,15 @@ Describe 'Get-CSProcess' {
     $ProcessWMIType = 'Microsoft.Management.Infrastructure.CimInstance#ROOT/cimv2/Win32_Process'
 
     It 'should return nothing when a nonexistent process name is specified' {
-        Get-CSProcess -Name nonexistentprocess -NoProgressBar | Should BeNullOrEmpty
+        Get-CSProcess -Name nonexistentprocess | Should BeNullOrEmpty
     }
 
     It 'should return nothing when a nonexistent process name is specified w/ CIM sessions' {
-        Get-CSProcess -Name nonexistentprocess -CimSession $TestCimSession1 -NoProgressBar | Should BeNullOrEmpty
+        Get-CSProcess -Name nonexistentprocess -CimSession $TestCimSession1 | Should BeNullOrEmpty
     }
 
     It 'should return the system process' {
-        $Process = Get-CSProcess -NoProgressBar -Name System -ProcessID 4 | Select-Object -First 1
+        $Process = Get-CSProcess -Name System -ProcessID 4 | Select-Object -First 1
         $Process | Should Not BeNullOrEmpty
         $Process.PSObject.TypeNames[0] | Should Be $ProcessWMIType
         $Process.Name | Should BeExactly 'System'
@@ -900,7 +902,7 @@ Describe 'Get-CSProcess' {
     }
 
     It 'should return the system process w/ CIM sessions' {
-        $Process = Get-CSProcess -NoProgressBar -Name System -ProcessID 4 -CimSession $TestCimSession1 | Select-Object -First 1
+        $Process = Get-CSProcess -Name System -ProcessID 4 -CimSession $TestCimSession1 | Select-Object -First 1
         $Process | Should Not BeNullOrEmpty
         $Process.PSObject.TypeNames[0] | Should Be $ProcessWMIType
         $Process.Name | Should BeExactly 'System'
@@ -910,7 +912,7 @@ Describe 'Get-CSProcess' {
 
     It 'should return a child process of the system process' {
         # This should always be smss.exe
-        $Process = Get-CSProcess -NoProgressBar -ParentProcessId 4 | Select-Object -First 1
+        $Process = Get-CSProcess -ParentProcessId 4 | Select-Object -First 1
         $Process | Should Not BeNullOrEmpty
         $Process.PSObject.TypeNames[0] | Should Be $ProcessWMIType
         $Process.PSComputerName | Should BeNullOrEmpty
@@ -918,35 +920,35 @@ Describe 'Get-CSProcess' {
 
     It 'should return a child process of the system process w/ CIM sessions' {
         # This should always be smss.exe
-        $Process = Get-CSProcess -NoProgressBar -ParentProcessId 4 -CimSession $TestCimSession1 | Select-Object -First 1
+        $Process = Get-CSProcess -ParentProcessId 4 -CimSession $TestCimSession1 | Select-Object -First 1
         $Process | Should Not BeNullOrEmpty
         $Process.PSObject.TypeNames[0] | Should Be $ProcessWMIType
         $Process.PSComputerName | Should BeExactly 'localhost'
     }
 
     It 'should return a process instance' {
-        $Process = Get-CSProcess -NoProgressBar | Select-Object -First 1
+        $Process = Get-CSProcess | Select-Object -First 1
         $Process | Should Not BeNullOrEmpty
         $Process.PSObject.TypeNames[0] | Should Be $ProcessWMIType
         $Process.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should return a process instance w/ CIM sessions' {
-        $Process = Get-CSProcess -NoProgressBar -CimSession $TestCimSession1 | Select-Object -First 1
+        $Process = Get-CSProcess -CimSession $TestCimSession1 | Select-Object -First 1
         $Process | Should Not BeNullOrEmpty
         $Process.PSObject.TypeNames[0] | Should Be $ProcessWMIType
         $Process.PSComputerName | Should BeExactly 'localhost'
     }
 
     It 'should limit the output of its properties to a default set' {
-        $Process = Get-CSProcess -NoProgressBar -LimitOutput | Select-Object -First 1
+        $Process = Get-CSProcess -LimitOutput | Select-Object -First 1
         $Process | Should Not BeNullOrEmpty
         $Process.PSObject.TypeNames -contains $ProcessWMIType | Should Be $True
         $Process.VM | Should BeNullOrEmpty
         $Process.Name | Should Not BeNullOrEmpty
         $Process.PSComputerName | Should BeNullOrEmpty
 
-        $Process = Get-CSProcess -NoProgressBar | Select-Object -First 1
+        $Process = Get-CSProcess | Select-Object -First 1
         $Process | Should Not BeNullOrEmpty
         $Process.PSObject.TypeNames -contains $ProcessWMIType | Should Be $True
         $Process.VM | Should Not BeNullOrEmpty
@@ -955,14 +957,14 @@ Describe 'Get-CSProcess' {
     }
 
     It 'should limit the output of its properties to a default set w/ CIM sessions' {
-        $Process = Get-CSProcess -NoProgressBar -LimitOutput -CimSession $TestCimSession1 | Select-Object -First 1
+        $Process = Get-CSProcess -LimitOutput -CimSession $TestCimSession1 | Select-Object -First 1
         $Process | Should Not BeNullOrEmpty
         $Process.PSObject.TypeNames -contains $ProcessWMIType | Should Be $True
         $Process.VM | Should BeNullOrEmpty
         $Process.Name | Should Not BeNullOrEmpty
         $Process.PSComputerName | Should BeExactly 'localhost'
 
-        $Process = Get-CSProcess -NoProgressBar -CimSession $TestCimSession1 | Select-Object -First 1
+        $Process = Get-CSProcess -CimSession $TestCimSession1 | Select-Object -First 1
         $Process | Should Not BeNullOrEmpty
         $Process.PSObject.TypeNames -contains $ProcessWMIType | Should Be $True
         $Process.VM | Should Not BeNullOrEmpty
@@ -971,7 +973,7 @@ Describe 'Get-CSProcess' {
     }
 
     It 'should only include the specified property' {
-        $Process = Get-CSProcess -NoProgressBar -Property Name | Select-Object -First 1
+        $Process = Get-CSProcess -Property Name | Select-Object -First 1
         $Process | Should Not BeNullOrEmpty
         $Process.PSObject.TypeNames -contains $ProcessWMIType | Should Be $True
         $Process.VM | Should BeNullOrEmpty
@@ -980,7 +982,7 @@ Describe 'Get-CSProcess' {
     }
 
     It 'should only include the specified property w/ CIM sessions' {
-        $Process = Get-CSProcess -NoProgressBar -Property Name -CimSession $TestCimSession1 | Select-Object -First 1
+        $Process = Get-CSProcess -Property Name -CimSession $TestCimSession1 | Select-Object -First 1
         $Process | Should Not BeNullOrEmpty
         $Process.PSObject.TypeNames -contains $ProcessWMIType | Should Be $True
         $Process.VM | Should BeNullOrEmpty
@@ -991,7 +993,7 @@ Describe 'Get-CSProcess' {
 
 Describe 'Get-CSEnvironmentVariable' {
     It 'should return a populated environment variable' {
-        $EnvVar = Get-CSEnvironmentVariable -NoProgressBar | Select-Object -First 1
+        $EnvVar = Get-CSEnvironmentVariable | Select-Object -First 1
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should Not BeNullOrEmpty
         $EnvVar.User | Should Not BeNullOrEmpty
@@ -1000,7 +1002,7 @@ Describe 'Get-CSEnvironmentVariable' {
     }
 
     It 'should return a populated environment variable w/ CIM sessions' {
-        $EnvVar = Get-CSEnvironmentVariable -CimSession $TestCimSession1 -NoProgressBar | Select-Object -First 1
+        $EnvVar = Get-CSEnvironmentVariable -CimSession $TestCimSession1 | Select-Object -First 1
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should Not BeNullOrEmpty
         $EnvVar.User | Should Not BeNullOrEmpty
@@ -1009,7 +1011,7 @@ Describe 'Get-CSEnvironmentVariable' {
     }
 
     It 'should return a populated system environment variable' {
-        $EnvVar = Get-CSEnvironmentVariable -SystemVariable -NoProgressBar | Select-Object -First 1
+        $EnvVar = Get-CSEnvironmentVariable -SystemVariable | Select-Object -First 1
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should Not BeNullOrEmpty
         $EnvVar.User | Should BeExactly '<SYSTEM>'
@@ -1018,7 +1020,7 @@ Describe 'Get-CSEnvironmentVariable' {
     }
 
     It 'should return a populated system environment variable w/ CIM sessions' {
-        $EnvVar = Get-CSEnvironmentVariable -SystemVariable -CimSession $TestCimSession1 -NoProgressBar | Select-Object -First 1
+        $EnvVar = Get-CSEnvironmentVariable -SystemVariable -CimSession $TestCimSession1 | Select-Object -First 1
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should Not BeNullOrEmpty
         $EnvVar.User | Should BeExactly '<SYSTEM>'
@@ -1027,7 +1029,7 @@ Describe 'Get-CSEnvironmentVariable' {
     }
 
     It 'should return a populated user environment variable' {
-        $EnvVar = Get-CSEnvironmentVariable -UserVariable -NoProgressBar | Select-Object -First 1
+        $EnvVar = Get-CSEnvironmentVariable -UserVariable | Select-Object -First 1
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should Not BeNullOrEmpty
         $EnvVar.User | Should Not BeNullOrEmpty
@@ -1037,7 +1039,7 @@ Describe 'Get-CSEnvironmentVariable' {
     }
 
     It 'should return a populated user environment variable w/ CIM sessions' {
-        $EnvVar = Get-CSEnvironmentVariable -UserVariable -CimSession $TestCimSession1 -NoProgressBar | Select-Object -First 1
+        $EnvVar = Get-CSEnvironmentVariable -UserVariable -CimSession $TestCimSession1 | Select-Object -First 1
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should Not BeNullOrEmpty
         $EnvVar.User | Should Not BeNullOrEmpty
@@ -1047,7 +1049,7 @@ Describe 'Get-CSEnvironmentVariable' {
     }
 
     It 'should return a named environment variable' {
-        $EnvVar = Get-CSEnvironmentVariable -VariableName TEMP -NoProgressBar | Select-Object -First 1
+        $EnvVar = Get-CSEnvironmentVariable -VariableName TEMP | Select-Object -First 1
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should BeExactly 'TEMP'
         $EnvVar.User | Should Not BeNullOrEmpty
@@ -1056,7 +1058,7 @@ Describe 'Get-CSEnvironmentVariable' {
     }
 
     It 'should return a named environment variable w/ CIM sessions' {
-        $EnvVar = Get-CSEnvironmentVariable -VariableName TEMP -CimSession $TestCimSession1 -NoProgressBar | Select-Object -First 1
+        $EnvVar = Get-CSEnvironmentVariable -VariableName TEMP -CimSession $TestCimSession1 | Select-Object -First 1
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should BeExactly 'TEMP'
         $EnvVar.User | Should Not BeNullOrEmpty
@@ -1065,7 +1067,7 @@ Describe 'Get-CSEnvironmentVariable' {
     }
 
     It 'should return a named system environment variable' {
-        $EnvVar = Get-CSEnvironmentVariable -SystemVariable -VariableName TEMP -NoProgressBar | Select-Object -First 1
+        $EnvVar = Get-CSEnvironmentVariable -SystemVariable -VariableName TEMP | Select-Object -First 1
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should BeExactly 'TEMP'
         $EnvVar.User | Should BeExactly '<SYSTEM>'
@@ -1074,7 +1076,7 @@ Describe 'Get-CSEnvironmentVariable' {
     }
 
     It 'should return a named system environment variable w/ CIM sessions' {
-        $EnvVar = Get-CSEnvironmentVariable -SystemVariable -VariableName TEMP -CimSession $TestCimSession1 -NoProgressBar | Select-Object -First 1
+        $EnvVar = Get-CSEnvironmentVariable -SystemVariable -VariableName TEMP -CimSession $TestCimSession1 | Select-Object -First 1
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should BeExactly 'TEMP'
         $EnvVar.User | Should BeExactly '<SYSTEM>'
@@ -1083,7 +1085,7 @@ Describe 'Get-CSEnvironmentVariable' {
     }
 
     It 'should return a named user environment variable' {
-        $EnvVar = Get-CSEnvironmentVariable -UserVariable -VariableName TEMP -NoProgressBar | Select-Object -First 1
+        $EnvVar = Get-CSEnvironmentVariable -UserVariable -VariableName TEMP | Select-Object -First 1
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should BeExactly 'TEMP'
         $EnvVar.User | Should Not BeNullOrEmpty
@@ -1093,7 +1095,7 @@ Describe 'Get-CSEnvironmentVariable' {
     }
 
     It 'should return a named user environment variable w/ CIM sessions' {
-        $EnvVar = Get-CSEnvironmentVariable -UserVariable -VariableName TEMP -CimSession $TestCimSession1 -NoProgressBar | Select-Object -First 1
+        $EnvVar = Get-CSEnvironmentVariable -UserVariable -VariableName TEMP -CimSession $TestCimSession1 | Select-Object -First 1
         $EnvVar | Should Not BeNullOrEmpty
         $EnvVar.Name | Should BeExactly 'TEMP'
         $EnvVar.User | Should Not BeNullOrEmpty

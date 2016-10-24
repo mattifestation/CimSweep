@@ -11,10 +11,6 @@ License: BSD 3-Clause
 
 The ability to remotely query scheduled tasks was not introduced until Windows 8. Get-CSScheduledTaskFile offers the next best thing by simply scanning %SystemRoot%\Windows\Tasks.
 
-.PARAMETER NoProgressBar
-
-Do not display a progress bar. This parameter is designed to be used with wrapper functions.
-
 .PARAMETER CimSession
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
@@ -49,9 +45,6 @@ Outputs CIM_DataFile instances representing task XML files.
     [CmdletBinding()]
     [OutputType('Microsoft.Management.Infrastructure.CimInstance#root/cimv2/CIM_DataFile')]
     param(
-        [Switch]
-        $NoProgressBar,
-
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
@@ -82,11 +75,9 @@ Outputs CIM_DataFile instances representing task XML files.
             $ComputerName = $Session.ComputerName
             if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
 
-            if (-not $PSBoundParameters['NoProgressBar']) {
-                # Display a progress activity for each CIM session
-                Write-Progress -Id 1 -Activity 'CimSweep - Scheduled task file sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
-                $CurrentCIMSession++
-            }
+            # Display a progress activity for each CIM session
+            Write-Progress -Id 1 -Activity 'CimSweep - Scheduled task file sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+            $CurrentCIMSession++
 
             $CommonArgs = @{}
 
@@ -104,18 +95,14 @@ Outputs CIM_DataFile instances representing task XML files.
                 Write-Verbose "[$ComputerName] Windows directory task path: $WindowsTaskDir"
 
                 $WindowsTaskDir, $SystemTaskDir | ForEach-Object {
-                    if (-not $PSBoundParameters['NoProgressBar']) {
-                        Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status $_
-                    }
+                    Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status $_
 
                     # List tasks in root directory
                     Get-CSDirectoryListing -DirectoryPath $_ -File @CommonArgs @Timeout
 
                     # Start by only retrieving directory info recursively. This is a performance enhancement
                     Get-CSDirectoryListing -DirectoryPath $_ -Recurse -Directory -DoNotDetectRecursiveDirs @CommonArgs @Timeout | ForEach-Object {
-                        if (-not $PSBoundParameters['NoProgressBar']) {
-                            Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status ($_.Name)
-                        }
+                        Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status ($_.Name)
 
                         # Get task file information for each subdirectory
                         $_ | Get-CSDirectoryListing -File @CommonArgs @Timeout
@@ -152,10 +139,6 @@ Specifies that only system-level shell folders should be retrieved.
 .PARAMETER UserFolder
 
 Specifies that only user-specific shell folders should be retrieved.
-
-.PARAMETER NoProgressBar
-
-Do not display a progress bar. This parameter is designed to be used with wrapper functions.
 
 .PARAMETER CimSession
 
@@ -241,9 +224,6 @@ Outputs a list of registry values representing shell folder paths.
         [Switch]
         $UserFolder,
 
-        [Switch]
-        $NoProgressBar,
-
         [Parameter(ParameterSetName = 'Default')]
         [Parameter(ParameterSetName = 'System')]
         [Parameter(ParameterSetName = 'User')]
@@ -276,14 +256,12 @@ Outputs a list of registry values representing shell folder paths.
 
     PROCESS {
         foreach ($Session in $CimSession) {
-            if (-not $PSBoundParameters['NoProgressBar']) {
-                $ComputerName = $Session.ComputerName
-                if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
+            $ComputerName = $Session.ComputerName
+            if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
 
-                # Display a progress activity for each CIM session
-                Write-Progress -Id 1 -Activity 'CimSweep - Shell folder path sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
-                $CurrentCIMSession++
-            }
+            # Display a progress activity for each CIM session
+            Write-Progress -Id 1 -Activity 'CimSweep - Shell folder path sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+            $CurrentCIMSession++
 
             $CommonArgs = @{}
 
@@ -354,10 +332,6 @@ Specifies that only system-level temp directories should be retrieved.
 
 Specifies that only user-specific temp directories should be retrieved.
 
-.PARAMETER NoProgressBar
-
-Do not display a progress bar. This parameter is designed to be used with wrapper functions.
-
 .PARAMETER DoNotRecurse
 
 Only list files in the root directory.
@@ -426,12 +400,6 @@ Outputs CIM_DataFile instances of files present in the specified temp directory 
         [Parameter(ParameterSetName = 'Default')]
         [Parameter(ParameterSetName = 'System')]
         [Parameter(ParameterSetName = 'User')]
-        [Switch]
-        $NoProgressBar,
-
-        [Parameter(ParameterSetName = 'Default')]
-        [Parameter(ParameterSetName = 'System')]
-        [Parameter(ParameterSetName = 'User')]
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
@@ -465,11 +433,9 @@ Outputs CIM_DataFile instances of files present in the specified temp directory 
             $ComputerName = $Session.ComputerName
             if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
 
-            if (-not $PSBoundParameters['NoProgressBar']) {
-                # Display a progress activity for each CIM session
-                Write-Progress -Id 1 -Activity 'CimSweep - Temp directory sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
-                $CurrentCIMSession++
-            }
+            # Display a progress activity for each CIM session
+            Write-Progress -Id 1 -Activity 'CimSweep - Temp directory sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+            $CurrentCIMSession++
 
             $CommonArgs = @{}
 
@@ -477,23 +443,19 @@ Outputs CIM_DataFile instances of files present in the specified temp directory 
 
             if (($PSCmdlet.ParameterSetName -eq 'System') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
                 # Get system temp path from the registry
-                $SystemTempPath = Get-CSEnvironmentVariable -SystemVariable -VariableName TEMP -NoProgressBar @CommonArgs @Timeout
+                $SystemTempPath = Get-CSEnvironmentVariable -SystemVariable -VariableName TEMP @CommonArgs @Timeout
 
                 if ($SystemTempPath.VariableValue) {
                     Write-Verbose "[$ComputerName] User temp directory: $($SystemTempPath.VariableValue)"
 
-                    if (-not $PSBoundParameters['NoProgressBar']) {
-                        Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status $SystemTempPath.VariableValue
-                    }
+                    Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status $SystemTempPath.VariableValue
 
                     # Display files in the root temp dir
                     Get-CSDirectoryListing -DirectoryPath $SystemTempPath.VariableValue -File @TargetExtensions @CommonArgs @Timeout
 
                     if (-not $PSBoundParameters['DoNotRecurse']) {
                         Get-CSDirectoryListing -DirectoryPath $SystemTempPath.VariableValue -Directory -Recurse @CommonArgs @Timeout | ForEach-Object {
-                            if (-not $PSBoundParameters['NoProgressBar']) {
-                                Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status ($_.Name)
-                            }
+                            Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status ($_.Name)
 
                             $_ | Get-CSDirectoryListing -File @TargetExtensions @Timeout
                         }
@@ -505,8 +467,8 @@ Outputs CIM_DataFile instances of files present in the specified temp directory 
 
             if (($PSCmdlet.ParameterSetName -eq 'User') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
                 # Get user %USERPROFILE% and validate the end of %TEMP%. The root path of %TEMP% is not often not resolved properly.
-                $UserProfiles = Get-CSEnvironmentVariable -UserVariable -VariableName USERPROFILE -NoProgressBar @CommonArgs @Timeout
-                $TempVars = Get-CSEnvironmentVariable -UserVariable -VariableName TEMP -NoProgressBar @CommonArgs @Timeout
+                $UserProfiles = Get-CSEnvironmentVariable -UserVariable -VariableName USERPROFILE @CommonArgs @Timeout
+                $TempVars = Get-CSEnvironmentVariable -UserVariable -VariableName TEMP @CommonArgs @Timeout
 
                 foreach ($UserProfile in $UserProfiles) {
                     $TempVars | Where-Object { $_.User -eq $UserProfile.User } | ForEach-Object {
@@ -528,18 +490,14 @@ Outputs CIM_DataFile instances of files present in the specified temp directory 
                         if ($ExpectedPathObtained) {
                             Write-Verbose "[$ComputerName] User temp directory: $FullTempPath"
 
-                            if (-not $PSBoundParameters['NoProgressBar']) {
-                                Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status $FullTempPath
-                            }
+                            Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status $FullTempPath
 
                             # Display files in the root temp dir
                             Get-CSDirectoryListing -DirectoryPath $FullTempPath -File @TargetExtensions @CommonArgs @Timeout
 
                             if (-not $PSBoundParameters['DoNotRecurse']) {
                                 Get-CSDirectoryListing -DirectoryPath $FullTempPath -Directory -Recurse @CommonArgs @Timeout | ForEach-Object {
-                                    if (-not $PSBoundParameters['NoProgressBar']) {
-                                        Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status ($_.Name)
-                                    }
+                                    Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status ($_.Name)
 
                                     $_ | Get-CSDirectoryListing -File @TargetExtensions @Timeout
                                 }
@@ -568,10 +526,6 @@ Get-CSLowILPathFile lists files present in user low-integrity folders. This can 
 .PARAMETER Extension
 
 Specifies that only files of a certain extension should be returned. When specifying extensions, do not include a dot - e.g. 'exe', 'dll', 'sys'.
-
-.PARAMETER NoProgressBar
-
-Do not display a progress bar. This parameter is designed to be used with wrapper functions.
 
 .PARAMETER DoNotRecurse
 
@@ -618,9 +572,6 @@ Outputs CIM_DataFile instances of files present in low-integrity level directori
         [Switch]
         $DoNotRecurse,
 
-        [Switch]
-        $NoProgressBar,
-
         [Parameter(ValueFromPipeline = $True)]
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
@@ -655,34 +606,28 @@ Outputs CIM_DataFile instances of files present in low-integrity level directori
             $ComputerName = $Session.ComputerName
             if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
 
-            if (-not $PSBoundParameters['NoProgressBar']) {
-                # Display a progress activity for each CIM session
-                Write-Progress -Id 1 -Activity 'CimSweep - Low integrity level directory sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
-                $CurrentCIMSession++
-            }
+            # Display a progress activity for each CIM session
+            Write-Progress -Id 1 -Activity 'CimSweep - Low integrity level directory sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+            $CurrentCIMSession++
 
             $CommonArgs = @{}
 
             if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
-            Get-CSEnvironmentVariable -UserVariable -VariableName LOCALAPPDATA -NoProgressBar @CommonArgs @Timeout | ForEach-Object {
+            Get-CSEnvironmentVariable -UserVariable -VariableName LOCALAPPDATA @CommonArgs @Timeout | ForEach-Object {
                 Write-Verbose "[$ComputerName] LocalAppData path: $($_.VariableValue)"
 
                 if ($_.VariableValue) {
                     $LocalLowPath = "$($_.VariableValue)Low"
 
-                    if (-not $PSBoundParameters['NoProgressBar']) {
-                        Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status $LocalLowPath
-                    }
+                    Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status $LocalLowPath
 
                     # List all files in the root low IL dir
                     Get-CSDirectoryListing -DirectoryPath $LocalLowPath -File @TargetExtensions @CommonArgs @Timeout
 
                     if (-not $PSBoundParameters['DoNotRecurse']) {
                         Get-CSDirectoryListing -DirectoryPath $LocalLowPath -Recurse -Directory @CommonArgs @Timeout | ForEach-Object {
-                            if (-not $PSBoundParameters['NoProgressBar']) {
-                                Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status ($_.Name)
-                            }
+                            Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status ($_.Name)
 
                             $_ | Get-CSDirectoryListing -File @TargetExtensions @Timeout
                         }
