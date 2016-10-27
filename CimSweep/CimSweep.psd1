@@ -1,7 +1,7 @@
 ﻿@{
 RootModule = 'CimSweep.psm1'
 
-ModuleVersion = '0.5.1.0'
+ModuleVersion = '0.5.2.0'
 
 GUID = 'f347ef1c-d752-4d07-bf68-3197c0aa661a'
 
@@ -35,7 +35,8 @@ FunctionsToExport = @(
     'Get-CSWmiNamespace',
     'Get-CSVulnerableServicePermission',
     'Get-CSAVInfo',
-    'Get-CSProxyConfig'
+    'Get-CSProxyConfig',
+    'Get-CSInstalledAppCompatShimDatabase'
 )
 
 PrivateData = @{
@@ -48,6 +49,14 @@ PrivateData = @{
         ProjectUri = 'https://github.com/PowerShellMafia/CimSweep'
 
         ReleaseNotes = @'
+0.5.2
+-----
+Enhancements:
+* Added Get-CSInstalledAppCompatShimDatabase
+
+Removed:
+* Removed the -NoProgressBar parameter from all functions since this is what $ProgressPreference is for.
+
 0.5.1
 -----
 Enhancements:
