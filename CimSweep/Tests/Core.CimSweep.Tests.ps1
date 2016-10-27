@@ -571,7 +571,7 @@ Describe 'Get-CSDirectoryListing' {
     }
 
     It 'should recurse one folder deep by piping output to itself' {
-        $ConfigDir = Get-CSDirectoryListing -DirectoryPath $SystemDirectory -Directory | Where-Object { $_.Name -eq "$SystemDirectory\config" }
+        $ConfigDir = Get-CSDirectoryListing -DirectoryPath $SystemDirectory -Directory | Where-Object { $_.Name -eq "$SystemDirectory\drivers" }
         $ConfigDirListing = $ConfigDir | Get-CSDirectoryListing | Select-Object -First 1
 
         $ConfigDirListing | Should Not BeNullOrEmpty
