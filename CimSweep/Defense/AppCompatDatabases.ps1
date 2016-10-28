@@ -33,7 +33,7 @@ Lists all installed app compat databases.
 
 CimSweep.AppCompatDB
 
-Outputs objects representing the relevant information regarding installed application compatibility databases. Note: the InstallDateTime property is a UTC datet
+Outputs objects representing the relevant information regarding installed application compatibility databases. Note: the InstallDateTime property is a UTC datetime.
 #>
 
     [CmdletBinding()]
