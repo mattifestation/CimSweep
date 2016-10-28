@@ -19,14 +19,6 @@ Specifies that driver file permissions should be queried in addition to user-mod
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
 
-.PARAMETER OperationTimeoutSec
-
-Specifies the amount of time that the cmdlet waits for a response from the computer.
-
-By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
-
-If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
-
 .EXAMPLE
 
 Get-CSVulnerableServicePermission
@@ -55,11 +47,7 @@ Service ACL sweep across a large amount of hosts will take a long time.
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession,
-
-        [UInt32]
-        [Alias('OT')]
-        $OperationTimeoutSec
+        $CimSession
     )
 
     BEGIN {
@@ -76,9 +64,6 @@ Service ACL sweep across a large amount of hosts will take a long time.
         if (-not $IncludeDrivers) {
             $UserModeServices['UserModeServices'] = $True
         }
-
-        $Timeout = @{}
-        if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
     }
 
     PROCESS {
@@ -96,7 +81,7 @@ Service ACL sweep across a large amount of hosts will take a long time.
 
             $UserGrouping = @{}
 
-            Get-CSService -IncludeAcl -IncludeFileInfo @UserModeServices @CommonArgs @Timeout | ForEach-Object {
+            Get-CSService -IncludeAcl -IncludeFileInfo @UserModeServices @CommonArgs | ForEach-Object {
                 $ServiceName = $_.Name
 
                 Write-Progress -Id 2 -ParentId 1 -Activity "   Current service:" -Status $ServiceName

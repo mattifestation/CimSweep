@@ -31,14 +31,6 @@ Gets the registry keys in the specified subkey as well as all child keys.
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
 
-.PARAMETER OperationTimeoutSec
-
-Specifies the amount of time that the cmdlet waits for a response from the computer.
-
-By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
-
-If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
-
 .EXAMPLE
 
 Get-CSRegistryKey -Hive HKLM
@@ -97,11 +89,7 @@ It is not recommended to recursively list all registry keys from most parent key
         [Parameter(ValueFromPipelineByPropertyName = $True)]
         [Alias('Session')]
         [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession,
-
-        [UInt32]
-        [Alias('OT')]
-        $OperationTimeoutSec
+        $CimSession
     )
 
     BEGIN {
@@ -112,9 +100,6 @@ It is not recommended to recursively list all registry keys from most parent key
 
         $AddAcl = @{}
         if ($PSBoundParameters['IncludeAcl']) { $AddAcl['IncludeAcl'] = $True }
-
-        $Timeout = @{}
-        if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
     }
 
     PROCESS {
@@ -149,7 +134,7 @@ It is not recommended to recursively list all registry keys from most parent key
 
             $CimMethodArgs['Arguments'] = $RegistryMethodArgs
 
-            $Result = Invoke-CimMethod @CimMethodArgs @Timeout
+            $Result = Invoke-CimMethod @CimMethodArgs
 
             if ($Result.sNames) {
                 foreach ($KeyName in $Result.sNames) {
@@ -214,7 +199,7 @@ It is not recommended to recursively list all registry keys from most parent key
                         $ObjectProperties.Remove('PSTypeName')
                         $ObjectProperties.Remove('PSComputerName')
                         $ObjectProperties.Remove('ACL')
-                        Get-CSRegistryKey @ObjectProperties @Timeout @AddAcl -Recurse
+                        Get-CSRegistryKey @ObjectProperties @AddAcl -Recurse
                     }
                 }
             }
@@ -258,14 +243,6 @@ Specifies that the content of the registry value should not be received. This sw
 .PARAMETER CimSession
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
-
-.PARAMETER OperationTimeoutSec
-
-Specifies the amount of time that the cmdlet waits for a response from the computer.
-
-By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
-
-If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
 
 .EXAMPLE
 
@@ -349,11 +326,7 @@ Outputs a list of objects representing registry value names, their respective ty
         [Parameter(ValueFromPipelineByPropertyName = $True)]
         [Alias('Session')]
         [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession,
-
-        [UInt32]
-        [Alias('OT')]
-        $OperationTimeoutSec
+        $CimSession
     )
 
     BEGIN {
@@ -361,9 +334,6 @@ Outputs a list of objects representing registry value names, their respective ty
         if (-not $PSBoundParameters['CimSession']) {
             $CimSession = ''
         }
-
-        $Timeout = @{}
-        if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
 
         $Type = @{
             0  = 'REG_NONE'
@@ -465,7 +435,7 @@ Outputs a list of objects representing registry value names, their respective ty
                 $ValueContent = $null
 
                 if (-not $PSBoundParameters['ValueNameOnly']) {
-                    $Result = Invoke-CimMethod @CimMethodArgs @Timeout
+                    $Result = Invoke-CimMethod @CimMethodArgs
 
                     if ($Result.ReturnValue -eq 0) {
                         $ValueContent = $Result."$ReturnProp"
@@ -495,7 +465,7 @@ Outputs a list of objects representing registry value names, their respective ty
 
                 $CimMethodArgs['Arguments'] = $RegistryMethodArgs
 
-                $Result = Invoke-CimMethod @CimMethodArgs @Timeout
+                $Result = Invoke-CimMethod @CimMethodArgs
 
                 # Only progress if EnumValues returns actual value and type data
                 if ($Result.Types.Length) {
@@ -584,7 +554,7 @@ Outputs a list of objects representing registry value names, their respective ty
                             $ValueContent = $null
 
                             if (-not $PSBoundParameters['ValueNameOnly']) {
-                                $Result2 = Invoke-CimMethod @CimMethod2Args @Timeout
+                                $Result2 = Invoke-CimMethod @CimMethod2Args
 
                                 if ($Result2.ReturnValue -eq 0) {
                                     $ValueContent = $Result2."$ReturnProp"
@@ -629,14 +599,6 @@ Get-CSEventLog lists the available event logs from which event entries can be re
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
 
-.PARAMETER OperationTimeoutSec
-
-Specifies the amount of time that the cmdlet waits for a response from the computer.
-
-By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
-
-If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
-
 .NOTES
 
 Get-CSEventLog is useful for determining which event log to filter off of in Get-CSEventLogEntry.
@@ -666,11 +628,7 @@ Outputs objects representing the available event logs which can be piped to Get-
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession,
-
-        [UInt32]
-        [Alias('OT')]
-        $OperationTimeoutSec
+        $CimSession
     )
 
     BEGIN {
@@ -683,9 +641,6 @@ Outputs objects representing the available event logs which can be piped to Get-
         }
 
         $CurrentCIMSession = 0
-
-        $Timeout = @{}
-        if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
     }
 
     PROCESS {
@@ -701,7 +656,7 @@ Outputs objects representing the available event logs which can be piped to Get-
 
             if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
-            Get-CimInstance -ClassName Win32_NTEventlogFile -Property LogfileName @CommonArgs @Timeout | ForEach-Object {
+            Get-CimInstance -ClassName Win32_NTEventlogFile -Property LogfileName @CommonArgs | ForEach-Object {
                 $ObjectProperties = [Ordered] @{
                     PSTypeName = 'CimSweep.EventLog'
                     LogName = $_.LogfileName
@@ -782,14 +737,6 @@ Specifies the desired properties to retrieve from Win32_Process instances. The f
 .PARAMETER CimSession
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
-
-.PARAMETER OperationTimeoutSec
-
-Specifies the amount of time that the cmdlet waits for a response from the computer.
-
-By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
-
-If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
 
 .EXAMPLE
 
@@ -907,11 +854,7 @@ Outputs Win32_NtLogEvent instances.
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession,
-
-        [UInt32]
-        [Alias('OT')]
-        $OperationTimeoutSec
+        $CimSession
     )
 
     BEGIN {
@@ -927,9 +870,6 @@ Outputs Win32_NtLogEvent instances.
 
         $PropertyList = @{}
         if ($PSBoundParameters['LimitOutput'] -or $PSBoundParameters['Property']) { $PropertyList['Property'] = $Property }
-
-        $Timeout = @{}
-        if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
     }
 
     PROCESS {
@@ -978,7 +918,7 @@ Outputs Win32_NtLogEvent instances.
                 $EventLogEntryArgs['Filter'] = $Filter
             }
 
-            Get-CimInstance -ClassName Win32_NTLogEvent @CommonArgs @EventLogEntryArgs @PropertyList @Timeout
+            Get-CimInstance -ClassName Win32_NTLogEvent @CommonArgs @EventLogEntryArgs @PropertyList
         }
     }
 }
@@ -999,14 +939,6 @@ Get-CSMountedVolumeDriveLetter lists the drive letters of mounted drives. This i
 .PARAMETER CimSession
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
-
-.PARAMETER OperationTimeoutSec
-
-Specifies the amount of time that the cmdlet waits for a response from the computer.
-
-By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
-
-If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
 
 .EXAMPLE
 
@@ -1033,11 +965,7 @@ Outputs a list of mounted drive letters.
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession,
-
-        [UInt32]
-        [Alias('OT')]
-        $OperationTimeoutSec
+        $CimSession
     )
 
     BEGIN {
@@ -1045,9 +973,6 @@ Outputs a list of mounted drive letters.
         if (-not $PSBoundParameters['CimSession']) {
             $CimSession = ''
         }
-
-        $Timeout = @{}
-        if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
     }
 
     PROCESS {
@@ -1059,7 +984,7 @@ Outputs a list of mounted drive letters.
 
             if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
-            $Result = Get-CimInstance -ClassName Win32_LogicalDisk -Property DeviceID @CommonArgs @Timeout
+            $Result = Get-CimInstance -ClassName Win32_LogicalDisk -Property DeviceID @CommonArgs
 
             foreach ($Volume in $Result) {
                 if ($Volume.DeviceID) {
@@ -1171,14 +1096,6 @@ Recurse on all child directories.
 .PARAMETER CimSession
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
-
-.PARAMETER OperationTimeoutSec
-
-Specifies the amount of time that the cmdlet waits for a response from the computer.
-
-By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
-
-If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
 
 .EXAMPLE
 
@@ -1324,11 +1241,7 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
         [Parameter(ValueFromPipelineByPropertyName = $True)]
         [Alias('Session')]
         [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession,
-
-        [UInt32]
-        [Alias('OT')]
-        $OperationTimeoutSec
+        $CimSession
     )
 
     BEGIN {
@@ -1336,9 +1249,6 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
         if (-not $PSBoundParameters['CimSession']) {
             $CimSession = ''
         }
-
-        $Timeout = @{}
-        if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
     }
 
     PROCESS {
@@ -1380,7 +1290,7 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
             # Only obtain directory information if -File was not specified
             if (-not $PSBoundParameters['File']) {
                 # Get all directories present in the specified folder
-                Get-CimInstance @CommonArgs @DirArguments @Timeout | ForEach-Object {
+                Get-CimInstance @CommonArgs @DirArguments | ForEach-Object {
                     $DirObject = $_
 
                     # Append the CimSession instance. This enables piping Get-CSDirectoryListing to itself
@@ -1494,7 +1404,7 @@ Filter parameters in Get-CSDirectoryListing only apply to files, not directories
                 }
 
                 # Get all files present in the specified folder
-                Get-CimInstance @CommonArgs @FileArguments @Timeout | ForEach-Object {
+                Get-CimInstance @CommonArgs @FileArguments | ForEach-Object {
                     $Object = $_
                     Add-Member -InputObject $Object -MemberType NoteProperty -Name CimSession -Value $CimSession
 
@@ -1610,14 +1520,6 @@ Specifies that the ACL file hosting the service be returned. -IncludeFileInfo wi
 .PARAMETER CimSession
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
-
-.PARAMETER OperationTimeoutSec
-
-Specifies the amount of time that the cmdlet waits for a response from the computer.
-
-By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
-
-If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
 
 .EXAMPLE
 
@@ -1741,11 +1643,7 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession,
-
-        [UInt32]
-        [Alias('OT')]
-        $OperationTimeoutSec
+        $CimSession
     )
 
     BEGIN {
@@ -1761,9 +1659,6 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
 
         $PropertyList = @{}
         if ($PSBoundParameters['LimitOutput'] -or $PSBoundParameters['Property']) { $PropertyList['Property'] = $Property }
-
-        $Timeout = @{}
-        if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
 
         <#
         # This won't compile using Add-Type in Nano Server TP5 due to
@@ -1904,7 +1799,7 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
             if ($UserModeServices -and (-not $Drivers)) { $ClassName = 'Win32_Service' }
             if ($Drivers -and (-not $UserModeServices)) { $ClassName = 'Win32_SystemDriver' }
 
-            Get-CimInstance -ClassName $ClassName @CommonArgs @ServiceEntryArgs @PropertyList @Timeout | ForEach-Object {
+            Get-CimInstance -ClassName $ClassName @CommonArgs @ServiceEntryArgs @PropertyList | ForEach-Object {
                 $CurrentService = $_
 
                 $IsWin32Service = $CurrentService.PSTypeNames -contains 'Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Service'
@@ -2051,14 +1946,6 @@ Specifies the desired properties to retrieve from Win32_Process instances. The f
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
 
-.PARAMETER OperationTimeoutSec
-
-Specifies the amount of time that the cmdlet waits for a response from the computer.
-
-By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
-
-If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
-
 .EXAMPLE
 
 Get-CSProcess
@@ -2179,11 +2066,7 @@ Outputs Win32_Process instances.
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession,
-
-        [UInt32]
-        [Alias('OT')]
-        $OperationTimeoutSec
+        $CimSession
     )
 
     BEGIN {
@@ -2196,9 +2079,6 @@ Outputs Win32_Process instances.
         }
 
         $CurrentCIMSession = 0
-
-        $Timeout = @{}
-        if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
 
         $PropertyList = @{}
         if ($PSBoundParameters['LimitOutput'] -or $PSBoundParameters['Property']) { $PropertyList['Property'] = $Property }
@@ -2232,7 +2112,7 @@ Outputs Win32_Process instances.
                 $ProcessEntryArgs['Filter'] = $Filter
             }
 
-            Get-CimInstance -ClassName Win32_Process @CommonArgs @ProcessEntryArgs @PropertyList @Timeout
+            Get-CimInstance -ClassName Win32_Process @CommonArgs @ProcessEntryArgs @PropertyList
         }
     }
 }
@@ -2265,14 +2145,6 @@ Specifies that only user-scope environment variables should be returned.
 .PARAMETER CimSession
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
-
-.PARAMETER OperationTimeoutSec
-
-Specifies the amount of time that the cmdlet waits for a response from the computer.
-
-By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
-
-If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
 
 .EXAMPLE
 
@@ -2332,11 +2204,7 @@ Outputs objects consisting of the name, value, and scope (user vs. system) of an
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession,
-
-        [UInt32]
-        [Alias('OT')]
-        $OperationTimeoutSec
+        $CimSession
     )
 
     BEGIN {
@@ -2374,7 +2242,7 @@ Outputs objects consisting of the name, value, and scope (user vs. system) of an
             # Performance enhancements are realized when specifying a specific environment variable name.
             if ($PSBoundParameters['VariableName']) {
                 if (($PSCmdlet.ParameterSetName -eq 'System') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
-                    $Result = Get-CSRegistryValue -Hive HKLM -SubKey $SystemEnvPath -ValueName $VariableName -ValueType REG_SZ @CommonArgs @Timeout
+                    $Result = Get-CSRegistryValue -Hive HKLM -SubKey $SystemEnvPath -ValueName $VariableName -ValueType REG_SZ @CommonArgs
 
                     if ($Result.ValueContent) {
                         $ObjectProperties = [Ordered] @{
@@ -2393,11 +2261,11 @@ Outputs objects consisting of the name, value, and scope (user vs. system) of an
 
                 if (($PSCmdlet.ParameterSetName -eq 'User') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
                     # Get the SIDS for each user in the registry
-                    $HKUSIDs = Get-HKUSID @CommonArgs @Timeout
+                    $HKUSIDs = Get-HKUSID @CommonArgs
 
                     # Iterate over each local user hive
                     foreach ($SID in $HKUSIDs) {
-                        $Result = Get-CSRegistryValue -Hive HKU -SubKey "$SID\Volatile Environment" -ValueName $VariableName -ValueType REG_SZ @CommonArgs @Timeout
+                        $Result = Get-CSRegistryValue -Hive HKU -SubKey "$SID\Volatile Environment" -ValueName $VariableName -ValueType REG_SZ @CommonArgs
 
                         if ($Result.ValueContent) {
                             $ObjectProperties = [Ordered] @{
@@ -2413,7 +2281,7 @@ Outputs objects consisting of the name, value, and scope (user vs. system) of an
 
                             [PSCustomObject] $ObjectProperties
                         } else {
-                            $Result = Get-CSRegistryValue -Hive HKU -SubKey "$SID\Environment" -ValueName $VariableName -ValueType REG_SZ @CommonArgs @Timeout
+                            $Result = Get-CSRegistryValue -Hive HKU -SubKey "$SID\Environment" -ValueName $VariableName -ValueType REG_SZ @CommonArgs
 
                             if ($Result.ValueContent) {
                                 $ObjectProperties = [Ordered] @{
@@ -2433,7 +2301,7 @@ Outputs objects consisting of the name, value, and scope (user vs. system) of an
                 }
             } else { # Retrieve all environment variables
                 if (($PSCmdlet.ParameterSetName -eq 'System') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
-                    Get-CSRegistryValue -Hive HKLM -SubKey $SystemEnvPath @CommonArgs @Timeout | ForEach-Object {
+                    Get-CSRegistryValue -Hive HKLM -SubKey $SystemEnvPath @CommonArgs | ForEach-Object {
                         $ObjectProperties = [Ordered] @{
                             PSTypeName = $ObjectType
                             Name = $_.ValueName
@@ -2450,11 +2318,11 @@ Outputs objects consisting of the name, value, and scope (user vs. system) of an
 
                 if (($PSCmdlet.ParameterSetName -eq 'User') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
                     # Get the SIDS for each user in the registry
-                    $HKUSIDs = Get-HKUSID @CommonArgs @Timeout
+                    $HKUSIDs = Get-HKUSID @CommonArgs
 
                     # Iterate over each local user hive
                     foreach ($SID in $HKUSIDs) {
-                        Get-CSRegistryValue -Hive HKU -SubKey "$SID\Volatile Environment" @CommonArgs @Timeout | ForEach-Object {
+                        Get-CSRegistryValue -Hive HKU -SubKey "$SID\Volatile Environment" @CommonArgs | ForEach-Object {
                             $ObjectProperties = [Ordered] @{
                                 PSTypeName = $ObjectType
                                 Name = $_.ValueName
@@ -2468,7 +2336,7 @@ Outputs objects consisting of the name, value, and scope (user vs. system) of an
                             [PSCustomObject] $ObjectProperties
                         }
 
-                        Get-CSRegistryValue -Hive HKU -SubKey "$SID\Environment" @CommonArgs @Timeout | ForEach-Object {
+                        Get-CSRegistryValue -Hive HKU -SubKey "$SID\Environment" @CommonArgs | ForEach-Object {
                             $ObjectProperties = [Ordered] @{
                                 PSTypeName = $ObjectType
                                 Name = $_.ValueName
@@ -2517,14 +2385,6 @@ Specifies that the ACL for the namespace should be returned. -IncludeAcl will ap
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
 
-.PARAMETER OperationTimeoutSec
-
-Specifies the amount of time that the cmdlet waits for a response from the computer.
-
-By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
-
-If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
-
 .EXAMPLE
 
 Get-CSWmiNamespace
@@ -2570,11 +2430,7 @@ Microsoft.Management.Infrastructure.CimInstance#root/__NAMESPACE
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession,
-
-        [UInt32]
-        [Alias('OT')]
-        $OperationTimeoutSec
+        $CimSession
     )
 
     BEGIN {
@@ -2582,9 +2438,6 @@ Microsoft.Management.Infrastructure.CimInstance#root/__NAMESPACE
         if (-not $PSBoundParameters['CimSession']) {
             $CimSession = ''
         }
-
-        $Timeout = @{}
-        if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
 
         $RecurseArg = @{}
         if ($Recurse) { $RecurseArg['Recurse'] = $True }
@@ -2674,7 +2527,7 @@ Microsoft.Management.Infrastructure.CimInstance#root/__NAMESPACE
                         MethodName = 'GetSecurityDescriptor'
                     }
 
-                    $GetSDResult = Invoke-CimMethod @GetSDArgs @CommonArgs @Timeout -ErrorAction SilentlyContinue
+                    $GetSDResult = Invoke-CimMethod @GetSDArgs @CommonArgs -ErrorAction SilentlyContinue
 
                     if ($GetSDResult.ReturnValue -eq 0) {
                         $Win32SDToBinarySDArgs = @{
@@ -2685,7 +2538,7 @@ Microsoft.Management.Infrastructure.CimInstance#root/__NAMESPACE
                             }
                         }
 
-                        $ConversionResult = Invoke-CimMethod @Win32SDToBinarySDArgs @CommonArgs @Timeout
+                        $ConversionResult = Invoke-CimMethod @Win32SDToBinarySDArgs @CommonArgs
 
                         if ($ConversionResult.ReturnValue -eq 0) {
                             $NamespaceSD = [Activator]::CreateInstance($NamespaceSecurityType)
@@ -2705,7 +2558,7 @@ Microsoft.Management.Infrastructure.CimInstance#root/__NAMESPACE
                 $_
 
                 if ($Recurse) {
-                    Get-CSWmiNamespace -Namespace $FullyQualifiedNamespace @CommonArgs @RecurseArg @IncludeAclArg @Timeout
+                    Get-CSWmiNamespace -Namespace $FullyQualifiedNamespace @CommonArgs @RecurseArg @IncludeAclArg
                 }
             }
         }

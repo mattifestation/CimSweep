@@ -39,11 +39,6 @@ Describe 'Get-CSRegistryKey' {
             { Get-CSRegistryKey -Hive HKLM -CimSession $TestCimSession1 } | Should Not BeNullOrEmpty
             { Get-CSRegistryKey -Hive HKLM -CimSession $TestSessionArray } | Should Not BeNullOrEmpty
         }
-
-        It 'should accept -OperationTimeoutSec' {
-            { Get-CSRegistryKey -Hive HKLM -OperationTimeoutSec 3 } | Should Not Throw
-            { Get-CSRegistryKey -Hive HKLM -OperationTimeoutSec 3 -CimSession $TestCimSession1 } | Should Not Throw
-        }
     }
 
     Context 'expected behavior' {
@@ -128,11 +123,6 @@ Describe 'Get-CSRegistryValue' {
             { Get-CSRegistryValue -Hive HKLM -SubKey $CurrentVersionPath -CimSession $TestSessionArray } | Should Not Throw
             { Get-CSRegistryValue -Hive HKLM -SubKey $CurrentVersionPath -CimSession $TestCimSession1 } | Should Not BeNullOrEmpty
             { Get-CSRegistryValue -Hive HKLM -SubKey $CurrentVersionPath -CimSession $TestSessionArray } | Should Not BeNullOrEmpty
-        }
-
-        It 'should accept -OperationTimeoutSec' {
-            { Get-CSRegistryValue -Hive HKLM -SubKey $CurrentVersionPath -OperationTimeoutSec 3 } | Should Not Throw
-            { Get-CSRegistryValue -Hive HKLM -SubKey $CurrentVersionPath -OperationTimeoutSec 3 -CimSession $TestCimSession1 } | Should Not Throw
         }
     }
 
@@ -319,19 +309,6 @@ Describe 'Get-CSEventLog' {
         $Result.LogName | Should Not BeNullOrEmpty
         $Result.PSComputerName | Should BeExactly 'localhost'
     }
-
-    It 'should return output and accept -OperationTimeoutSec' {
-        $Result = Get-CSEventLog -OperationTimeoutSec 3 | Select -First 1
-
-        $Result.LogName | Should Not BeNullOrEmpty
-    }
-
-    It 'should return output with CIM sessions and accept -OperationTimeoutSec' {
-        $Result = Get-CSEventLog -CimSession $TestSessionArray -OperationTimeoutSec 3 | Select -First 1
-
-        $Result.LogName | Should Not BeNullOrEmpty
-        $Result.PSComputerName | Should BeExactly 'localhost'
-    }
 }
 
 Describe 'Get-CSEventLogEntry' {
@@ -465,14 +442,6 @@ Describe 'Get-CSMountedVolumeDriveLetter' {
         $Drive.DriveLetter | Should Match '^[A-Z]$'
         $Drive.DirectoryPath | Should Match "^$($Drive.DriveLetter):\\`$"
         $Drive.PSComputerName | Should BeExactly 'localhost'
-    }
-
-    It 'should accept -OperationTimeoutSec' {
-        $Drive = Get-CSMountedVolumeDriveLetter -OperationTimeoutSec 3 | Select-Object -First 1
-
-        $Drive | Should Not BeNullOrEmpty
-        $Drive.DriveLetter | Should Match '^[A-Z]$'
-        $Drive.DirectoryPath | Should Match "^$($Drive.DriveLetter):\\`$"
     }
 }
 
@@ -1100,11 +1069,6 @@ Describe 'Get-CSWmiNamespace' {
             { Get-CSWmiNamespace -CimSession $TestSessionArray -ErrorAction Stop } | Should Not Throw
             { Get-CSWmiNamespace -CimSession $TestCimSession1 -ErrorAction Stop } | Should Not BeNullOrEmpty
             { Get-CSWmiNamespace -CimSession $TestSessionArray -ErrorAction Stop } | Should Not BeNullOrEmpty
-        }
-
-        It 'should accept -OperationTimeoutSec' {
-            { Get-CSWmiNamespace -OperationTimeoutSec 3 -ErrorAction Stop } | Should Not Throw
-            { Get-CSWmiNamespace -OperationTimeoutSec 3 -CimSession $TestCimSession1 -ErrorAction Stop } | Should Not Throw
         }
     }
 

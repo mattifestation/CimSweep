@@ -15,14 +15,6 @@ The ability to remotely query scheduled tasks was not introduced until Windows 8
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
 
-.PARAMETER OperationTimeoutSec
-
-Specifies the amount of time that the cmdlet waits for a response from the computer.
-
-By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
-
-If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
-
 .EXAMPLE
 
 Get-CSScheduledTaskFile
@@ -48,11 +40,7 @@ Outputs CIM_DataFile instances representing task XML files.
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession,
-
-        [UInt32]
-        [Alias('OT')]
-        $OperationTimeoutSec
+        $CimSession
     )
 
     BEGIN {
@@ -65,9 +53,6 @@ Outputs CIM_DataFile instances representing task XML files.
         }
 
         $CurrentCIMSession = 0
-
-        $Timeout = @{}
-        if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
     }
 
     PROCESS {
@@ -83,7 +68,7 @@ Outputs CIM_DataFile instances representing task XML files.
 
             if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
-            $OSInfo = Get-CimInstance -ClassName Win32_OperatingSystem -Property SystemDirectory, WindowsDirectory @CommonArgs @Timeout
+            $OSInfo = Get-CimInstance -ClassName Win32_OperatingSystem -Property SystemDirectory, WindowsDirectory @CommonArgs
 
             if ($OSInfo.SystemDirectory -and $OSInfo.WindowsDirectory) {
                 # %SystemRoot%\System32\Tasks
@@ -98,14 +83,14 @@ Outputs CIM_DataFile instances representing task XML files.
                     Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status $_
 
                     # List tasks in root directory
-                    Get-CSDirectoryListing -DirectoryPath $_ -File @CommonArgs @Timeout
+                    Get-CSDirectoryListing -DirectoryPath $_ -File @CommonArgs
 
                     # Start by only retrieving directory info recursively. This is a performance enhancement
-                    Get-CSDirectoryListing -DirectoryPath $_ -Recurse -Directory -DoNotDetectRecursiveDirs @CommonArgs @Timeout | ForEach-Object {
+                    Get-CSDirectoryListing -DirectoryPath $_ -Recurse -Directory -DoNotDetectRecursiveDirs @CommonArgs | ForEach-Object {
                         Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status ($_.Name)
 
                         # Get task file information for each subdirectory
-                        $_ | Get-CSDirectoryListing -File @CommonArgs @Timeout
+                        $_ | Get-CSDirectoryListing -File @CommonArgs
                     }
                 }
             } else {
@@ -270,23 +255,23 @@ Outputs a list of registry values representing shell folder paths.
             # Get a precise registry value if a specific folder is specified. This is a performance enhancement.
             if ($PSBoundParameters['FolderName']) {
                 if (($PSCmdlet.ParameterSetName -eq 'System') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
-                    Get-CSRegistryValue -Hive HKLM -SubKey $ShellFolders -ValueName $FolderName -ValueType REG_SZ @CommonArgs @Timeout |
+                    Get-CSRegistryValue -Hive HKLM -SubKey $ShellFolders -ValueName $FolderName -ValueType REG_SZ @CommonArgs |
                         Where-Object { $_.ValueContent }
                 }
 
                 if (($PSCmdlet.ParameterSetName -eq 'User') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
                     # Get the SIDS for each user in the registry
-                    $HKUSIDs = Get-HKUSID @CommonArgs @Timeout
+                    $HKUSIDs = Get-HKUSID @CommonArgs
 
                     # Iterate over each local user hive
                     foreach ($SID in $HKUSIDs) {
-                        Get-CSRegistryValue -Hive HKU -SubKey "$SID\$ShellFolders" -ValueName $FolderName -ValueType REG_SZ @CommonArgs @Timeout |
+                        Get-CSRegistryValue -Hive HKU -SubKey "$SID\$ShellFolders" -ValueName $FolderName -ValueType REG_SZ @CommonArgs |
                             Where-Object { $_.ValueContent }
                     }
                 }
             } else { # Otherwise, retrieve all shell folders
                 if (($PSCmdlet.ParameterSetName -eq 'System') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
-                    Get-CSRegistryValue -Hive HKLM -SubKey $ShellFolders -ValueNameOnly @CommonArgs @Timeout | 
+                    Get-CSRegistryValue -Hive HKLM -SubKey $ShellFolders -ValueNameOnly @CommonArgs | 
                         Where-Object { -not $_.ValueName.StartsWith('!') -and -not $_.ValueName.StartsWith('{') } |
                         Get-CSRegistryValue
                 }
@@ -297,7 +282,7 @@ Outputs a list of registry values representing shell folder paths.
 
                     # Iterate over each local user hive
                     foreach ($SID in $HKUSIDs) {
-                        Get-CSRegistryValue -Hive HKU -SubKey "$SID\$ShellFolders" -ValueNameOnly @CommonArgs @Timeout | 
+                        Get-CSRegistryValue -Hive HKU -SubKey "$SID\$ShellFolders" -ValueNameOnly @CommonArgs | 
                             Where-Object { -not $_.ValueName.StartsWith('!') -and -not $_.ValueName.StartsWith('{') } |
                             Get-CSRegistryValue
                     }
@@ -443,7 +428,7 @@ Outputs CIM_DataFile instances of files present in the specified temp directory 
 
             if (($PSCmdlet.ParameterSetName -eq 'System') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
                 # Get system temp path from the registry
-                $SystemTempPath = Get-CSEnvironmentVariable -SystemVariable -VariableName TEMP @CommonArgs @Timeout
+                $SystemTempPath = Get-CSEnvironmentVariable -SystemVariable -VariableName TEMP @CommonArgs
 
                 if ($SystemTempPath.VariableValue) {
                     Write-Verbose "[$ComputerName] User temp directory: $($SystemTempPath.VariableValue)"
@@ -451,13 +436,13 @@ Outputs CIM_DataFile instances of files present in the specified temp directory 
                     Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status $SystemTempPath.VariableValue
 
                     # Display files in the root temp dir
-                    Get-CSDirectoryListing -DirectoryPath $SystemTempPath.VariableValue -File @TargetExtensions @CommonArgs @Timeout
+                    Get-CSDirectoryListing -DirectoryPath $SystemTempPath.VariableValue -File @TargetExtensions @CommonArgs
 
                     if (-not $PSBoundParameters['DoNotRecurse']) {
-                        Get-CSDirectoryListing -DirectoryPath $SystemTempPath.VariableValue -Directory -Recurse @CommonArgs @Timeout | ForEach-Object {
+                        Get-CSDirectoryListing -DirectoryPath $SystemTempPath.VariableValue -Directory -Recurse @CommonArgs | ForEach-Object {
                             Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status ($_.Name)
 
-                            $_ | Get-CSDirectoryListing -File @TargetExtensions @Timeout
+                            $_ | Get-CSDirectoryListing -File @TargetExtensions
                         }
                     }
                 } else {
@@ -467,8 +452,8 @@ Outputs CIM_DataFile instances of files present in the specified temp directory 
 
             if (($PSCmdlet.ParameterSetName -eq 'User') -or ($PSCmdlet.ParameterSetName -eq 'Default')) {
                 # Get user %USERPROFILE% and validate the end of %TEMP%. The root path of %TEMP% is not often not resolved properly.
-                $UserProfiles = Get-CSEnvironmentVariable -UserVariable -VariableName USERPROFILE @CommonArgs @Timeout
-                $TempVars = Get-CSEnvironmentVariable -UserVariable -VariableName TEMP @CommonArgs @Timeout
+                $UserProfiles = Get-CSEnvironmentVariable -UserVariable -VariableName USERPROFILE @CommonArgs
+                $TempVars = Get-CSEnvironmentVariable -UserVariable -VariableName TEMP @CommonArgs
 
                 foreach ($UserProfile in $UserProfiles) {
                     $TempVars | Where-Object { $_.User -eq $UserProfile.User } | ForEach-Object {
@@ -493,13 +478,13 @@ Outputs CIM_DataFile instances of files present in the specified temp directory 
                             Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status $FullTempPath
 
                             # Display files in the root temp dir
-                            Get-CSDirectoryListing -DirectoryPath $FullTempPath -File @TargetExtensions @CommonArgs @Timeout
+                            Get-CSDirectoryListing -DirectoryPath $FullTempPath -File @TargetExtensions @CommonArgs
 
                             if (-not $PSBoundParameters['DoNotRecurse']) {
-                                Get-CSDirectoryListing -DirectoryPath $FullTempPath -Directory -Recurse @CommonArgs @Timeout | ForEach-Object {
+                                Get-CSDirectoryListing -DirectoryPath $FullTempPath -Directory -Recurse @CommonArgs | ForEach-Object {
                                     Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status ($_.Name)
 
-                                    $_ | Get-CSDirectoryListing -File @TargetExtensions @Timeout
+                                    $_ | Get-CSDirectoryListing -File @TargetExtensions
                                 }
                             }
                         }
@@ -614,7 +599,7 @@ Outputs CIM_DataFile instances of files present in low-integrity level directori
 
             if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
-            Get-CSEnvironmentVariable -UserVariable -VariableName LOCALAPPDATA @CommonArgs @Timeout | ForEach-Object {
+            Get-CSEnvironmentVariable -UserVariable -VariableName LOCALAPPDATA @CommonArgs | ForEach-Object {
                 Write-Verbose "[$ComputerName] LocalAppData path: $($_.VariableValue)"
 
                 if ($_.VariableValue) {
@@ -623,13 +608,13 @@ Outputs CIM_DataFile instances of files present in low-integrity level directori
                     Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status $LocalLowPath
 
                     # List all files in the root low IL dir
-                    Get-CSDirectoryListing -DirectoryPath $LocalLowPath -File @TargetExtensions @CommonArgs @Timeout
+                    Get-CSDirectoryListing -DirectoryPath $LocalLowPath -File @TargetExtensions @CommonArgs
 
                     if (-not $PSBoundParameters['DoNotRecurse']) {
-                        Get-CSDirectoryListing -DirectoryPath $LocalLowPath -Recurse -Directory @CommonArgs @Timeout | ForEach-Object {
+                        Get-CSDirectoryListing -DirectoryPath $LocalLowPath -Recurse -Directory @CommonArgs | ForEach-Object {
                             Write-Progress -Id 2 -ParentId 1 -Activity "Current directory:" -Status ($_.Name)
 
-                            $_ | Get-CSDirectoryListing -File @TargetExtensions @Timeout
+                            $_ | Get-CSDirectoryListing -File @TargetExtensions
                         }
                     }
                 }

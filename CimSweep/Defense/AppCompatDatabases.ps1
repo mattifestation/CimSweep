@@ -15,14 +15,6 @@ Get-InstalledAppCompatShimDatabase lists details about all installed application
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
 
-.PARAMETER OperationTimeoutSec
-
-Specifies the amount of time that the cmdlet waits for a response from the computer.
-
-By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
-
-If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
-
 .EXAMPLE
 
 Get-CSRegistryAutoStart
@@ -42,11 +34,7 @@ Outputs objects representing the relevant information regarding installed applic
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession,
-
-        [UInt32]
-        [Alias('OT')]
-        $OperationTimeoutSec
+        $CimSession
     )
 
     BEGIN {
@@ -59,9 +47,6 @@ Outputs objects representing the relevant information regarding installed applic
         }
 
         $CurrentCIMSession = 0
-
-        $Timeout = @{}
-        if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
     }
 
     PROCESS {
@@ -78,10 +63,10 @@ Outputs objects representing the relevant information regarding installed applic
             if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
             # Collect all of the GUIDs for which each shimmed executable is associated.
-            $ShimmedExecutablesTable = Get-CSRegistryKey -Hive HKLM -SubKey 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Custom' @CommonArgs @Timeout |
+            $ShimmedExecutablesTable = Get-CSRegistryKey -Hive HKLM -SubKey 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Custom' @CommonArgs |
                 Get-CSRegistryValue -ValueNameOnly | Group-Object -Property ValueName -AsHashTable
 
-            $InstalledSdb = Get-CSRegistryKey -Hive HKLM -SubKey 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\InstalledSdb' @CommonArgs @Timeout
+            $InstalledSdb = Get-CSRegistryKey -Hive HKLM -SubKey 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\InstalledSdb' @CommonArgs
             $CurrentSdb = 0
             
             foreach ($Database in $InstalledSdb) {
@@ -95,13 +80,13 @@ Outputs objects representing the relevant information regarding installed applic
                 $DatabasePath = $DatabaseDetails['DatabasePath'].ValueContent
                 $DatabasePathDir = Split-Path -Path $DatabasePath -Parent
                 $DatabasePathFileName = Split-Path -Path $DatabasePath -Leaf
-                $DatabaseFileInfo = Get-CSDirectoryListing -DirectoryPath $DatabasePathDir -FileName $DatabasePathFileName @CommonArgs @Timeout
+                $DatabaseFileInfo = Get-CSDirectoryListing -DirectoryPath $DatabasePathDir -FileName $DatabasePathFileName @CommonArgs
 
                 $ShimmedExecutables = $ShimmedExecutablesTable["$GUID.sdb"] | ForEach-Object { $_.Subkey.Split('\')[-1] }
 
                 $IsPresentInAddRemovePrograms = $False
 
-                $Result = Get-CSRegistryValue -Hive HKLM -SubKey "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$GUID.sdb" -ValueNameOnly @CommonArgs @Timeout
+                $Result = Get-CSRegistryValue -Hive HKLM -SubKey "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$GUID.sdb" -ValueNameOnly @CommonArgs
 
                 if ($Result) {
                     $IsPresentInAddRemovePrograms = $True

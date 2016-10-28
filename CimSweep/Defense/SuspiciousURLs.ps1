@@ -15,14 +15,6 @@ Get-CSTypedURL retrieves URLs that were typed into the Internet Explorer URL bar
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
 
-.PARAMETER OperationTimeoutSec
-
-Specifies the amount of time that the cmdlet waits for a response from the computer.
-
-By default, the value of this parameter is 0, which means that the cmdlet uses the default timeout value for the server.
-
-If the OperationTimeoutSec parameter is set to a value less than the robust connection retry timeout of 3 minutes, network failures that last more than the value of the OperationTimeoutSec parameter are not recoverable, because the operation on the server times out before the client can reconnect.
-
 .EXAMPLE
 
 Get-CSTypedURL
@@ -48,11 +40,7 @@ Outputs the registry values consisting of typed IE URLs.
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession,
-
-        [UInt32]
-        [Alias('OT')]
-        $OperationTimeoutSec
+        $CimSession
     )
 
     BEGIN {
@@ -65,9 +53,6 @@ Outputs the registry values consisting of typed IE URLs.
         }
 
         $CurrentCIMSession = 0
-
-        $Timeout = @{}
-        if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
     }
 
     PROCESS {
@@ -90,7 +75,7 @@ Outputs the registry values consisting of typed IE URLs.
 
             # Iterate over each local user hive
             foreach ($SID in $HKUSIDs) {
-                Get-CSRegistryValue -Hive HKU -SubKey "$SID\$TypedURLs" @CommonArgs @Timeout
+                Get-CSRegistryValue -Hive HKU -SubKey "$SID\$TypedURLs" @CommonArgs
             }
         }
     }

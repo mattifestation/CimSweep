@@ -1,7 +1,7 @@
 ﻿@{
 RootModule = 'CimSweep.psm1'
 
-ModuleVersion = '0.5.2.0'
+ModuleVersion = '0.6.0.0'
 
 GUID = 'f347ef1c-d752-4d07-bf68-3197c0aa661a'
 
@@ -50,7 +50,7 @@ PrivateData = @{
         ProjectUri = 'https://github.com/PowerShellMafia/CimSweep'
 
         ReleaseNotes = @'
-0.5.2
+0.6.0
 -----
 Enhancements:
 * Added Get-CSInstalledAppCompatShimDatabase
@@ -58,6 +58,8 @@ Enhancements:
 
 Removed:
 * Removed the -NoProgressBar parameter from all functions since this is what $ProgressPreference is for.
+* Removed Set-DefaultDisplayProperty helper function and all calls to it. It was creating unnecessary code complexity.
+* Removed -OperationTimeoutSec param from all functions. Was creating unnecessary code complexity.
 
 0.5.1
 -----
