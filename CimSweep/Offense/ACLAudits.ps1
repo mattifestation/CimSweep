@@ -199,7 +199,7 @@ Service ACL sweep across a large amount of hosts will take a long time.
             foreach ($Group in $UserGrouping.Keys) {
                 $Permissions = $UserGrouping[$Group]
 
-                [PSCustomObject] @{
+                $ObjectProperties = [Ordered] @{
                     PSTypeName = 'CimSweep.ServiceACLAudit'
                     GroupName = $Group
                     CanStartService = $Permissions.ServiceCanStart
@@ -213,8 +213,11 @@ Service ACL sweep across a large amount of hosts will take a long time.
                     CanWriteToFile = $Permissions.FileCanWrite
                     CanWriteDataToFile = $Permissions.FileCanWriteData
                     FullControlOfFile = $Permissions.FileHasFullControl
-                    PSComputerName = $Session.ComputerName
                 }
+
+                if ($Session.ComputerName) { $ObjectProperties['PSComputerName'] = $Session.ComputerName }
+
+                [PSCustomObject] $ObjectProperties
             }
         }
     }

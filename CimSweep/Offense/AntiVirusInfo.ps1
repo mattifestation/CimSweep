@@ -93,7 +93,7 @@ Outputs custom objects representing the current AV configuration.
 
             if ($InstanceArgs['NameSpace'] -eq 'root/SecurityCenter2')
             {
-                $AntiVirus = [PSCustomObject] @{
+                $ObjectProperties = [Ordered] @{
                     PSTypeName = 'CimSweep.AVInfo'
                     Name = $AV.displayName
                     Executable = $AV.pathToSignedProductExe
@@ -101,7 +101,6 @@ Outputs custom objects representing the current AV configuration.
                     ScannerEnabled = $null
                     Updated = $null
                     ExclusionInfo = $null
-                    PSComputerName = $Session.ComputerName
                 }
 
                 #parse the byte value of productstate
@@ -111,26 +110,31 @@ Outputs custom objects representing the current AV configuration.
                 
                 if($scanner -ge (10 -as [byte]))
                 {
-                    $AntiVirus.ScannerEnabled = $True
+                    $ObjectProperties.ScannerEnabled = $True
                 }
                 elseif($scanner -eq (00 -as [byte]) -or $scanner -eq (01 -as [byte]))
                 {
-                    $AntiVirus.ScannerEnabled = $False
+                    $ObjectProperties.ScannerEnabled = $False
                 }
 
                 #Determine if the AV definitions are up to date
                 if($updated -eq (00 -as [byte]))
                 {
-                    $AntiVirus.Updated = $True
+                    $ObjectProperties.Updated = $True
                 }
                 elseif($updated -eq (10 -as [byte]))
                 {
-                    $AntiVirus.Updated = $False
-                }  
+                    $ObjectProperties.Updated = $False
+                }
+
+                if ($Session.ComputerName) { $ObjectProperties['PSComputerName'] = $Session.ComputerName }
+
+                $AntiVirus = [PSCustomObject] $ObjectProperties
             }
             else
             {
-                $AntiVirus = [PSCustomObject] @{
+                $ObjectProperties = [Ordered] @{
+                    PSTypeName = 'CimSweep.AVInfo'
                     Name = $AV.displayName
                     Executable = $AV.pathToEnableOnAccessUI
                     InstanceGUID =  $AV.instanceGuid
@@ -139,6 +143,10 @@ Outputs custom objects representing the current AV configuration.
                     ExclusionInfo = $null
                     PSComputerName = $Session.ComputerName
                 }
+
+                if ($Session.ComputerName) { $ObjectProperties['PSComputerName'] = $Session.ComputerName }
+
+                $AntiVirus = [PSCustomObject] $ObjectProperties
             }
 
 
@@ -172,6 +180,7 @@ Outputs custom objects representing the current AV configuration.
             }
 
             $AntiVirus.ExclusionInfo = $ExclusionInfo
+
             $AntiVirus
         }
     }

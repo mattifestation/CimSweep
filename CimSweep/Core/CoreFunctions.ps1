@@ -164,8 +164,6 @@ It is not recommended to recursively list all registry keys from most parent key
                         SubKey = $NewSubKey
                     }
 
-                    $DefaultProperties = @('Hive', 'SubKey') -as [Type] 'Collections.Generic.List[String]'
-
                     if ($IncludeAcl) {
                         $GetSDArgs = @{
                             Namespace = 'root/default'
@@ -207,20 +205,10 @@ It is not recommended to recursively list all registry keys from most parent key
                         $ObjectProperties['ACL'] = $RegSD
                     }
 
-                    if ($Result.PSComputerName) {
-                        $ObjectProperties['PSComputerName'] = $Result.PSComputerName
-                        $DefaultProperties.Add('PSComputerName')
-                    } else {
-                        $ObjectProperties['PSComputerName'] = $null
-                    }
-
+                    if ($Result.PSComputerName) { $ObjectProperties['PSComputerName'] = $Result.PSComputerName }
                     if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
 
-                    $KeyObject = New-Object -TypeName PSObject -Property $ObjectProperties
-
-                    Set-DefaultDisplayProperty -InputObject $KeyObject -PropertyNames $DefaultProperties
-
-                    $KeyObject
+                    [PSCustomObject] $ObjectProperties
 
                     if ($PSBoundParameters['Recurse']) {
                         $ObjectProperties.Remove('PSTypeName')
@@ -485,6 +473,7 @@ Outputs a list of objects representing registry value names, their respective ty
                 }
 
                 $ObjectProperties = [Ordered] @{
+                    PSTypeName = 'CimSweep.RegistryValue'
                     Hive = $Hive
                     SubKey = $TrimmedKey
                     ValueName = if ($ValueName) { $ValueName } else { '(Default)' }
@@ -492,23 +481,10 @@ Outputs a list of objects representing registry value names, their respective ty
                     ValueContent = $ValueContent
                 }
 
-                $DefaultProperties = [String[]] $ObjectProperties.Keys -as [Type] 'Collections.Generic.List[String]'
-                $ObjectProperties['PSTypeName'] = 'CimSweep.RegistryValue'
-
-                if ($Result.PSComputerName) {
-                    $ObjectProperties['PSComputerName'] = $Result.PSComputerName
-                    $DefaultProperties.Add('PSComputerName')
-                } else {
-                    $ObjectProperties['PSComputerName'] = $null
-                }
-
+                if ($Result.PSComputerName) { $ObjectProperties['PSComputerName'] = $Result.PSComputerName }
                 if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
 
-                $ValueObject = [PSCustomObject] $ObjectProperties
-
-                Set-DefaultDisplayProperty -InputObject $ValueObject -PropertyNames $DefaultProperties
-
-                $ValueObject
+                [PSCustomObject] $ObjectProperties
             } else {
                 $CimMethodArgs['MethodName'] = 'EnumValues'
 
@@ -616,6 +592,7 @@ Outputs a list of objects representing registry value names, their respective ty
                             }
 
                             $ObjectProperties = [Ordered] @{
+                                PSTypeName = 'CimSweep.RegistryValue'
                                 Hive = $Hive
                                 SubKey = $TrimmedKey
                                 ValueName = if ($ValueNames[$i]) { $ValueNames[$i] } else { '(Default)' }
@@ -623,23 +600,10 @@ Outputs a list of objects representing registry value names, their respective ty
                                 ValueContent = $ValueContent
                             }
 
-                            $DefaultProperties = [String[]] $ObjectProperties.Keys -as [Type] 'Collections.Generic.List[String]'
-                            $ObjectProperties['PSTypeName'] = 'CimSweep.RegistryValue'
-
-                            if ($Result.PSComputerName) {
-                                $ObjectProperties['PSComputerName'] = $Result.PSComputerName
-                                $DefaultProperties.Add('PSComputerName')
-                            } else {
-                                $ObjectProperties['PSComputerName'] = $null
-                            }
-
+                            if ($Result.PSComputerName) { $ObjectProperties['PSComputerName'] = $Result.PSComputerName }
                             if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
 
-                            $ValueObject = [PSCustomObject] $ObjectProperties
-
-                            Set-DefaultDisplayProperty -InputObject $ValueObject -PropertyNames $DefaultProperties
-
-                            $ValueObject
+                            [PSCustomObject] $ObjectProperties
                         }
                     }
                 }
@@ -743,22 +707,10 @@ Outputs objects representing the available event logs which can be piped to Get-
                     LogName = $_.LogfileName
                 }
 
-                $DefaultProperties = @('LogName') -as [Type] 'Collections.Generic.List[String]'
-
-                if ($_.PSComputerName) {
-                    $ObjectProperties['PSComputerName'] = $_.PSComputerName
-                    $DefaultProperties.Add('PSComputerName')
-                } else {
-                    $ObjectProperties['PSComputerName'] = $null
-                }
-
+                if ($_.PSComputerName) { $ObjectProperties['PSComputerName'] = $_.PSComputerName }
                 if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
 
-                $EventLog = [PSCustomObject] $ObjectProperties
-
-                Set-DefaultDisplayProperty -InputObject $EventLog -PropertyNames $DefaultProperties
-
-                $EventLog
+                [PSCustomObject] $ObjectProperties
             }
         }
     }
@@ -1117,22 +1069,10 @@ Outputs a list of mounted drive letters.
                         DirectoryPath = "$($Volume.DeviceID)\"
                     }
 
-                    $DefaultProperties = 'DriveLetter', 'DirectoryPath' -as [Type] 'Collections.Generic.List[String]'
-
-                    if ($Volume.PSComputerName) {
-                        $ObjectProperties['PSComputerName'] = $Volume.PSComputerName
-                        $DefaultProperties.Add('PSComputerName')
-                    } else {
-                        $ObjectProperties['PSComputerName'] = $null
-                    }
-
+                    if ($Volume.PSComputerName) { $ObjectProperties['PSComputerName'] = $Volume.PSComputerName }
                     if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
 
-                    $DiskInfo = [PSCustomObject] $ObjectProperties
-
-                    Set-DefaultDisplayProperty -InputObject $DiskInfo -PropertyNames $DefaultProperties
-
-                    $DiskInfo
+                    [PSCustomObject] $ObjectProperties
                 }
             }
         }
@@ -2416,7 +2356,6 @@ Outputs objects consisting of the name, value, and scope (user vs. system) of an
         $SystemEnvPath = 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment'
 
         $ObjectType = 'CimSweep.EnvironmentVariable'
-        $DefaultPropertyNames = 'Name', 'User', 'VariableValue'
     }
 
     PROCESS {
@@ -2445,22 +2384,10 @@ Outputs objects consisting of the name, value, and scope (user vs. system) of an
                             VariableValue = $Result.ValueContent
                         }
 
-                        $DefaultProperties = $DefaultPropertyNames -as [Type] 'Collections.Generic.List[String]'
-
-                        if ($Result.PSComputerName) {
-                            $ObjectProperties['PSComputerName'] = $Result.PSComputerName
-                            $DefaultProperties.Add('PSComputerName')
-                        } else {
-                            $ObjectProperties['PSComputerName'] = $null
-                        }
-
+                        if ($Result.PSComputerName) { $ObjectProperties['PSComputerName'] = $Result.PSComputerName}
                         if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
 
-                        $EnvVarInfo = [PSCustomObject] $ObjectProperties
-
-                        Set-DefaultDisplayProperty -InputObject $EnvVarInfo -PropertyNames $DefaultProperties
-
-                        $EnvVarInfo
+                        [PSCustomObject] $ObjectProperties
                     }
                 }
 
@@ -2480,22 +2407,11 @@ Outputs objects consisting of the name, value, and scope (user vs. system) of an
                                 VariableValue = $Result.ValueContent
                             }
 
-                            $DefaultProperties = $DefaultPropertyNames -as [Type] 'Collections.Generic.List[String]'
-
-                            if ($Result.PSComputerName) {
-                                $ObjectProperties['PSComputerName'] = $Result.PSComputerName
-                                $DefaultProperties.Add('PSComputerName')
-                            } else {
-                                $ObjectProperties['PSComputerName'] = $null
-                            }
+                            if ($Result.PSComputerName) { $ObjectProperties['PSComputerName'] = $Result.PSComputerName }
 
                             if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
 
-                            $EnvVarInfo = [PSCustomObject] $ObjectProperties
-
-                            Set-DefaultDisplayProperty -InputObject $EnvVarInfo -PropertyNames $DefaultProperties
-
-                            $EnvVarInfo
+                            [PSCustomObject] $ObjectProperties
                         } else {
                             $Result = Get-CSRegistryValue -Hive HKU -SubKey "$SID\Environment" -ValueName $VariableName -ValueType REG_SZ @CommonArgs @Timeout
 
@@ -2507,22 +2423,10 @@ Outputs objects consisting of the name, value, and scope (user vs. system) of an
                                     VariableValue = $Result.ValueContent
                                 }
 
-                                $DefaultProperties = $DefaultPropertyNames -as [Type] 'Collections.Generic.List[String]'
-
-                                if ($Result.PSComputerName) {
-                                    $ObjectProperties['PSComputerName'] = $Result.PSComputerName
-                                    $DefaultProperties.Add('PSComputerName')
-                                } else {
-                                    $ObjectProperties['PSComputerName'] = $null
-                                }
-
+                                if ($Result.PSComputerName) { $ObjectProperties['PSComputerName'] = $Result.PSComputerName }
                                 if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
 
-                                $EnvVarInfo = [PSCustomObject] $ObjectProperties
-
-                                Set-DefaultDisplayProperty -InputObject $EnvVarInfo -PropertyNames $DefaultProperties
-
-                                $EnvVarInfo
+                                [PSCustomObject] $ObjectProperties
                             }
                         }
                     }
@@ -2537,22 +2441,10 @@ Outputs objects consisting of the name, value, and scope (user vs. system) of an
                             VariableValue = $_.ValueContent
                         }
 
-                        $DefaultProperties = $DefaultPropertyNames -as [Type] 'Collections.Generic.List[String]'
-
-                        if ($_.PSComputerName) {
-                            $ObjectProperties['PSComputerName'] = $_.PSComputerName
-                            $DefaultProperties.Add('PSComputerName')
-                        } else {
-                            $ObjectProperties['PSComputerName'] = $null
-                        }
-
+                        if ($_.PSComputerName) { $ObjectProperties['PSComputerName'] = $_.PSComputerName }
                         if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
 
-                        $EnvVarInfo = [PSCustomObject] $ObjectProperties
-
-                        Set-DefaultDisplayProperty -InputObject $EnvVarInfo -PropertyNames $DefaultProperties
-
-                        $EnvVarInfo
+                        [PSCustomObject] $ObjectProperties
                     }
                 }
 
@@ -2570,22 +2462,10 @@ Outputs objects consisting of the name, value, and scope (user vs. system) of an
                                 VariableValue = $_.ValueContent
                             }
 
-                            $DefaultProperties = $DefaultPropertyNames -as [Type] 'Collections.Generic.List[String]'
-
-                            if ($_.PSComputerName) {
-                                $ObjectProperties['PSComputerName'] = $_.PSComputerName
-                                $DefaultProperties.Add('PSComputerName')
-                            } else {
-                                $ObjectProperties['PSComputerName'] = $null
-                            }
-
+                            if ($_.PSComputerName) { $ObjectProperties['PSComputerName'] = $_.PSComputerName }
                             if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
 
-                            $EnvVarInfo = [PSCustomObject] $ObjectProperties
-
-                            Set-DefaultDisplayProperty -InputObject $EnvVarInfo -PropertyNames $DefaultProperties
-
-                            $EnvVarInfo
+                            [PSCustomObject] $ObjectProperties
                         }
 
                         Get-CSRegistryValue -Hive HKU -SubKey "$SID\Environment" @CommonArgs @Timeout | ForEach-Object {
@@ -2596,22 +2476,10 @@ Outputs objects consisting of the name, value, and scope (user vs. system) of an
                                 VariableValue = $_.ValueContent
                             }
 
-                            $DefaultProperties = $DefaultPropertyNames -as [Type] 'Collections.Generic.List[String]'
-
-                            if ($_.PSComputerName) {
-                                $ObjectProperties['PSComputerName'] = $_.PSComputerName
-                                $DefaultProperties.Add('PSComputerName')
-                            } else {
-                                $ObjectProperties['PSComputerName'] = $null
-                            }
-
+                            if ($_.PSComputerName) { $ObjectProperties['PSComputerName'] = $_.PSComputerName }
                             if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
 
-                            $EnvVarInfo = [PSCustomObject] $ObjectProperties
-
-                            Set-DefaultDisplayProperty -InputObject $EnvVarInfo -PropertyNames $DefaultProperties
-
-                            $EnvVarInfo
+                            [PSCustomObject] $ObjectProperties
                         }
                     }
                 }
@@ -2789,8 +2657,6 @@ Microsoft.Management.Infrastructure.CimInstance#root/__NAMESPACE
             $ComputerName = $Session.ComputerName
             if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
 
-            $DefaultProperties = 'FullyQualifiedNamespace' -as [Type] 'Collections.Generic.List[String]'
-
             $CommonArgs = @{}
             if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
@@ -2835,7 +2701,6 @@ Microsoft.Management.Infrastructure.CimInstance#root/__NAMESPACE
                 }
 
                 Add-Member -InputObject $_ -NotePropertyName FullyQualifiedNamespace -NotePropertyValue $FullyQualifiedNamespace
-                Set-DefaultDisplayProperty -InputObject $_ -PropertyNames $DefaultProperties
 
                 $_
 

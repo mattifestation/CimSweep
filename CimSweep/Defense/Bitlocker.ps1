@@ -5,7 +5,7 @@
 Obtains Bitlocker volume key material.
 
 Author: Matthew Graeber (@mattifestation)
-Inspiration/Motivation: Jared Atkinson (@jaredcatkinson), Brian Reitz
+Inspiration/Motivation: Jared Atkinson (@jaredcatkinson), Brian Reitz (@brian_psu)
 License: BSD 3-Clause
 
 .DESCRIPTION
@@ -280,9 +280,7 @@ Outputs objects representing Bitlocker volume key material.
                         Certificate = $KeyProtectorCertificate
                     }
 
-                    if ($CurrentVolume.PSComputerName) {
-                        $ProtectorProperties['PSComputerName'] = $CurrentVolume.PSComputerName
-                    }
+                    if ($CurrentVolume.PSComputerName) { $ProtectorProperties['PSComputerName'] = $CurrentVolume.PSComputerName }
 
                     [PSCustomObject] $ProtectorProperties
                 }

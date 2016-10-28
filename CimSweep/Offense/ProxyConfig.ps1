@@ -102,12 +102,15 @@ CimSweep.ProxyConfig
             #If the 5th byte is even, the AutoDetectProxySetting is most likely enabled
             if (($ProxyConfig.ValueContent[4] % 2) -eq 0) { $AutoDetectProxy = $True }
 
-            $ProxySettings = [PSCustomObject] @{
+            $ObjectProperties = [Ordered] @{
                 PSTypeName = 'CimSweep.ProxyConfig'
                 AutoDetectProxy = $AutoDetectProxy
                 InternetSettings = $null
-                PSComputerName = $Session.ComputerName
             }
+
+            if ($Session.ComputerName) { $ObjectProperties['PSComputerName'] = $Session.ComputerName }
+
+            $ProxySettings = [PSCustomObject] $ObjectProperties
 
             #Get the current Internet Settings from the registry
             $SubKey = $SubKey.TrimEnd('Connections')

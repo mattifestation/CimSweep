@@ -104,12 +104,6 @@ Describe 'Get-CSRegistryKey' {
             $UniqueComputerNames | Should BeExactly 'localhost'
         }
 
-        It 'should not return a computer name when not using a CIM session' {
-            $Result = Get-CSRegistryKey -Hive HKLM | Select -First 1
-
-            $Result.PSComputerName | Should BeNullOrEmpty
-        }
-
         It 'should return nothing upon querying a nonexistent key' {
             Get-CSRegistryKey -Hive HKCU -SubKey 'nonexistentkey' | Should BeNullOrEmpty
         }
@@ -150,8 +144,6 @@ Describe 'Get-CSRegistryValue' {
 
             $CurrentVersion | Should Not BeNullOrEmpty
             $CurrentVersion.ValueContent | Should Not BeNullOrEmpty
-
-            $CurrentVersion.PSComputerName | Should BeNullOrEmpty
         }
 
         It 'should return value contents for an entire subkey: using -Hive and -SubKey w/ CIM Sessions' {
@@ -171,8 +163,6 @@ Describe 'Get-CSRegistryValue' {
             $CurrentVersion | Should Not BeNullOrEmpty
 
             $CurrentVersion.ValueContent | Should Not BeNullOrEmpty
-
-            $CurrentVersion.PSComputerName | Should BeNullOrEmpty
         }
 
         It 'should return value contents for a specific subkey value: using -Hive and -SubKey w/ CIM Sessions' {
@@ -192,8 +182,6 @@ Describe 'Get-CSRegistryValue' {
 
             $CurrentVersion | Should Not BeNullOrEmpty
             $CurrentVersion.ValueContent | Should BeNullOrEmpty
-
-            $CurrentVersion.PSComputerName | Should BeNullOrEmpty
         }
 
         It 'should return only value names for an entire subkey: using -Hive and -SubKey w/ CIM Sessions' {
@@ -214,8 +202,6 @@ Describe 'Get-CSRegistryValue' {
 
             $CurrentVersion | Should Not BeNullOrEmpty
             $CurrentVersion.ValueContent | Should Not BeNullOrEmpty
-
-            $CurrentVersion.PSComputerName | Should BeNullOrEmpty
         }
 
         It 'should return value contents via receiving value names over the pipeline (from Get-CSRegistryValue) for an entire subkey: using -Hive and -SubKey w/ CIM Sessions' {
@@ -234,8 +220,6 @@ Describe 'Get-CSRegistryValue' {
 
             $CurrentVersion | Should Not BeNullOrEmpty
             $CurrentVersion.ValueContent | Should Not BeNullOrEmpty
-
-            $CurrentVersion.PSComputerName | Should BeNullOrEmpty
         }
 
         It 'should return value contents via receiving a value name over the pipeline (from Get-CSRegistryValue) for a specific subkey value: using -Hive and -SubKey w/ CIM Sessions' {
@@ -254,8 +238,6 @@ Describe 'Get-CSRegistryValue' {
 
             $CurrentVersion | Should Not BeNullOrEmpty
             $CurrentVersion.ValueContent | Should Not BeNullOrEmpty
-
-            $CurrentVersion.PSComputerName | Should BeNullOrEmpty
         }
 
         It 'should return value contents via receiving subkeys over the pipeline (from Get-CSRegistryKey) for an entire subkey: using -Hive and -SubKey w/ CIM Sessions' {
@@ -274,8 +256,6 @@ Describe 'Get-CSRegistryValue' {
 
             $CurrentVersion | Should Not BeNullOrEmpty
             $CurrentVersion.ValueContent | Should Not BeNullOrEmpty
-
-            $CurrentVersion.PSComputerName | Should BeNullOrEmpty
         }
 
         It 'should return value contents via receiving subkeys over the pipeline (from Get-CSRegistryKey) for a specific subkey value: using -Hive and -SubKey w/ CIM Sessions' {
@@ -294,8 +274,6 @@ Describe 'Get-CSRegistryValue' {
 
             $CurrentVersion | Should Not BeNullOrEmpty
             $CurrentVersion.ValueContent | Should BeNullOrEmpty
-
-            $CurrentVersion.PSComputerName | Should BeNullOrEmpty
         }
 
         It 'should return value names only via receiving subkeys over the pipeline (from Get-CSRegistryKey) for an entire subkey: using -Hive and -SubKey w/ CIM Sessions' {
@@ -324,7 +302,6 @@ Describe 'Get-CSRegistryValue' {
             $Result.SubKey | Should BeExactly $CurrentVersionPath
             $Result.ValueName | Should BeExactly 'CurrentVersion'
             $Result.ValueContent | Should Not BeNullOrEmpty
-            $Result.PSComputerName | Should BeNullOrEmpty
         }
     }
 }
@@ -334,7 +311,6 @@ Describe 'Get-CSEventLog' {
         $Result = Get-CSEventLog | Select -First 1
 
         $Result.LogName | Should Not BeNullOrEmpty
-        $Result.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should return output with CIM sessions' {
@@ -348,7 +324,6 @@ Describe 'Get-CSEventLog' {
         $Result = Get-CSEventLog -OperationTimeoutSec 3 | Select -First 1
 
         $Result.LogName | Should Not BeNullOrEmpty
-        $Result.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should return output with CIM sessions and accept -OperationTimeoutSec' {
@@ -481,7 +456,6 @@ Describe 'Get-CSMountedVolumeDriveLetter' {
         $Drive | Should Not BeNullOrEmpty
         $Drive.DriveLetter | Should Match '^[A-Z]$'
         $Drive.DirectoryPath | Should Match "^$($Drive.DriveLetter):\\`$"
-        $Drive.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should return at least one mounted partition w/ CIM sessions' {
@@ -499,7 +473,6 @@ Describe 'Get-CSMountedVolumeDriveLetter' {
         $Drive | Should Not BeNullOrEmpty
         $Drive.DriveLetter | Should Match '^[A-Z]$'
         $Drive.DirectoryPath | Should Match "^$($Drive.DriveLetter):\\`$"
-        $Drive.PSComputerName | Should BeNullOrEmpty
     }
 }
 
@@ -998,7 +971,6 @@ Describe 'Get-CSEnvironmentVariable' {
         $EnvVar.Name | Should Not BeNullOrEmpty
         $EnvVar.User | Should Not BeNullOrEmpty
         $EnvVar.VariableValue | Should Not BeNullOrEmpty
-        $EnvVar.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should return a populated environment variable w/ CIM sessions' {
@@ -1016,7 +988,6 @@ Describe 'Get-CSEnvironmentVariable' {
         $EnvVar.Name | Should Not BeNullOrEmpty
         $EnvVar.User | Should BeExactly '<SYSTEM>'
         $EnvVar.VariableValue | Should Not BeNullOrEmpty
-        $EnvVar.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should return a populated system environment variable w/ CIM sessions' {
@@ -1035,7 +1006,6 @@ Describe 'Get-CSEnvironmentVariable' {
         $EnvVar.User | Should Not BeNullOrEmpty
         $EnvVar.User | Should Not Be '<SYSTEM>'
         $EnvVar.VariableValue | Should Not BeNullOrEmpty
-        $EnvVar.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should return a populated user environment variable w/ CIM sessions' {
@@ -1054,7 +1024,6 @@ Describe 'Get-CSEnvironmentVariable' {
         $EnvVar.Name | Should BeExactly 'TEMP'
         $EnvVar.User | Should Not BeNullOrEmpty
         $EnvVar.VariableValue | Should Not BeNullOrEmpty
-        $EnvVar.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should return a named environment variable w/ CIM sessions' {
@@ -1072,7 +1041,6 @@ Describe 'Get-CSEnvironmentVariable' {
         $EnvVar.Name | Should BeExactly 'TEMP'
         $EnvVar.User | Should BeExactly '<SYSTEM>'
         $EnvVar.VariableValue | Should Not BeNullOrEmpty
-        $EnvVar.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should return a named system environment variable w/ CIM sessions' {
@@ -1091,7 +1059,6 @@ Describe 'Get-CSEnvironmentVariable' {
         $EnvVar.User | Should Not BeNullOrEmpty
         $EnvVar.User | Should Not Be '<SYSTEM>'
         $EnvVar.VariableValue | Should Not BeNullOrEmpty
-        $EnvVar.PSComputerName | Should BeNullOrEmpty
     }
 
     It 'should return a named user environment variable w/ CIM sessions' {

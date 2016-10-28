@@ -202,22 +202,9 @@ Outputs objects representing autoruns entries similar to the output of Sysintern
                 Category = $Category
             }
 
-            $DefaultProperties = 'Path', 'AutoRunEntry', 'ImagePath', 'Category' -as [Type] 'Collections.Generic.List[String]'
+            if ($PSComputerName) { $ObjectProperties['PSComputerName'] = $PSComputerName }
 
-            if ($PSComputerName) {
-                $ObjectProperties['PSComputerName'] = $PSComputerName
-                $DefaultProperties.Add('PSComputerName')
-            } else {
-                $ObjectProperties['PSComputerName'] = $null
-            }
-
-            if ($Session.Id) { $ObjectProperties['CimSession'] = $Session }
-
-            $AutoRunsEntry = [PSCustomObject] $ObjectProperties
-
-            Set-DefaultDisplayProperty -InputObject $AutoRunsEntry -PropertyNames $DefaultProperties
-
-            $AutoRunsEntry
+            [PSCustomObject] $ObjectProperties
         }
     }
 
@@ -715,14 +702,17 @@ Get-CSWmiPersistence only returns output when __FilterToConsumerBinding instance
                 Write-Verbose "[$($Session.ComputerName)] Correlating referenced __EventConsumer instance."
                 $Consumer = Get-CimInstance -Namespace root/subscription -ClassName $ConsumerClass -Filter "Name=`"$($_.Consumer.Name)`"" @CommonArgs @Timeout
 
-                [PSCustomObject] @{
+                $ObjectProperties = [Ordered] @{
                     PSTypeName = 'CimSweep.WmiPersistence'
                     Filter = $Filter
                     ConsumerClass = $ConsumerClass
                     Consumer = $Consumer
                     FilterToConsumerBinding = $_
-                    PSComputerName = $_.PSComputerName
                 }
+
+                if ($_.PSComputerName) { $ObjectProperties['PSComputerName'] = $_.PSComputerName }
+
+                [PSCustomObject] $ObjectProperties
             }
         }
     }

@@ -119,20 +119,11 @@ Outputs objects representing the relevant information regarding installed applic
                     FileInfo = $DatabaseFileInfo
                 }
 
-                $DefaultProperties = 'DatabaseGUID', 'DatabaseName', 'DatabasePath', 'DatabaseType', 'InstallDateTime', 'ShimmedExecutables', 'IsPresentInAddRemovePrograms', 'FileInfo' -as [Type] 'Collections.Generic.List[String]'
-
                 if ($Database.PSComputerName) {
                     $ObjectProperties['PSComputerName'] = $_.PSComputerName
-                    $DefaultProperties.Add('PSComputerName')
-                } else {
-                    $ObjectProperties['PSComputerName'] = $null
                 }
 
-                $InstalledDatabase = [PSCustomObject] $ObjectProperties
-
-                Set-DefaultDisplayProperty -InputObject $InstalledDatabase -PropertyNames $DefaultProperties
-
-                $InstalledDatabase
+                [PSCustomObject] $ObjectProperties
             }
         }
     }
