@@ -36,7 +36,8 @@ FunctionsToExport = @(
     'Get-CSVulnerableServicePermission',
     'Get-CSAVInfo',
     'Get-CSProxyConfig',
-    'Get-CSInstalledAppCompatShimDatabase'
+    'Get-CSInstalledAppCompatShimDatabase',
+    'Get-CSBitlockerKeyProtector'
 )
 
 PrivateData = @{
@@ -53,6 +54,7 @@ PrivateData = @{
 -----
 Enhancements:
 * Added Get-CSInstalledAppCompatShimDatabase
+* Added Get-CSBitlockerKeyProtector
 
 Removed:
 * Removed the -NoProgressBar parameter from all functions since this is what $ProgressPreference is for.
