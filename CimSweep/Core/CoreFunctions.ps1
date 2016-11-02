@@ -1558,7 +1558,7 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
         [Parameter(ParameterSetName='DefaultOutput')]
         [Parameter(ParameterSetName='RestrictOutput')]
         [String]
-        [ValidateNotNullOrEmpty()]
+        [ValidateNotNull()]
         $DisplayName,
 
         [Parameter(ParameterSetName='DefaultOutput')]
@@ -1582,13 +1582,13 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
         [Parameter(ParameterSetName='DefaultOutput')]
         [Parameter(ParameterSetName='RestrictOutput')]
         [String]
-        [ValidateNotNullOrEmpty()]
+        [ValidateNotNull()]
         $PathName,
 
         [Parameter(ParameterSetName='DefaultOutput')]
         [Parameter(ParameterSetName='RestrictOutput')]
         [String]
-        [ValidateNotNullOrEmpty()]
+        [ValidateNotNull()]
         $Description,
 
         [Parameter(ParameterSetName='DefaultOutput')]
@@ -1783,12 +1783,30 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
             $ServiceEntryArgs = @{}
 
             if ($PSBoundParameters['Name']) { $FilterComponents.Add("Name LIKE '%$Name%'") }
-            if ($PSBoundParameters['DisplayName']) { $FilterComponents.Add("DisplayName LIKE '%$DisplayName%'") }
+            if ($PSBoundParameters.ContainsKey('DisplayName')) {
+                if ($DisplayName -eq [String]::Empty) {
+                    $FilterComponents.Add('PathName = ""')
+                } else {
+                    $FilterComponents.Add("PathName LIKE '%$DisplayName%'")
+                }
+            }
             if ($PSBoundParameters['State']) { $FilterComponents.Add("State = '$State'") }
             if ($PSBoundParameters['StartMode']) { $FilterComponents.Add("StartMode = '$StartMode'") }
             if ($PSBoundParameters['ServiceType']) { $FilterComponents.Add("ServiceType = '$ServiceType'") }
-            if ($PSBoundParameters['PathName']) { $FilterComponents.Add("PathName LIKE '%$PathName%'") }
-            if ($PSBoundParameters['Description']) { $FilterComponents.Add("Description LIKE '%$Description%'") }
+            if ($PSBoundParameters.ContainsKey('PathName')) {
+                if ($PathName -eq [String]::Empty) {
+                    $FilterComponents.Add('PathName = ""')
+                } else {
+                    $FilterComponents.Add("PathName LIKE '%$PathName%'")
+                }
+            }
+            if ($PSBoundParameters.ContainsKey('Description')) {
+                if ($Description -eq [String]::Empty) {
+                    $FilterComponents.Add('PathName = ""')
+                } else {
+                    $FilterComponents.Add("PathName LIKE '%$Description%'")
+                }
+            }
 
             if ($FilterComponents.Count) {
                 $Filter = $FilterComponents -join ' AND '
@@ -1998,13 +2016,13 @@ Outputs Win32_Process instances.
         [Parameter(ParameterSetName='DefaultOutput')]
         [Parameter(ParameterSetName='RestrictOutput')]
         [String]
-        [ValidateNotNullOrEmpty()]
+        [ValidateNotNull()]
         $CommandLine,
 
         [Parameter(ParameterSetName='DefaultOutput')]
         [Parameter(ParameterSetName='RestrictOutput')]
         [String]
-        [ValidateNotNullOrEmpty()]
+        [ValidateNotNull()]
         $ExecutablePath,
 
         [Parameter(ParameterSetName='DefaultOutput')]
@@ -2104,8 +2122,20 @@ Outputs Win32_Process instances.
             if ($PSBoundParameters['Name']) { $FilterComponents.Add("Name LIKE '%$Name%'") }
             if ($PSBoundParameters['ProcessID']) { $FilterComponents.Add("ProcessID = $ProcessID") }
             if ($PSBoundParameters['ParentProcessID']) { $FilterComponents.Add("ParentProcessID = $ParentProcessID") }
-            if ($PSBoundParameters['CommandLine']) { $FilterComponents.Add("CommandLine LIKE '%$CommandLine%'") }
-            if ($PSBoundParameters['ExecutablePath']) { $FilterComponents.Add("ExecutablePath LIKE '%$ExecutablePath%'") }
+            if ($PSBoundParameters.ContainsKey('CommandLine')) {
+                if ($CommandLine -eq [String]::Empty) {
+                    $FilterComponents.Add('ExecutablePath = ""')
+                } else {
+                    $FilterComponents.Add("ExecutablePath LIKE '%$CommandLine%'")
+                }
+            }
+            if ($PSBoundParameters.ContainsKey('ExecutablePath')) {
+                if ($ExecutablePath -eq [String]::Empty) {
+                    $FilterComponents.Add('ExecutablePath = ""')
+                } else {
+                    $FilterComponents.Add("ExecutablePath LIKE '%$ExecutablePath%'")
+                }
+            }
 
             if ($FilterComponents.Count) {
                 $Filter = $FilterComponents -join ' AND '
