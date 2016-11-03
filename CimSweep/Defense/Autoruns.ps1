@@ -636,6 +636,8 @@ Get-CSWmiPersistence only returns output when __FilterToConsumerBinding instance
         }
 
         $Current = 0
+
+        $TargetNamespaces = @( 'root/subscription', 'root/default' )
     }
 
     PROCESS {
@@ -649,25 +651,28 @@ Get-CSWmiPersistence only returns output when __FilterToConsumerBinding instance
 
             Write-Verbose "[$($Session.ComputerName)] Retrieving __FilterToConsumerBinding instance."
 
-            Get-CimInstance -Namespace root/subscription -ClassName __FilterToConsumerBinding @CommonArgs | ForEach-Object {
-                Write-Verbose "[$($Session.ComputerName)] Correlating referenced __EventFilter instance."
-                $Filter = Get-CimInstance -Namespace root/subscription -ClassName __EventFilter -Filter "Name=`"$($_.Filter.Name)`"" @CommonArgs
+            foreach ($Namespace in $TargetNamespaces) {
+                Get-CimInstance -Namespace $Namespace -ClassName __FilterToConsumerBinding @CommonArgs | ForEach-Object {
+                    Write-Verbose "[$($Session.ComputerName)] Correlating referenced __EventFilter instance."
+                    $Filter = Get-CimInstance -Namespace $Namespace -ClassName __EventFilter -Filter "Name=`"$($_.Filter.Name)`"" @CommonArgs
 
-                $ConsumerClass = $_.Consumer.PSObject.TypeNames[0].Split('/')[-1]
-                Write-Verbose "[$($Session.ComputerName)] Correlating referenced __EventConsumer instance."
-                $Consumer = Get-CimInstance -Namespace root/subscription -ClassName $ConsumerClass -Filter "Name=`"$($_.Consumer.Name)`"" @CommonArgs
+                    $ConsumerClass = $_.Consumer.PSObject.TypeNames[0].Split('/')[-1]
+                    Write-Verbose "[$($Session.ComputerName)] Correlating referenced __EventConsumer instance."
+                    $Consumer = Get-CimInstance -Namespace $Namespace -ClassName $ConsumerClass -Filter "Name=`"$($_.Consumer.Name)`"" @CommonArgs
 
-                $ObjectProperties = [Ordered] @{
-                    PSTypeName = 'CimSweep.WmiPersistence'
-                    Filter = $Filter
-                    ConsumerClass = $ConsumerClass
-                    Consumer = $Consumer
-                    FilterToConsumerBinding = $_
+                    $ObjectProperties = [Ordered] @{
+                        PSTypeName = 'CimSweep.WmiPersistence'
+                        Filter = $Filter
+                        ConsumerClass = $ConsumerClass
+                        Consumer = $Consumer
+                        FilterToConsumerBinding = $_
+                        Namespace = $Namespace
+                    }
+
+                    if ($_.PSComputerName) { $ObjectProperties['PSComputerName'] = $_.PSComputerName }
+
+                    [PSCustomObject] $ObjectProperties
                 }
-
-                if ($_.PSComputerName) { $ObjectProperties['PSComputerName'] = $_.PSComputerName }
-
-                [PSCustomObject] $ObjectProperties
             }
         }
     }
