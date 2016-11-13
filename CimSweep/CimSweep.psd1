@@ -37,7 +37,8 @@ FunctionsToExport = @(
     'Get-CSAVInfo',
     'Get-CSProxyConfig',
     'Get-CSInstalledAppCompatShimDatabase',
-    'Get-CSBitlockerKeyProtector'
+    'Get-CSBitlockerKeyProtector',
+    'Get-CSDeviceGuardStatus'
 )
 
 PrivateData = @{
@@ -56,6 +57,7 @@ Enhancements:
 * Added Get-CSInstalledAppCompatShimDatabase
 * Added Get-CSBitlockerKeyProtector
 * Get-CSWmiPersistence now also detects persistence in the root/default namespace.
+* Added Get-CSDeviceGuardStatus
 
 Removed:
 * Removed the -NoProgressBar parameter from all functions since this is what $ProgressPreference is for.
