@@ -622,3 +622,5 @@ Outputs CIM_DataFile instances of files present in low-integrity level directori
         }
     }
 }
+
+Export-ModuleMember -Function Get-CSScheduledTaskFile, Get-CSShellFolderPath, Get-CSTempFile, Get-CSLowILPathFile

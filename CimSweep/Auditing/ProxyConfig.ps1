@@ -118,3 +118,5 @@ CimSweep.ProxyConfig
         }
     }
 }
+
+Export-ModuleMember -Function Get-CSProxyConfig

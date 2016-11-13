@@ -174,3 +174,5 @@ Outputs custom objects representing the current AV configuration.
         }
     }
 }
+
+Export-ModuleMember -Function Get-CSAVInfo

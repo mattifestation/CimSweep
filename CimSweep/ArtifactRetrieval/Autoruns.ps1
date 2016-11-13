@@ -677,3 +677,5 @@ Get-CSWmiPersistence only returns output when __FilterToConsumerBinding instance
         }
     }
 }
+
+Export-ModuleMember -Function Get-CSRegistryAutoStart, Get-CSStartMenuEntry, Get-CSWmiPersistence

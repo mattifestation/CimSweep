@@ -113,3 +113,5 @@ Outputs objects representing the relevant information regarding installed applic
         }
     }
 }
+
+Export-ModuleMember -Function Get-CSInstalledAppCompatShimDatabase

@@ -2594,3 +2594,18 @@ Microsoft.Management.Infrastructure.CimInstance#root/__NAMESPACE
         }
     }
 }
+
+$ToExport = @(
+    'Get-CSRegistryKey',
+    'Get-CSRegistryValue',
+    'Get-CSEventLog',
+    'Get-CSEventLogEntry',
+    'Get-CSMountedVolumeDriveLetter',
+    'Get-CSDirectoryListing',
+    'Get-CSService',
+    'Get-CSProcess',
+    'Get-CSEnvironmentVariable',
+    'Get-CSWmiNamespace'
+)
+
+Export-ModuleMember -Function $ToExport

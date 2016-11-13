@@ -80,3 +80,5 @@ Outputs the registry values consisting of typed IE URLs.
         }
     }
 }
+
+Export-ModuleMember -Function Get-CSTypedURL

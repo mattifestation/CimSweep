@@ -207,3 +207,5 @@ Service ACL sweep across a large amount of hosts will take a long time.
         }
     }
 }
+
+Export-ModuleMember -Function Get-CSVulnerableServicePermission

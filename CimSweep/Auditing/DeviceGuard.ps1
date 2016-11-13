@@ -140,3 +140,5 @@ Outputs objects representing available and configured Device Guard settings.
         }
     }
 }
+
+Export-ModuleMember -Function Get-CSDeviceGuardStatus

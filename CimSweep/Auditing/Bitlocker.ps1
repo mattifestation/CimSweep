@@ -276,3 +276,5 @@ Outputs objects representing Bitlocker volume key material.
         }
     }
 }
+
+Export-ModuleMember -Function Get-CSBitlockerKeyProtector
