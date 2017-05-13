@@ -16,10 +16,6 @@ Get-CSAVInfo uses the AntiVirusProduct WMI class to enumerate Anti Virus on a lo
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
 
-.PARAMETER OperationTimeoutSec
-
-Specifies the amount of time that the cmdlet waits for a response from the computer.
-
 .EXAMPLE
 
 Get-CimAVInfo
@@ -42,11 +38,7 @@ Outputs custom objects representing the current AV configuration.
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession,
-
-        [UInt32]
-        [Alias('OT')]
-        $OperationTimeoutSec
+        $CimSession
     )
 
 
@@ -56,9 +48,6 @@ Outputs custom objects representing the current AV configuration.
         {
             $CimSession = ''
         }
-
-        $Timeout = @{}
-        if ($PSBoundParameters['OperationTimeoutSec']) { $Timeout['OperationTimeoutSec'] = $OperationTimeoutSec }
     }
 
     PROCESS
@@ -76,11 +65,11 @@ Outputs custom objects representing the current AV configuration.
             if ($Session.Id) {$CommonArgs['CimSession'] = $Session}
 
             #Determine if the namespace exists
-            if (Get-CimInstance -Namespace root -ClassName __NAMESPACE -Filter 'Name="SecurityCenter2"' @CommonArgs @Timeout) 
+            if (Get-CimInstance -Namespace root -ClassName __NAMESPACE -Filter 'Name="SecurityCenter2"' @CommonArgs) 
             {
                 $InstanceArgs['Namespace'] = 'root/SecurityCenter2'
             }
-            elseif (Get-CimInstance -Namespace root -ClassName __NAMESPACE -Filter 'Name="SecurityCenter"' @CommonArgs @Timeout) 
+            elseif (Get-CimInstance -Namespace root -ClassName __NAMESPACE -Filter 'Name="SecurityCenter"' @CommonArgs) 
             {
                 $InstanceArgs['Namespace'] = 'root/SecurityCenter'
             }
@@ -89,11 +78,11 @@ Outputs custom objects representing the current AV configuration.
                 break    
             }
 
-            $AV = Get-CimInstance @InstanceArgs @CommonArgs @Timeout
+            $AV = Get-CimInstance @InstanceArgs @CommonArgs
 
             if ($InstanceArgs['NameSpace'] -eq 'root/SecurityCenter2')
             {
-                $AntiVirus = [PSCustomObject] @{
+                $ObjectProperties = [Ordered] @{
                     PSTypeName = 'CimSweep.AVInfo'
                     Name = $AV.displayName
                     Executable = $AV.pathToSignedProductExe
@@ -101,7 +90,6 @@ Outputs custom objects representing the current AV configuration.
                     ScannerEnabled = $null
                     Updated = $null
                     ExclusionInfo = $null
-                    PSComputerName = $Session.ComputerName
                 }
 
                 #parse the byte value of productstate
@@ -111,26 +99,31 @@ Outputs custom objects representing the current AV configuration.
                 
                 if($scanner -ge (10 -as [byte]))
                 {
-                    $AntiVirus.ScannerEnabled = $True
+                    $ObjectProperties.ScannerEnabled = $True
                 }
                 elseif($scanner -eq (00 -as [byte]) -or $scanner -eq (01 -as [byte]))
                 {
-                    $AntiVirus.ScannerEnabled = $False
+                    $ObjectProperties.ScannerEnabled = $False
                 }
 
                 #Determine if the AV definitions are up to date
                 if($updated -eq (00 -as [byte]))
                 {
-                    $AntiVirus.Updated = $True
+                    $ObjectProperties.Updated = $True
                 }
                 elseif($updated -eq (10 -as [byte]))
                 {
-                    $AntiVirus.Updated = $False
-                }  
+                    $ObjectProperties.Updated = $False
+                }
+
+                if ($Session.ComputerName) { $ObjectProperties['PSComputerName'] = $Session.ComputerName }
+
+                $AntiVirus = [PSCustomObject] $ObjectProperties
             }
             else
             {
-                $AntiVirus = [PSCustomObject] @{
+                $ObjectProperties = [Ordered] @{
+                    PSTypeName = 'CimSweep.AVInfo'
                     Name = $AV.displayName
                     Executable = $AV.pathToEnableOnAccessUI
                     InstanceGUID =  $AV.instanceGuid
@@ -139,6 +132,10 @@ Outputs custom objects representing the current AV configuration.
                     ExclusionInfo = $null
                     PSComputerName = $Session.ComputerName
                 }
+
+                if ($Session.ComputerName) { $ObjectProperties['PSComputerName'] = $Session.ComputerName }
+
+                $AntiVirus = [PSCustomObject] $ObjectProperties
             }
 
 
@@ -159,7 +156,7 @@ Outputs custom objects representing the current AV configuration.
             {
                 $ExclusionInfo = [PSCustomObject] @{}
                 $DefenderPaths.GetEnumerator() | ForEach-Object {
-                    $ExclusionInfo | Add-Member -NotePropertyName $_.Key -NotePropertyValue $(Get-CSRegistryValue -Hive HKLM -SubKey $($_.Value) @CommonArgs @Timeout).ValueName
+                    $ExclusionInfo | Add-Member -NotePropertyName $_.Key -NotePropertyValue $(Get-CSRegistryValue -Hive HKLM -SubKey $($_.Value) @CommonArgs).ValueName
                 }
 
             }
@@ -167,12 +164,15 @@ Outputs custom objects representing the current AV configuration.
             {
                 $ExclusionInfo = [PSCustomObject] @{}
                 $McAfeePaths.GetEnumerator() | ForEach-Object {
-                    $ExclusionInfo | Add-Member -NotePropertyName $_.Key -NotePropertyValue $(Get-CSRegistryValue -Hive HKLM -SubKey $($_.Value) @CommonArgs @Timeout).ValueName
+                    $ExclusionInfo | Add-Member -NotePropertyName $_.Key -NotePropertyValue $(Get-CSRegistryValue -Hive HKLM -SubKey $($_.Value) @CommonArgs).ValueName
                 }
             }
 
             $AntiVirus.ExclusionInfo = $ExclusionInfo
+
             $AntiVirus
         }
     }
 }
+
+Export-ModuleMember -Function Get-CSAVInfo

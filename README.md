@@ -1,6 +1,7 @@
-|Master   |  Dev |
-|:------:|:------:|:-------:|:-------:|
-[![Build status](https://ci.appveyor.com/api/projects/status/58jy9aie7w6aac0y/branch/master?svg=true)](https://ci.appveyor.com/project/mattifestation/cimsweep/branch/master)|[![Build status](https://ci.appveyor.com/api/projects/status/58jy9aie7w6aac0y/branch/dev?svg=true)](https://ci.appveyor.com/project/mattifestation/cimsweep/branch/dev) |
+#### Master
+[![Build status](https://ci.appveyor.com/api/projects/status/58jy9aie7w6aac0y/branch/master?svg=true)](https://ci.appveyor.com/project/mattifestation/cimsweep/branch/master)
+#### Dev
+[![Build status](https://ci.appveyor.com/api/projects/status/58jy9aie7w6aac0y/branch/dev?svg=true)](https://ci.appveyor.com/project/mattifestation/cimsweep/branch/dev)
 
 # CimSweep
 CimSweep is a suite of CIM/WMI-based tools that enable the ability to perform incident response and hunting operations remotely across all versions of Windows. CimSweep may also be used to engage in offensive reconnaisance without the need to drop any payload to disk. Windows Management Instrumentation has been installed and its respective service running by default since Windows XP and Windows 2000 and is fully supported in the latest versions of Windows including Windows 10, Nano Server, and Server 2016.
@@ -93,18 +94,17 @@ All of the following requirements will have an accompanying Pester test to ensur
 
 1. All functions must have an OutputType attribute and an accompanying .OUTPUTS block in comment-based help. It is important to know the types of objects that a function outputs including with custom PowerShell objects. You can apply a type name to custom objects by including a PSTypeName property to each object. Custom object type names must start with CimSweep - e.g. CimSweep.RegistryKey.
 2. All functions must support a -CimSession parameter along with respective .PARAMETER documentation.
-3. All functions must support a -OperationTimeoutSec parameter along with respective .PARAMETER documentation.
-4. All function names must have a "CS" noun prefix.
-5. All functions must contain a .SYNOPSIS help block.
-6. All functions must contain an author name in .SYNOPSIS.
-7. All functions must contain a BSD license clause in .SYNOPSIS.
-8. All functions must contain a .DESCRIPTION help block.
-9. All functions must contain a .PARAMETER block for each defined parameter.
-10. All functions must contain at lease one .EXAMPLE block.
+3. All function names must have a "CS" noun prefix.
+4. All functions must contain a .SYNOPSIS help block.
+5. All functions must contain an author name in .SYNOPSIS.
+6. All functions must contain a BSD license clause in .SYNOPSIS.
+7. All functions must contain a .DESCRIPTION help block.
+8. All functions must contain a .PARAMETER block for each defined parameter.
+9. All functions must contain at lease one .EXAMPLE block.
 
 #### Optional design considerations.
 1. Your function should include a Pester test!!! How else can you be sure it works as designed and that it will be resiliant to refactoring? Without a Pester test, you'll just be left guessing as to whether or not your code will be stable in production.
-2. All defensive or offensive functions should implement a -NoProgressBar parameter and to output a progress bar by default. A progress bar can come in very handy when running a sweep across 1000 systems.
+2. All non-core functions should utilize Write-Progress. A progress bar can come in very handy when running a sweep across 1000 systems.
 3. All error or verbose messages should include the computer name for the local or remote session. This is helpful when diagnosing issues on a large number of remote sessions.
 
 #### Additional design considerations

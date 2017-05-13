@@ -18,10 +18,6 @@ Specifies the user name to enumerate proxy settings for.
 
 Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
 
-.PARAMETER OperationTimeoutSec
-
-Specifies the amount of time that the cmdlet waits for a response from the computer.
-
 .EXAMPLE
 
 Get-CSProxyConfig -UserName bob
@@ -48,11 +44,7 @@ CimSweep.ProxyConfig
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
         [Microsoft.Management.Infrastructure.CimSession[]]
-        $CimSession,
-
-        [UInt32]
-        [Alias('OT')]
-        $OperationTimeoutSec
+        $CimSession
     )
 
     BEGIN
@@ -87,13 +79,13 @@ CimSweep.ProxyConfig
             if($PSBoundParameters['UserName'])
             {
                 $InstanceArgs['Filter'] = "Name=`'$UserName`'"
-                $SID = (Get-CimInstance @InstanceArgs @CommonArgs @Timeout).SID 
+                $SID = (Get-CimInstance @InstanceArgs @CommonArgs).SID 
 
                 $Hive = 'HKU'
                 $SubKey = "$SID\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings\Connections"
             }
 
-            $ProxyConfig = Get-CSRegistryValue -Hive $Hive -SubKey $SubKey -ValueName 'DefaultConnectionSettings' @CommonArgs @Timeout
+            $ProxyConfig = Get-CSRegistryValue -Hive $Hive -SubKey $SubKey -ValueName 'DefaultConnectionSettings' @CommonArgs
 
             if (-not $ProxyConfig) { break }
 
@@ -102,18 +94,21 @@ CimSweep.ProxyConfig
             #If the 5th byte is even, the AutoDetectProxySetting is most likely enabled
             if (($ProxyConfig.ValueContent[4] % 2) -eq 0) { $AutoDetectProxy = $True }
 
-            $ProxySettings = [PSCustomObject] @{
+            $ObjectProperties = [Ordered] @{
                 PSTypeName = 'CimSweep.ProxyConfig'
                 AutoDetectProxy = $AutoDetectProxy
                 InternetSettings = $null
-                PSComputerName = $Session.ComputerName
             }
+
+            if ($Session.ComputerName) { $ObjectProperties['PSComputerName'] = $Session.ComputerName }
+
+            $ProxySettings = [PSCustomObject] $ObjectProperties
 
             #Get the current Internet Settings from the registry
             $SubKey = $SubKey.TrimEnd('Connections')
             $InternetSettings = [PSCustomObject] @{}
 
-            Get-CSRegistryValue -Hive $Hive -SubKey $SubKey @CommonArgs @Timeout | ForEach-Object {
+            Get-CSRegistryValue -Hive $Hive -SubKey $SubKey @CommonArgs | ForEach-Object {
                 $InternetSettings | Add-Member -NotePropertyName $_.ValueName -NotePropertyValue $_.ValueContent
             }
 
@@ -123,3 +118,5 @@ CimSweep.ProxyConfig
         }
     }
 }
+
+Export-ModuleMember -Function Get-CSProxyConfig

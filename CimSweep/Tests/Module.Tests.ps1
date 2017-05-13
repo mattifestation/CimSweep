@@ -32,13 +32,6 @@ Describe 'Module-wide tests' -Tags 'Module' {
                 $CimSessionParam.Name.Extent.Text | Should BeExactly '$CimSession'
                 $CimSessionParam.StaticType.FullName | Should BeExactly 'Microsoft.Management.Infrastructure.CimSession[]'
             }
-
-            It 'should have a -OperationTimeoutSec parameter with proper capitalization and is of type UInt32' {
-                $CimSessionParam = $AST.ParamBlock.Parameters | Where-Object { $_.Name.Extent.Text -eq '$OperationTimeoutSec' }
-                $CimSessionParam | Should Not BeNullOrEmpty
-                $CimSessionParam.Name.Extent.Text | Should BeExactly '$OperationTimeoutSec'
-                $CimSessionParam.StaticType.FullName | Should BeExactly 'System.UInt32'
-            }
         }
 
         Context "Required exported command naming scheme for $Function" {
@@ -67,13 +60,13 @@ Describe 'Module-wide tests' -Tags 'Module' {
             }
             
             # Get the parameters declared in the Comment Based Help
-            $HelpParameters = $Help.Parameters.Parameter
+            $HelpParameters = @($Help.Parameters.Parameter)
             
             # Get the parameters declared in the AST PARAM() Block
-            $ASTParameters = $AST.ParamBlock.Parameters.Name.Variablepath.Userpath
+            $ASTParameters = @($AST.ParamBlock.Parameters.Name.Variablepath.Userpath)
             
             It 'should contain a matching number of .PARAMETER blocks for all defined parameters' {
-                $NamedArgs = try { $AST.ParamBlock.Attributes.NamedArguments } catch {}
+                $NamedArgs = try { $AST.ParamBlock.Attributes.NamedArguments } catch { $null }
 
                 if ($NamedArgs -and $NamedArgs.ArgumentName -contains 'SupportsShouldProcess') {
                     $Count = $ASTParameters.Count + 2 # Accounting for -WhatIf and -Confirm
