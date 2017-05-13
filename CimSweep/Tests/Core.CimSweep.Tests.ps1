@@ -298,13 +298,13 @@ Describe 'Get-CSRegistryValue' {
 
 Describe 'Get-CSEventLog' {
     It 'should return output' {
-        $Result = Get-CSEventLog | Select -First 1
+        $Result = Get-CSEventLog | Select-Object -First 1
 
         $Result.LogName | Should Not BeNullOrEmpty
     }
 
     It 'should return output with CIM sessions' {
-        $Result = Get-CSEventLog -CimSession $TestSessionArray | Select -First 1
+        $Result = Get-CSEventLog -CimSession $TestSessionArray | Select-Object -First 1
 
         $Result.LogName | Should Not BeNullOrEmpty
         $Result.PSComputerName | Should BeExactly 'localhost'
@@ -522,7 +522,7 @@ Describe 'Get-CSDirectoryListing' {
     }
 
     It 'should recurse one folder deep by piping output to itself w/ CIM sessions' {
-        $ConfigDir = Get-CSDirectoryListing -DirectoryPath $SystemDirectory -Directory -CimSession $TestCimSession1 | Where-Object { $_.Name -eq "$SystemDirectory\config" }
+        $ConfigDir = Get-CSDirectoryListing -DirectoryPath $SystemDirectory -Directory -CimSession $TestCimSession1 | Where-Object { $_.Name -eq "$SystemDirectory\drivers" }
         $ConfigDirListing = $ConfigDir | Get-CSDirectoryListing | Select-Object -First 1
 
         $ConfigDirListing | Should Not BeNullOrEmpty
@@ -632,8 +632,6 @@ Describe 'Get-CSDirectoryListing' {
         $TempFileDir = Split-Path $TempFile -Parent
         $TempFileName = Split-Path $TempFile -Leaf
 
-        $TempFileDetails = Get-ChildItem $TempFile
-
         $TempFile | Should Exist
         $FileContents = Get-Content $TempFile
         $FileContents | Should BeExactly ([Text.Encoding]::ASCII.GetString($FileBytes))
@@ -685,8 +683,6 @@ Describe 'Get-CSDirectoryListing' {
 
         $TempFileDir = Split-Path $TempFile -Parent
         $TempFileName = Split-Path $TempFile -Leaf
-
-        $TempFileDetails = Get-ChildItem $TempFile
 
         $TempFile | Should Exist
         $FileContents = Get-Content $TempFile
@@ -763,7 +759,7 @@ Describe 'Get-CSService' {
         $AppDomain = [Reflection.Assembly].Assembly.GetType('System.AppDomain').GetProperty('CurrentDomain').GetValue($null)
         $ServiceSecurityType = $AppDomain.GetAssemblies() | Where-Object {
                 ($_.FullName.StartsWith('CimSweepAssembly')) -and ($_.GetType('CimSweep.ServiceSecurity'))
-            } | Select -First 1
+            } | Select-Object -First 1
 
         $ServiceSecurityType | Should Not BeNullOrEmpty
     }
@@ -1085,7 +1081,7 @@ Describe 'Get-CSWmiNamespace' {
 
         It 'should recurse over namespaces' {
             # Ignore errors since you may not have permission to retrieve all namespaces as an unprivileged user.
-            $AllNamespaces = Get-CSWmiNamespace -ErrorAction SilentlyContinue -Recurse | Select -First 10
+            $AllNamespaces = Get-CSWmiNamespace -ErrorAction SilentlyContinue -Recurse | Select-Object -First 10
 
             $CIMv2Namespaces = Get-CSWmiNamespace -Namespace 'ROOT/CIMV2' -ErrorAction Stop
 
@@ -1099,7 +1095,7 @@ Describe 'Get-CSWmiNamespace' {
             $AppDomain = [Reflection.Assembly].Assembly.GetType('System.AppDomain').GetProperty('CurrentDomain').GetValue($null)
             $WmiNamespaceSecurityType = $AppDomain.GetAssemblies() | Where-Object {
                 ($_.FullName.StartsWith('CimSweepAssembly')) -and ($_.GetType('CimSweep.WmiNamespaceSecurity'))
-            } | Select -First 1
+            } | Select-Object -First 1
 
             $WmiNamespaceSecurityType | Should Not BeNullOrEmpty
         }

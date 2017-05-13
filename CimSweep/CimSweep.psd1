@@ -58,11 +58,17 @@ Enhancements:
 * Added Get-CSBitlockerKeyProtector
 * Get-CSWmiPersistence now also detects persistence in the root/default namespace.
 * Added Get-CSDeviceGuardStatus
+* Added positional parameters for Name parameters for Get-CSEventLogEntry, Get-CSService, Get-CSProcess, Get-CSEnvironmentVariable, and Get-CSWmiNamespace.
 
 Removed:
 * Removed the -NoProgressBar parameter from all functions since this is what $ProgressPreference is for.
 * Removed Set-DefaultDisplayProperty helper function and all calls to it. It was creating unnecessary code complexity.
 * Removed -OperationTimeoutSec param from all functions. Was creating unnecessary code complexity.
+
+General changes:
+* Reorganized the folder structure and removed any offensive code.
+* A decision was also made that CimSweep will only ever have Get- functions. Considering CimSweep is designed to pull information at scale, it should never perform any action that would change system state.
+* Applied PSScriptAnalyzer rules to test code and addressed its findings.
 
 0.5.1
 -----

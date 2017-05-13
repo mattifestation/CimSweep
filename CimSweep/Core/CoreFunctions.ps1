@@ -770,9 +770,9 @@ Outputs Win32_NtLogEvent instances.
     [OutputType('Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_NTLogEvent')]
     [CmdletBinding(DefaultParameterSetName='DefaultOutput')]
     param(
-        [Parameter(ParameterSetName='DefaultOutput')]
-        [Parameter(ParameterSetName='RestrictOutput')]
-        [Parameter(ValueFromPipelineByPropertyName = $True)]
+        [Parameter(Position = 0, ParameterSetName='DefaultOutput')]
+        [Parameter(Position = 0, ParameterSetName='RestrictOutput')]
+        [Parameter(Position = 0, ValueFromPipelineByPropertyName = $True)]
         [String]
         $LogName,
 
@@ -1549,8 +1549,8 @@ Outputs Win32_Service or Win32_SystemDriver instances both of which derive from 
     [CmdletBinding(DefaultParameterSetName='DefaultOutput')]
     [OutputType('Microsoft.Management.Infrastructure.CimInstance#ROOT/cimv2/Win32_BaseService')]
     param(
-        [Parameter(ParameterSetName='DefaultOutput')]
-        [Parameter(ParameterSetName='RestrictOutput')]
+        [Parameter(Position = 0, ParameterSetName='DefaultOutput')]
+        [Parameter(Position = 0, ParameterSetName='RestrictOutput')]
         [String]
         [ValidateNotNullOrEmpty()]
         $Name,
@@ -1996,8 +1996,8 @@ Outputs Win32_Process instances.
     [CmdletBinding(DefaultParameterSetName='DefaultOutput')]
     [OutputType('Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Process')]
     param(
-        [Parameter(ParameterSetName='DefaultOutput')]
-        [Parameter(ParameterSetName='RestrictOutput')]
+        [Parameter(Position = 0, ParameterSetName='DefaultOutput')]
+        [Parameter(Position = 0, ParameterSetName='RestrictOutput')]
         [String]
         [ValidateNotNullOrEmpty()]
         $Name,
@@ -2210,9 +2210,9 @@ Outputs objects consisting of the name, value, and scope (user vs. system) of an
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     [OutputType('CimSweep.EnvironmentVariable')]
     param(
-        [Parameter(ParameterSetName = 'Default')]
-        [Parameter(ParameterSetName = 'System')]
-        [Parameter(ParameterSetName = 'User')]
+        [Parameter(Position = 0, ParameterSetName = 'Default')]
+        [Parameter(Position = 0, ParameterSetName = 'System')]
+        [Parameter(Position = 0, ParameterSetName = 'User')]
         [Alias('Name')]
         [String]
         [ValidateNotNullOrEmpty()]
@@ -2447,6 +2447,7 @@ Microsoft.Management.Infrastructure.CimInstance#root/__NAMESPACE
     [CmdletBinding()]
     [OutputType('Microsoft.Management.Infrastructure.CimInstance#root/__NAMESPACE')]
     Param (
+        [Parameter(Position = 0)]
         [String]
         [ValidateNotNullOrEmpty()]
         $Namespace = 'ROOT',

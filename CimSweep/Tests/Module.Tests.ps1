@@ -66,7 +66,7 @@ Describe 'Module-wide tests' -Tags 'Module' {
             $ASTParameters = @($AST.ParamBlock.Parameters.Name.Variablepath.Userpath)
             
             It 'should contain a matching number of .PARAMETER blocks for all defined parameters' {
-                $NamedArgs = try { $AST.ParamBlock.Attributes.NamedArguments } catch {}
+                $NamedArgs = try { $AST.ParamBlock.Attributes.NamedArguments } catch { $null }
 
                 if ($NamedArgs -and $NamedArgs.ArgumentName -contains 'SupportsShouldProcess') {
                     $Count = $ASTParameters.Count + 2 # Accounting for -WhatIf and -Confirm
