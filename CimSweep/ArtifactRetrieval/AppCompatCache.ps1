@@ -58,7 +58,7 @@ Outputs objects consisting of the application's file path and that file's last m
             if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
 
             # Display a progress activity for each CIM session
-            Write-Progress -Id 1 -Activity 'CimSweep - Installed App Compat database sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+            Write-Progress -Id 1 -Activity 'CimSweep - AppCompatCache sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
             $CurrentCIMSession++
 
             $CommonArgs = @{}
