@@ -9,7 +9,7 @@ License: BSD 3-Clause
 
 .DESCRIPTION
 
-Get-CSNetworkProfile retrieves and parses user assist entry information stored in the registry.
+Get-CSUserAssist retrieves and parses user assist entry information stored in the registry.
 
 .PARAMETER CimSession
 
