@@ -58,7 +58,7 @@ Outputs objects consisting of relevant network profile information. Note: the ti
             if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
 
             # Display a progress activity for each CIM session
-            Write-Progress -Id 1 -Activity 'CimSweep - Network Profiles sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+            Write-Progress -Id 1 -Activity 'CimSweep - Network Profile sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
             $CurrentCIMSession++
 
             $CommonArgs = @{}
