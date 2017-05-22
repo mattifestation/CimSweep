@@ -2,14 +2,14 @@
 <#
 .SYNOPSIS
 
-Retrieves and parses entries from the AppCompatCache based on OS version.
+Retrieves network profile information.
 
 Author: Jesse Davis (@secabstraction)
 License: BSD 3-Clause
 
 .DESCRIPTION
 
-Get-CSAppCompatCache parses entries from the Application Compatibility Cache stored in the registry.
+Get-CSNetworkProfile retrieves and parses network profile information stored in the registry.
 
 .PARAMETER CimSession
 
@@ -17,17 +17,17 @@ Specifies the CIM session to use for this cmdlet. Enter a variable that contains
 
 .EXAMPLE
 
-Get-CSAppCompatCache
+Get-CSNetworkProfile
 
 .EXAMPLE
 
-Get-CSAppCompatCache -CimSession $CimSession
+Get-CSNetworkProfile -CimSession $CimSession
 
 .OUTPUTS
 
-CimSweep.AppCompatCacheEntry
+CimSweep.NetworkProfile
 
-Outputs objects consisting of the application's file path and that file's last modified time. Note: the LastModified property is a UTC datetime string in Round-trip format.
+Outputs objects consisting of relevant network profile information. Note: the timestamps of this object are a UTC datetime string in Round-trip format.
 
 #>
 
