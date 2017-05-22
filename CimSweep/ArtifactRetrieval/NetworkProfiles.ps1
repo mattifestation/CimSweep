@@ -106,3 +106,5 @@ Outputs objects consisting of relevant network profile information. Note: the ti
     }
     end {}
 }
+
+Export-ModuleMember -Function Get-CSNetworkProfile
