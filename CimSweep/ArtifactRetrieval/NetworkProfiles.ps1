@@ -71,34 +71,59 @@ Outputs objects consisting of relevant network profile information. Note: the ti
             }
     
             Get-CSRegistryKey @Parameters @CommonArgs | ForEach-Object { 
+                
                 $Properties = @{}
+                
                 Get-CSRegistryValue -Hive $_.Hive -SubKey $_.SubKey @CommonArgs | ForEach-Object { 
-                    if ($_.ValueName -like "Date*") {
-                        $BinaryReader = New-Object IO.BinaryReader (New-Object IO.MemoryStream (,$_.ValueContent))
-                        
-                        $Year = $BinaryReader.ReadInt16()
-                        $Month = $BinaryReader.ReadInt16()
-                        $null = $BinaryReader.ReadInt16() # skip week day
-                        $Day = $BinaryReader.ReadInt16()
-                        $Hour = $BinaryReader.ReadInt16()
-                        $Minute = $BinaryReader.ReadInt16()
-                        $Second = $BinaryReader.ReadInt16()
-                        $Millisecond = $BinaryReader.ReadInt16()
-                        
-                        $BinaryReader.BaseStream.Dispose()
-                        $BinaryReader.Dispose()
+                    
+                    $ValueName = $_.ValueName
+                    $ValueContent = $_.ValueContent
 
-                        $Properties.Add($_.ValueName, [datetime]::new($Year, $Month, $Day, $Hour, $Minute, $Second, $Millisecond, [DateTimeKind]::Utc).ToString('o'))
-                    }
-                    elseif ($_.ValueName  -eq 'NameType') { 
-                        $Type = switch ($_.ValueContent) {
-                             6 { 'Ethernet' }
-                            23 { 'VPN' }
-                            71 { 'WiFi' }
+                    switch ($ValueName) {
+                        
+                        { $_ -like "Date*" } {
+                            $BinaryReader = New-Object IO.BinaryReader (New-Object IO.MemoryStream (,$ValueContent))
+                        
+                            $Year = $BinaryReader.ReadInt16()
+                            $Month = $BinaryReader.ReadInt16()
+                            $null = $BinaryReader.ReadInt16() # skip week day
+                            $Day = $BinaryReader.ReadInt16()
+                            $Hour = $BinaryReader.ReadInt16()
+                            $Minute = $BinaryReader.ReadInt16()
+                            $Second = $BinaryReader.ReadInt16()
+                            $Millisecond = $BinaryReader.ReadInt16()
+                        
+                            $BinaryReader.BaseStream.Dispose()
+                            $BinaryReader.Dispose()
+
+                            $Date = New-Object datetime -ArgumentList @($Year, $Month, $Day, $Hour, $Minute, $Second, $Millisecond, 'Utc')
+                            
+                            $Properties.Add($ValueName, $Date.ToString('o'))
                         }
-                        $Properties.Add('Type',$Type)
+                        
+                        'NameType' { 
+                            $Type = switch ($ValueContent) {
+                                      6 { 'Wired' }
+                                     23 { 'VPN' }
+                                     71 { 'Wireless' }
+                                default { $ValueContent }
+                            }
+                            $Properties.Add('Type',$Type)
+                        }
+                        
+                        'Category' { 
+                            $Category = switch ($ValueContent) {
+                                0 { 'Public' }
+                                1 { 'Private' }
+                                2 { 'Domain' }
+                            }
+                            $Properties.Add('Category',$Category)
+                        }
+                        
+                        'Managed' { $Properties.Add('Managed', [bool]$ValueContent) }
+                          
+                          default { $Properties.Add($ValueName, $ValueContent) }
                     }
-                    else { $Properties.Add($_.ValueName, $_.ValueContent) }
                 }
                 [PSCustomObject]$Properties 
             } 

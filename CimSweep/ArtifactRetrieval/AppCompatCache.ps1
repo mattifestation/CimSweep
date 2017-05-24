@@ -65,19 +65,22 @@ Outputs objects consisting of the application's file path and that file's last m
 
             if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
 
-            $Parameters = @{
-                ClassName = 'Win32_OperatingSystem'
-                Property = @('Version','OSArchitecture')
+            $OS = Get-CimInstance -ClassName Win32_OperatingSystem @CommonArgs
+            
+            if ($OS.Version -like "5.1*") { 
+                $Parameters = @{
+                    Hive = 'HKLM'
+                    SubKey = 'SYSTEM\CurrentControlSet\Control\Session Manager\AppCompatibility'
+                }
+            }
+            else {
+                $Parameters = @{
+                    Hive = 'HKLM'
+                    SubKey = 'SYSTEM\CurrentControlSet\Control\Session Manager\AppCompatCache'
+                    ValueName = 'AppCompatCache'
+                }
             }
             
-            $OS = Get-CimInstance @Parameters @CommonArgs
-    
-            $Parameters = @{
-                Hive = 'HKLM'
-                SubKey = 'SYSTEM\CurrentControlSet\Control\Session Manager\AppCompatCache'
-                ValueName = 'AppCompatCache'
-            }
-    
             $AppCompatCache = Get-CSRegistryValue @Parameters @CommonArgs
 
             ConvertFrom-ByteArray -CacheBytes $AppCompatCache.ValueContent -OSVersion $OS.Version -OSArchitecture $OS.OSArchitecture
@@ -130,7 +133,6 @@ ConvertFrom-ByteArray -CacheBytes $AppCompatCacheKeyBytes -OSVersion 6.1 -OSArch
         $OSVersion,
         
         [Parameter()]
-        [ValidateSet('32-bit','64-bit')]
         [string]
         $OSArchitecture
     )

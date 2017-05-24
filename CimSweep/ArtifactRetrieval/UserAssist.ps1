@@ -91,10 +91,16 @@ Outputs objects consisting of relevant user assist information. Note: the LastEx
                                     default { $PlainCharList.Add($CipherChar) } # Pass through symbols and numbers
                                 }
                             }
+                            
+                            $ValueContent = $_.ValueContent
 
                             # Parse LastExecutedTime from binary data
-                            $FileTime = [datetime]::FromFileTime([BitConverter]::ToInt64($_.ValueContent[60..67],0))
-                            
+                            $FileTime = switch ($ValueContent.Count) {
+                                 8 { [datetime]::MinValue }
+                                16 { [datetime]::FromFileTime([BitConverter]::ToInt64($ValueContent[8..15],0)) }
+                                72 { [datetime]::FromFileTime([BitConverter]::ToInt64($ValueContent[60..67],0)) }
+                            }
+
                             [PSCustomObject]@{ 
                                 PSTypeName = 'CimSweep.UserAssistEntry'
                                 Name = -join $PlainCharList
