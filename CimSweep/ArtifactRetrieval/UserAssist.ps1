@@ -75,42 +75,38 @@ Outputs objects consisting of relevant user assist information. Note: the LastEx
                     Recurse = $true
                 }
     
-                Get-CSRegistryKey @Parameters @CommonArgs | ForEach-Object { 
-                    if ($_.SubKey -like "*Count") { 
-                        Get-CSRegistryValue -Hive $_.Hive -SubKey $_.SubKey @CommonArgs | ForEach-Object {
+                Get-CSRegistryKey @Parameters @CommonArgs | Where-Object { $_.SubKey -like "*Count" } | Get-CSRegistryValue @CommonArgs | ForEach-Object {
                             
-                            # Decrypt Rot13 from https://github.com/StackCrash/PoshCiphers
-                            # truncated && streamlined algorithm a little
+                    # Decrypt Rot13 from https://github.com/StackCrash/PoshCiphers
+                    # truncated && streamlined algorithm a little
 
-                            $PlainCharList = New-Object Collections.Generic.List[char]
-                            foreach ($CipherChar in $_.ValueName.ToCharArray()) {
+                    $PlainCharList = New-Object Collections.Generic.List[char]
+                    foreach ($CipherChar in $_.ValueName.ToCharArray()) {
     
-                                switch ($CipherChar) {
-                                    { $_ -ge 65 -and $_ -le 90 } { $PlainCharList.Add((((($_ - 65 - 13) % 26 + 26) % 26) + 65)) } # Uppercase characters
-                                    { $_ -ge 97 -and $_ -le 122 } { $PlainCharList.Add((((($_ - 97 - 13) % 26 + 26) % 26) + 97)) } # Lowercase characters
-                                    default { $PlainCharList.Add($CipherChar) } # Pass through symbols and numbers
-                                }
-                            }
-                            
-                            $ValueContent = $_.ValueContent
-
-                            # Parse LastExecutedTime from binary data
-                            $FileTime = switch ($ValueContent.Count) {
-                                 8 { [datetime]::MinValue }
-                                16 { [datetime]::FromFileTime([BitConverter]::ToInt64($ValueContent[8..15],0)) }
-                                72 { [datetime]::FromFileTime([BitConverter]::ToInt64($ValueContent[60..67],0)) }
-                            }
-
-                            [PSCustomObject]@{ 
-                                PSTypeName = 'CimSweep.UserAssistEntry'
-                                Name = -join $PlainCharList
-                                UserSid = $Sid
-                                LastExecutedTime = $FileTime.ToUniversalTime().ToString('o')
-                            }
+                        switch ($CipherChar) {
+                            { $_ -ge 65 -and $_ -le 90 } { $PlainCharList.Add((((($_ - 65 - 13) % 26 + 26) % 26) + 65)) } # Uppercase characters
+                            { $_ -ge 97 -and $_ -le 122 } { $PlainCharList.Add((((($_ - 97 - 13) % 26 + 26) % 26) + 97)) } # Lowercase characters
+                            default { $PlainCharList.Add($CipherChar) } # Pass through symbols and numbers
                         }
-                    } 
+                    }
+                            
+                    $ValueContent = $_.ValueContent
+
+                    # Parse LastExecutedTime from binary data
+                    $FileTime = switch ($ValueContent.Count) {
+                              8 { [datetime]::MinValue }
+                             16 { [datetime]::FromFileTime([BitConverter]::ToInt64($ValueContent[8..15],0)) }
+                        default { [datetime]::FromFileTime([BitConverter]::ToInt64($ValueContent[60..67],0)) }
+                    }
+
+                    [PSCustomObject]@{ 
+                        PSTypeName = 'CimSweep.UserAssistEntry'
+                        Name = -join $PlainCharList
+                        UserSid = $Sid
+                        LastExecutedTime = $FileTime.ToUniversalTime().ToString('o')
+                    }
                 }
-            }
+            } 
         }
     }
     end {}

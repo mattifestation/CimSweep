@@ -137,8 +137,7 @@ ConvertFrom-ByteArray -CacheBytes $AppCompatCacheKeyBytes -OSVersion 6.1 -OSArch
         $OSArchitecture
     )
 
-    $MemoryStream = New-Object IO.MemoryStream -ArgumentList @(,$CacheBytes)
-    $BinaryReader = New-Object IO.BinaryReader -ArgumentList $MemoryStream
+    $BinaryReader = New-Object IO.BinaryReader (New-Object IO.MemoryStream (,$CacheBytes))
 
     $ASCIIEncoding = [Text.Encoding]::ASCII
     $UnicodeEncoding = [Text.Encoding]::Unicode
@@ -324,8 +323,8 @@ ConvertFrom-ByteArray -CacheBytes $AppCompatCacheKeyBytes -OSVersion 6.1 -OSArch
             } until ($EntryPosition -eq $NumberOfEntries)
         }
     }
+    $BinaryReader.BaseStream.Dispose()
     $BinaryReader.Dispose()
-    $MemoryStream.Dispose()
 }
 
 Export-ModuleMember -Function Get-CSAppCompatCache
