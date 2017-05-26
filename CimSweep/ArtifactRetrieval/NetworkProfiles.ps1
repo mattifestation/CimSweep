@@ -72,7 +72,7 @@ Outputs objects consisting of relevant network profile information. Note: the ti
     
             Get-CSRegistryKey @Parameters @CommonArgs | ForEach-Object { 
                 
-                $Properties = @{}
+                $ObjectProperties = @{}
                 
                 Get-CSRegistryValue -Hive $_.Hive -SubKey $_.SubKey @CommonArgs | ForEach-Object { 
                     
@@ -98,34 +98,35 @@ Outputs objects consisting of relevant network profile information. Note: the ti
 
                             $Date = New-Object datetime -ArgumentList @($Year, $Month, $Day, $Hour, $Minute, $Second, $Millisecond, 'Utc')
                             
-                            $Properties.Add($ValueName, $Date.ToString('o'))
+                            $ObjectProperties[$ValueName] =  $Date.ToString('o')
                         }
                         
                         'NameType' { 
-                            $Type = switch ($ValueContent) {
+                            $ObjectProperties['Type'] = switch ($ValueContent) {
                                       6 { 'Wired' }
                                      23 { 'VPN' }
                                      71 { 'Wireless' }
                                 default { $ValueContent }
                             }
-                            $Properties.Add('Type',$Type)
                         }
                         
                         'Category' { 
-                            $Category = switch ($ValueContent) {
+                            $ObjectProperties['Category'] = switch ($ValueContent) {
                                 0 { 'Public' }
                                 1 { 'Private' }
                                 2 { 'Domain' }
                             }
-                            $Properties.Add('Category',$Category)
                         }
                         
-                        'Managed' { $Properties.Add('Managed', [bool]$ValueContent) }
+                        'Managed' { $ObjectProperties['Managed'] = [bool]$ValueContent }
                           
-                          default { $Properties.Add($ValueName, $ValueContent) }
+                          default { $ObjectProperties[$ValueName] = $ValueContent }
                     }
                 }
-                [PSCustomObject]$Properties 
+                if ($_.PSComputerName) { $ObjectProperties['PSComputerName'] = $_.PSComputerName }
+                if ($_.CimSession) { $ObjectProperties['CimSession'] = $_.CimSession }
+                
+                [PSCustomObject]$ObjectProperties
             } 
         }
     }

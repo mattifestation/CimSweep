@@ -81,9 +81,8 @@ Outputs objects consisting of the application's file path and that file's last m
                 }
             }
             
-            $AppCompatCache = Get-CSRegistryValue @Parameters @CommonArgs
-
-            ConvertFrom-ByteArray -CacheBytes $AppCompatCache.ValueContent -OSVersion $OS.Version -OSArchitecture $OS.OSArchitecture
+            $AppCompatCacheValue = Get-CSRegistryValue @Parameters @CommonArgs
+            ConvertFrom-ByteArray -CacheValue $AppCompatCacheValue -OSVersion $OS.Version -OSArchitecture $OS.OSArchitecture
         }
     }
     end {}
@@ -105,7 +104,7 @@ Thanks to @ericrzimmerman for these test files https://github.com/EricZimmerman/
 
 ConvertFrom-ByteArray converts bytes from the AppCompatCache registry key into objects.
 
-.PARAMETER CacheBytes
+.PARAMETER CacheValue
 
 Byte array from the AppCompatCache registry key.
 
@@ -124,8 +123,8 @@ ConvertFrom-ByteArray -CacheBytes $AppCompatCacheKeyBytes -OSVersion 6.1 -OSArch
     param (
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [byte[]]
-        $CacheBytes,
+        [Object]
+        $CacheValue,
         
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
@@ -137,7 +136,7 @@ ConvertFrom-ByteArray -CacheBytes $AppCompatCacheKeyBytes -OSVersion 6.1 -OSArch
         $OSArchitecture
     )
 
-    $BinaryReader = New-Object IO.BinaryReader (New-Object IO.MemoryStream (,$CacheBytes))
+    $BinaryReader = New-Object IO.BinaryReader (New-Object IO.MemoryStream (,$CacheValue.ValueContent))
 
     $ASCIIEncoding = [Text.Encoding]::ASCII
     $UnicodeEncoding = [Text.Encoding]::Unicode
@@ -162,11 +161,17 @@ ConvertFrom-ByteArray -CacheBytes $AppCompatCacheKeyBytes -OSVersion 6.1 -OSArch
                 
                 $null = $BinaryReader.ReadBytes($BinaryReader.ReadInt32()) # skip some bytes
 
-                [PSCustomObject]@{
+                $ObjectProperties = @{
                     PSTypeName = 'CimSweep.AppCompatCacheEntry'
                     Path = $Path
                     LastModifiedTime = $LastModifiedTime.ToUniversalTime().ToString('o')
                 }
+
+                if ($CacheValue.PSComputerName) { $ObjectProperties['PSComputerName'] = $CacheValue.PSComputerName }
+                if ($CacheValue.CimSession) { $ObjectProperties['CimSession'] = $CacheValue.CimSession }
+                
+                [PSCustomObject]$ObjectProperties
+
             } until ($ASCIIEncoding.GetString($BinaryReader.ReadBytes(4)) -ne '10ts')
         }
 
@@ -187,12 +192,18 @@ ConvertFrom-ByteArray -CacheBytes $AppCompatCacheKeyBytes -OSVersion 6.1 -OSArch
                 $LastModifiedTime = [DateTimeOffset]::FromFileTime($BinaryReader.ReadInt64()).DateTime
                 
                 $null = $BinaryReader.ReadBytes($BinaryReader.ReadInt32()) # skip some bytes
-                        
-                [PSCustomObject]@{
+                 
+                $ObjectProperties = @{
                     PSTypeName = 'CimSweep.AppCompatCacheEntry'
                     Path = $Path
                     LastModifiedTime = $LastModifiedTime.ToUniversalTime().ToString('o')
                 }
+
+                if ($CacheValue.PSComputerName) { $ObjectProperties['PSComputerName'] = $CacheValue.PSComputerName }
+                if ($CacheValue.CimSession) { $ObjectProperties['CimSession'] = $CacheValue.CimSession }
+                
+                [PSCustomObject]$ObjectProperties
+
             } until ($ASCIIEncoding.GetString($BinaryReader.ReadBytes(4)) -ne '10ts')
         }
 
@@ -212,12 +223,18 @@ ConvertFrom-ByteArray -CacheBytes $AppCompatCacheKeyBytes -OSVersion 6.1 -OSArch
                 $LastModifiedTime = [DateTimeOffset]::FromFileTime($BinaryReader.ReadInt64()).DateTime
                 
                 $null = $BinaryReader.ReadBytes($BinaryReader.ReadInt32()) # skip some bytes
-
-                [PSCustomObject]@{
+                
+                $ObjectProperties = @{
                     PSTypeName = 'CimSweep.AppCompatCacheEntry'
                     Path = $Path
                     LastModifiedTime = $LastModifiedTime.ToUniversalTime().ToString('o')
                 }
+
+                if ($CacheValue.PSComputerName) { $ObjectProperties['PSComputerName'] = $CacheValue.PSComputerName }
+                if ($CacheValue.CimSession) { $ObjectProperties['CimSession'] = $CacheValue.CimSession }
+                
+                [PSCustomObject]$ObjectProperties
+
             } until ($ASCIIEncoding.GetString($BinaryReader.ReadBytes(4)) -ne '00ts')
         }
         
@@ -252,12 +269,18 @@ ConvertFrom-ByteArray -CacheBytes $AppCompatCacheKeyBytes -OSVersion 6.1 -OSArch
                     $Path = $UnicodeEncoding.GetString($BinaryReader.ReadBytes($PathSize))
 
                     $null = $BinaryReader.BaseStream.Seek($Position, [IO.SeekOrigin]::Begin)
-
-                    [PSCustomObject]@{
+                    
+                    $ObjectProperties = @{
                         PSTypeName = 'CimSweep.AppCompatCacheEntry'
                         Path = $Path
                         LastModifiedTime = $LastModifiedTime.ToUniversalTime().ToString('o')
                     }
+
+                    if ($CacheValue.PSComputerName) { $ObjectProperties['PSComputerName'] = $CacheValue.PSComputerName }
+                    if ($CacheValue.CimSession) { $ObjectProperties['CimSession'] = $CacheValue.CimSession }
+                
+                    [PSCustomObject]$ObjectProperties
+
                 } until ($EntryPosition -eq $NumberOfEntries)
             }
 
@@ -283,12 +306,18 @@ ConvertFrom-ByteArray -CacheBytes $AppCompatCacheKeyBytes -OSVersion 6.1 -OSArch
                     $Path = $UnicodeEncoding.GetString($BinaryReader.ReadBytes($PathSize))
 
                     $null = $BinaryReader.BaseStream.Seek($Position, [IO.SeekOrigin]::Begin)
-
-                    [PSCustomObject]@{
+                    
+                    $ObjectProperties = @{
                         PSTypeName = 'CimSweep.AppCompatCacheEntry'
                         Path = $Path
                         LastModifiedTime = $LastModifiedTime.ToUniversalTime().ToString('o')
                     }
+
+                    if ($CacheValue.PSComputerName) { $ObjectProperties['PSComputerName'] = $CacheValue.PSComputerName }
+                    if ($CacheValue.CimSession) { $ObjectProperties['CimSession'] = $CacheValue.CimSession }
+                
+                    [PSCustomObject]$ObjectProperties
+
                 } until ($EntryPosition -eq $NumberOfEntries)
             }
         }
@@ -314,12 +343,18 @@ ConvertFrom-ByteArray -CacheBytes $AppCompatCacheKeyBytes -OSVersion 6.1 -OSArch
                 if (($LastModifiedTime.Year -eq 1600) -and !$Path) { break } # empty entries == end
 
                 $null = $BinaryReader.BaseStream.Seek(16, [IO.SeekOrigin]::Current) # skip some bytes
-
-                [PSCustomObject]@{
+                
+                $ObjectProperties = @{
                     PSTypeName = 'CimSweep.AppCompatCacheEntry'
                     Path = $Path
                     LastModifiedTime = $LastModifiedTime.ToUniversalTime().ToString('o')
                 }
+
+                if ($CacheValue.PSComputerName) { $ObjectProperties['PSComputerName'] = $CacheValue.PSComputerName }
+                if ($CacheValue.CimSession) { $ObjectProperties['CimSession'] = $CacheValue.CimSession }
+                
+                [PSCustomObject]$ObjectProperties
+
             } until ($EntryPosition -eq $NumberOfEntries)
         }
     }
