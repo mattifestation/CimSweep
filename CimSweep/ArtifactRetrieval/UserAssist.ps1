@@ -99,17 +99,14 @@ Outputs objects consisting of relevant user assist information. Note: the LastEx
                         default { [datetime]::FromFileTime([BitConverter]::ToInt64($ValueContent[60..67],0)) }
                     }
 
-                    $ObjectProperties = @{ 
+                    
+                    [PSCustomObject] @{ 
                         PSTypeName = 'CimSweep.UserAssistEntry'
                         Name = -join $PlainCharList
                         UserSid = $Sid
                         LastExecutedTime = $FileTime.ToUniversalTime().ToString('o')
+                        PSComputerName = $_.PSComputerName 
                     }
-
-                    if ($_.PSComputerName) { $ObjectProperties['PSComputerName'] = $_.PSComputerName }
-                    if ($_.CimSession) { $ObjectProperties['CimSession'] = $_.CimSession }
-                
-                    [PSCustomObject]$ObjectProperties
                 }
             } 
         }

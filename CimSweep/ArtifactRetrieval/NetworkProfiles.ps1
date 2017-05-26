@@ -73,7 +73,8 @@ Outputs objects consisting of relevant network profile information. Note: the ti
             Get-CSRegistryKey @Parameters @CommonArgs | ForEach-Object { 
                 
                 $ObjectProperties = @{}
-                
+                $ObjectProperties['PSComputerName'] = $_.PSComputerName
+
                 Get-CSRegistryValue -Hive $_.Hive -SubKey $_.SubKey @CommonArgs | ForEach-Object { 
                     
                     $ValueName = $_.ValueName
@@ -123,9 +124,6 @@ Outputs objects consisting of relevant network profile information. Note: the ti
                           default { $ObjectProperties[$ValueName] = $ValueContent }
                     }
                 }
-                if ($_.PSComputerName) { $ObjectProperties['PSComputerName'] = $_.PSComputerName }
-                if ($_.CimSession) { $ObjectProperties['CimSession'] = $_.CimSession }
-                
                 [PSCustomObject]$ObjectProperties
             } 
         }
