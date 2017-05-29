@@ -34,6 +34,7 @@ FunctionsToExport = @(
     'Get-CSWmiPersistence',
     'Get-CSWmiNamespace',
     'Get-CSVulnerableServicePermission',
+    'Get-CSEventLogPermission',
     'Get-CSAVInfo',
     'Get-CSProxyConfig',
     'Get-CSInstalledAppCompatShimDatabase',
@@ -51,6 +52,11 @@ PrivateData = @{
         ProjectUri = 'https://github.com/PowerShellMafia/CimSweep'
 
         ReleaseNotes = @'
+0.6.1
+-----
+Enhacements:
+* Add Get-CSEventLogPermission
+
 0.6.0
 -----
 Enhancements:

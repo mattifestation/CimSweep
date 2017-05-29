@@ -208,4 +208,141 @@ Service ACL sweep across a large amount of hosts will take a long time.
     }
 }
 
-Export-ModuleMember -Function Get-CSVulnerableServicePermission
+function Get-CSEventLogPermission {
+<#
+.SYNOPSIS
+
+List event log permissions granted for each defined group.
+
+Author: Matthew Graeber (@mattifestation)
+License: BSD 3-Clause
+
+.DESCRIPTION
+
+Get-CSEventLogPermission is used to perform event log ACL audits at scale. For each computer, it iterates through each event log security descriptor and groups potentially vulnerable access rights granted to each group. Event log security descriptors are stored in HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WINEVT\Channels.
+
+.PARAMETER CimSession
+
+Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
+
+.EXAMPLE
+
+Get-CSEventLogPermission
+
+.OUTPUTS
+
+CimSweep.EventLogACLAudit
+
+Outputs objects representing each group granted event log access rights.
+
+.NOTES
+
+Event log ACL sweep across a large amount of hosts will take a long time.
+#>
+
+    [CmdletBinding()]
+    [OutputType('CimSweep.EventLogACLAudit')]
+    param (
+        [Alias('Session')]
+        [ValidateNotNullOrEmpty()]
+        [Microsoft.Management.Infrastructure.CimSession[]]
+        $CimSession
+    )
+
+    BEGIN {
+        if (-not $PSBoundParameters['CimSession']) {
+            $CimSession = ''
+            $CIMSessionCount = 1
+        } else {
+            $CIMSessionCount = $CimSession.Count
+        }
+
+        $CurrentCIMSession = 0
+    }
+
+    PROCESS {
+        foreach ($Session in $CimSession) {
+            $ComputerName = $Session.ComputerName
+            if (-not $Session.ComputerName) { $ComputerName = 'localhost' }
+
+            # Display a progress activity for each CIM session
+            Write-Progress -Id 1 -Activity 'CimSweep - Event log ACL sweep' -Status "($($CurrentCIMSession+1)/$($CIMSessionCount)) Current computer: $ComputerName" -PercentComplete (($CurrentCIMSession / $CIMSessionCount) * 100)
+            $CurrentCIMSession++
+
+            $CommonArgs = @{}
+
+            if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
+
+            $UserGrouping = @{}
+
+            $EventChannels = Get-CSRegistryKey -Hive HKLM -SubKey 'SOFTWARE\Microsoft\Windows\CurrentVersion\WINEVT\Channels' @CommonArgs
+
+            $ChannelCount = $EventChannels.Count
+            $CurrentChannelCount = 0
+
+            $EventChannels | Get-CSRegistryValue -ValueName ChannelAccess @CommonArgs | ForEach-Object {
+                $ChannelName = $_.Subkey.Split('\')[-1]
+                
+                Write-Progress -Id 2 -ParentId 1 -Activity "Current event channel:" -Status $ChannelName -PercentComplete (($CurrentChannelCount / $ChannelCount) * 100)
+                
+                $CurrentChannelCount++
+
+                $AccessString = $_.ValueContent
+                $SecurityDescriptor = ConvertFrom-SddlString -Sddl $AccessString
+
+                foreach ($ACE in $SecurityDescriptor.RawDescriptor.DiscretionaryAcl) {
+                    if ($ACE.AceQualifier -eq [Security.AccessControl.AceQualifier]::AccessAllowed) {
+                        $Account = $null
+
+                        $SID = [Security.Principal.SecurityIdentifier] $ACE.SecurityIdentifier
+        
+                        try { $Account = $SID.Translate([Security.Principal.NTAccount]).ToString() } catch {
+                            $Account = $ACE.SecurityIdentifier
+                        }
+
+                        if (-not $UserGrouping.ContainsKey($Account)) {
+                            $Permissions = [PSCustomObject] @{
+                                EventCanRead =       (New-Object 'Collections.ObjectModel.Collection`1[System.String]')
+                                EventCanWrite =      (New-Object 'Collections.ObjectModel.Collection`1[System.String]')
+                                EventCanClear =      (New-Object 'Collections.ObjectModel.Collection`1[System.String]')
+                                EventCanWriteDAC =   (New-Object 'Collections.ObjectModel.Collection`1[System.String]')
+                                EventCanWriteOwner = (New-Object 'Collections.ObjectModel.Collection`1[System.String]')
+                            }
+                        } else {
+                            $Permissions = $UserGrouping[$Account]
+                        }
+
+                        $UserGrouping[$Account] = $Permissions
+        
+                        if (($ACE.AccessMask -band 1) -eq 1) { $UserGrouping[$Account].EventCanRead.Add($ChannelName) }
+                        if (($ACE.AccessMask -band 2) -eq 2) { $UserGrouping[$Account].EventCanWrite.Add($ChannelName) }
+                        if (($ACE.AccessMask -band 4) -eq 4) { $UserGrouping[$Account].EventCanClear.Add($ChannelName) }
+                        if (($ACE.AccessMask -band 0x00040000) -eq 0x00040000) { $UserGrouping[$Account].EventCanWriteDAC.Add($ChannelName) }
+                        if (($ACE.AccessMask -band 0x00080000) -eq 0x00080000) { $UserGrouping[$Account].EventCanWriteOwner.Add($ChannelName) }
+                    }
+                }
+            }
+
+            foreach ($Group in $UserGrouping.Keys) {
+                $Permissions = $UserGrouping[$Group]
+
+                $ObjectProperties = [Ordered] @{
+                    PSTypeName = 'CimSweep.EventLogACLAudit'
+                    GroupName = $Group
+                    EventCanRead = $Permissions.EventCanRead
+                    EventCanWrite = $Permissions.EventCanWrite
+                    EventCanClear = $Permissions.EventCanClear
+                    EventCanWriteDAC = $Permissions.EventCanWriteDAC
+                    EventCanWriteOwner = $Permissions.EventCanWriteOwner
+                }
+
+                if ($Session.ComputerName) { $ObjectProperties['PSComputerName'] = $Session.ComputerName }
+
+                [PSCustomObject] $ObjectProperties
+            }
+        }
+    }
+}
+
+Export-ModuleMember -Function 'Get-CSVulnerableServicePermission',
+    'Get-CSEventLogPermission'
