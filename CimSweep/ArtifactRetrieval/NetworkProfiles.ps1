@@ -64,7 +64,22 @@ Outputs objects consisting of relevant network profile information. Note: the ti
             $CommonArgs = @{}
 
             if ($Session.Id) { $CommonArgs['CimSession'] = $Session }
-                
+            
+            $Parameters = @{
+                Hive = 'HKLM'
+                SubKey = 'SYSTEM\CurrentControlSet\Control\TimeZoneInformation'
+                ValueName = 'TimeZoneKeyName'
+                ValueType = 'REG_SZ'
+            }
+
+            $TimeZoneName = Get-CSRegistryValue @Parameters @CommonArgs
+
+            # TimeZoneKeyName doesn't exist on XP, but CimSweep still returns an object as though it did
+            # NetworkList also doesn't exist on XP, so might as well bail now.
+
+            try { $TimeZoneInfo = [TimeZoneInfo]::FindSystemTimeZoneById($TimeZoneName.ValueContent) }
+            catch { break }
+
             $Parameters = @{
                 Hive = 'HKLM'
                 SubKey = 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\NetworkList\Profiles'
@@ -72,8 +87,7 @@ Outputs objects consisting of relevant network profile information. Note: the ti
     
             Get-CSRegistryKey @Parameters @CommonArgs | ForEach-Object { 
                 
-                $ObjectProperties = @{}
-                $ObjectProperties['PSComputerName'] = $_.PSComputerName
+                $ObjectProperties = [ordered] @{ PSTypeName = 'CimSweep.NetworkProfile' }
 
                 Get-CSRegistryValue -Hive $_.Hive -SubKey $_.SubKey @CommonArgs | ForEach-Object { 
                     
@@ -94,12 +108,13 @@ Outputs objects consisting of relevant network profile information. Note: the ti
                             $Second = $BinaryReader.ReadInt16()
                             $Millisecond = $BinaryReader.ReadInt16()
                         
-                            $BinaryReader.BaseStream.Dispose()
                             $BinaryReader.Dispose()
 
-                            $Date = New-Object datetime -ArgumentList @($Year, $Month, $Day, $Hour, $Minute, $Second, $Millisecond, 'Utc')
-                            
-                            $ObjectProperties[$ValueName] =  $Date.ToString('o')
+                            # dates are stored in local timezone
+                            $DateTime = New-Object datetime -ArgumentList @($Year, $Month, $Day, $Hour, $Minute, $Second, $Millisecond, 'Unspecified')
+                            $CorrectedTime = [TimeZoneInfo]::ConvertTimeToUtc($DateTime, $TimeZoneInfo)
+
+                            $ObjectProperties[$ValueName] =  $CorrectedTime.ToString('o')
                         }
                         
                         'NameType' { 
@@ -124,6 +139,7 @@ Outputs objects consisting of relevant network profile information. Note: the ti
                           default { $ObjectProperties[$ValueName] = $ValueContent }
                     }
                 }
+                if ($_.PSComputerName) { $ObjectProperties['PSComputerName'] = $_.PSComputerName }
                 [PSCustomObject]$ObjectProperties
             } 
         }

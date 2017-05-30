@@ -94,19 +94,20 @@ Outputs objects consisting of relevant user assist information. Note: the LastEx
 
                     # Parse LastExecutedTime from binary data
                     $FileTime = switch ($ValueContent.Count) {
-                              8 { [datetime]::MinValue }
+                              8 { [datetime]::FromFileTime(0) }
                              16 { [datetime]::FromFileTime([BitConverter]::ToInt64($ValueContent[8..15],0)) }
                         default { [datetime]::FromFileTime([BitConverter]::ToInt64($ValueContent[60..67],0)) }
                     }
 
-                    
-                    [PSCustomObject] @{ 
+                    $ObjectProperties = [ordered] @{ 
                         PSTypeName = 'CimSweep.UserAssistEntry'
                         Name = -join $PlainCharList
                         UserSid = $Sid
                         LastExecutedTime = $FileTime.ToUniversalTime().ToString('o')
-                        PSComputerName = $_.PSComputerName 
                     }
+
+                    if ($_.PSComputerName) { $ObjectProperties['PSComputerName'] = $_.PSComputerName }
+                    [PSCustomObject]$ObjectProperties
                 }
             } 
         }
