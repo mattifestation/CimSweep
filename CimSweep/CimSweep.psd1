@@ -57,8 +57,9 @@ PrivateData = @{
         ReleaseNotes = @'
 0.6.1
 -----
-Enhacements:
-* Add Get-CSEventLogPermission
+Enhancements:
+* Added Get-CSEventLogPermission
+* Added the following from @secabstraction: Get-CSAppCompatCache, Get-CSNetworkProfile, Get-CSUserAssist
 
 0.6.0
 -----
