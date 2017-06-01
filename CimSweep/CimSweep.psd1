@@ -37,7 +37,10 @@ FunctionsToExport = @(
     'Get-CSEventLogPermission',
     'Get-CSAVInfo',
     'Get-CSProxyConfig',
+    'Get-CSNetworkProfile',
     'Get-CSInstalledAppCompatShimDatabase',
+    'Get-CSAppCompatCache',
+    'Get-CSUserAssist',
     'Get-CSBitlockerKeyProtector',
     'Get-CSDeviceGuardStatus'
 )
