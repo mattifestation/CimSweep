@@ -33,7 +33,7 @@ FunctionsToExport = @(
     'Get-CSTypedURL',
     'Get-CSWmiPersistence',
     'Get-CSWmiNamespace',
-    'Get-CSVulnerableServicePermission',
+    'Get-CSServicePermission',
     'Get-CSEventLogPermission',
     'Get-CSAVInfo',
     'Get-CSProxyConfig',
@@ -61,6 +61,7 @@ Enhancements:
 * Added Get-CSEventLogPermission
 * Added the following from @secabstraction: Get-CSAppCompatCache, Get-CSNetworkProfile, Get-CSUserAssist
 * Bugfix: Removed .ForEach PSv4 language dependency
+* Renamed Get-CSVulnerableServicePermission to Get-CSServicePermission
 
 0.6.0
 -----

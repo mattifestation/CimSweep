@@ -1,4 +1,4 @@
-﻿function Get-CSVulnerableServicePermission {
+﻿function Get-CSServicePermission {
 <#
 .SYNOPSIS
 
@@ -9,7 +9,7 @@ License: BSD 3-Clause
 
 .DESCRIPTION
 
-Get-CSVulnerableServicePermission is used to perform service ACL audits at scale. For each computer, it iterates through the service and associated file permissions and groups potentially vulnerable access rights granted to each user. This can be used to quickly identify if members of lower privileged groups can elevate privileges via service misconfigurations.
+Get-CSServicePermission is used to perform service ACL audits at scale. For each computer, it iterates through the service and associated file permissions and groups potentially vulnerable access rights granted to each user. This can be used to quickly identify if members of lower privileged groups can elevate privileges via service misconfigurations.
 
 .PARAMETER IncludeDrivers
 
@@ -21,7 +21,7 @@ Specifies the CIM session to use for this cmdlet. Enter a variable that contains
 
 .EXAMPLE
 
-Get-CSVulnerableServicePermission
+Get-CSServicePermission
 
 Returns a list of groups and the services to which they are granted access to perform potentially vulnerable actions.
 
@@ -344,5 +344,5 @@ Event log ACL sweep across a large amount of hosts will take a long time.
     }
 }
 
-Export-ModuleMember -Function 'Get-CSVulnerableServicePermission',
+Export-ModuleMember -Function 'Get-CSServicePermission',
     'Get-CSEventLogPermission'
