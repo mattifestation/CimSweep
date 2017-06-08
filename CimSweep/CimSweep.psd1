@@ -1,7 +1,7 @@
 ﻿@{
 RootModule = 'CimSweep.psm1'
 
-ModuleVersion = '0.6.0.0'
+ModuleVersion = '0.6.1.1'
 
 GUID = 'f347ef1c-d752-4d07-bf68-3197c0aa661a'
 
@@ -33,10 +33,14 @@ FunctionsToExport = @(
     'Get-CSTypedURL',
     'Get-CSWmiPersistence',
     'Get-CSWmiNamespace',
-    'Get-CSVulnerableServicePermission',
+    'Get-CSServicePermission',
+    'Get-CSEventLogPermission',
     'Get-CSAVInfo',
     'Get-CSProxyConfig',
+    'Get-CSNetworkProfile',
     'Get-CSInstalledAppCompatShimDatabase',
+    'Get-CSAppCompatCache',
+    'Get-CSUserAssist',
     'Get-CSBitlockerKeyProtector',
     'Get-CSDeviceGuardStatus'
 )
@@ -51,6 +55,14 @@ PrivateData = @{
         ProjectUri = 'https://github.com/PowerShellMafia/CimSweep'
 
         ReleaseNotes = @'
+0.6.1
+-----
+Enhancements:
+* Added Get-CSEventLogPermission
+* Added the following from @secabstraction: Get-CSAppCompatCache, Get-CSNetworkProfile, Get-CSUserAssist
+* Bugfix: Removed .ForEach PSv4 language dependency
+* Renamed Get-CSVulnerableServicePermission to Get-CSServicePermission
+
 0.6.0
 -----
 Enhancements:
@@ -95,7 +107,7 @@ Removed:
 
 0.4.1
 -----
-* Bigfix: Forgot to rename Set-DefaultDisplayProperty in Get-CSRegistryAutoStart.
+* Bugfix: Forgot to rename Set-DefaultDisplayProperty in Get-CSRegistryAutoStart.
 * Enhancement: Addressed PSScriptAnalyzer warnings
 
 0.4.0

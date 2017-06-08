@@ -67,8 +67,11 @@ Outputs objects representing the relevant information regarding installed applic
                 Get-CSRegistryValue -ValueNameOnly | Group-Object -Property ValueName -AsHashTable
 
             $InstalledSdb = Get-CSRegistryKey -Hive HKLM -SubKey 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\InstalledSdb' @CommonArgs
+            if (-not $InstalledSdb) { continue }
+            if ($InstalledSdb.GetType() -isnot [System.Array]) { $InstalledSdb = @($InstalledSdb)}
+
             $CurrentSdb = 0
-            
+
             foreach ($Database in $InstalledSdb) {
                 $GUID = $Database.SubKey.Split('\')[-1]
 
