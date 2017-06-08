@@ -469,7 +469,7 @@ Outputs a list of objects representing registry value names, their respective ty
 
                 # Only progress if EnumValues returns actual value and type data
                 if ($Result.Types.Length) {
-                    $Types = $Result.Types.ForEach({$Type[$_]})
+                    $Types = foreach ($Value in $Result.Types) { $Type[$Value] }
 
                     $ValueNames = $Result.sNames
 

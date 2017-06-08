@@ -1,7 +1,7 @@
 ﻿@{
 RootModule = 'CimSweep.psm1'
 
-ModuleVersion = '0.6.0.0'
+ModuleVersion = '0.6.1.1'
 
 GUID = 'f347ef1c-d752-4d07-bf68-3197c0aa661a'
 
@@ -60,6 +60,7 @@ PrivateData = @{
 Enhancements:
 * Added Get-CSEventLogPermission
 * Added the following from @secabstraction: Get-CSAppCompatCache, Get-CSNetworkProfile, Get-CSUserAssist
+* Bugfix: Removed .ForEach PSv4 language dependency
 
 0.6.0
 -----
@@ -105,7 +106,7 @@ Removed:
 
 0.4.1
 -----
-* Bigfix: Forgot to rename Set-DefaultDisplayProperty in Get-CSRegistryAutoStart.
+* Bugfix: Forgot to rename Set-DefaultDisplayProperty in Get-CSRegistryAutoStart.
 * Enhancement: Addressed PSScriptAnalyzer warnings
 
 0.4.0
