@@ -569,13 +569,13 @@ If a shortcut is present in the start menu, an instance of a Win32_ShortcutFile 
 
             Get-CSShellFolderPath -SystemFolder -FolderName 'Common Startup' @CommonArgs | ForEach-Object {
                 Get-CSDirectoryListing -DirectoryPath $_.ValueContent -File @CommonArgs | Where-Object {
-                    $_.FileName -ne 'desktop' -and $_.Extension -ne 'ini'
+                    $_.FileName -ne 'desktop' -or $_.Extension -ne 'ini'
                 }
             }
 
             Get-CSShellFolderPath -UserFolder -FolderName 'Startup' @CommonArgs | ForEach-Object {
                 Get-CSDirectoryListing -DirectoryPath $_.ValueContent -File @CommonArgs | Where-Object {
-                    $_.FileName -ne 'desktop' -and $_.Extension -ne 'ini'
+                    $_.FileName -ne 'desktop' -or $_.Extension -ne 'ini'
                 }
             }
         }
