@@ -42,7 +42,8 @@ FunctionsToExport = @(
     'Get-CSAppCompatCache',
     'Get-CSUserAssist',
     'Get-CSBitlockerKeyProtector',
-    'Get-CSDeviceGuardStatus'
+    'Get-CSDeviceGuardStatus',
+    'Get-CSNetSessionEnumPermission'
 )
 
 PrivateData = @{
