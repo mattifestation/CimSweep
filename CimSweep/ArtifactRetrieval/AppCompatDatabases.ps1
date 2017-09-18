@@ -17,7 +17,7 @@ Specifies the CIM session to use for this cmdlet. Enter a variable that contains
 
 .EXAMPLE
 
-Get-CSRegistryAutoStart
+Get-CSInstalledAppCompatShimDatabase
 
 Lists all installed app compat databases.
 
