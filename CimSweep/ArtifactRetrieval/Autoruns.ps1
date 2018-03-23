@@ -258,6 +258,17 @@ Outputs objects representing autoruns entries similar to the output of Sysintern
                             New-AutoRunsEntry -Category $Category
                     }
                 }
+                
+                $RunOnceExPaths = @(
+                    'SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnceEx'
+                    'SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\RunOnceEx'
+                )
+
+                foreach ($RunOnceExPath in $RunOnceExPaths) {
+                    Get-CSRegistryKey -Hive HKLM -SubKey $AutoStartPath @CommonArgs |
+                        Get-CSRegistryValue |
+                            New-AutoRunsEntry -Category $Category
+                }
 
                 $null, 'Wow6432Node\' | ForEach-Object {
                     $InstalledComponents = "SOFTWARE\$($_)Microsoft\Active Setup\Installed Components"
