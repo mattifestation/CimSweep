@@ -1,5 +1,5 @@
 function Get-CSNetSessionEnumPermission {
-<#
+    <#
 .SYNOPSIS
 
 Lists the users and groups, that are allowed to enumerate active file and printer sessions to a computer.
@@ -43,7 +43,7 @@ Outputs file and printer session enumeration permssions.
 #>
 
     [CmdletBinding()]
-    [OutputType('CimSweep.NetSessionEnumPermission')]
+    [OutputType('System.Security.AccessControl.DirectorySecurity')]
     param(
         [Alias('Session')]
         [ValidateNotNullOrEmpty()]
@@ -56,7 +56,8 @@ Outputs file and printer session enumeration permssions.
         if (-not $PSBoundParameters['CimSession']) {
             $CimSession = ''
             $CIMSessionCount = 1
-        } else {
+        }
+        else {
             $CIMSessionCount = $CimSession.Count
         }
 
@@ -83,22 +84,10 @@ Outputs file and printer session enumeration permssions.
             }
             $SrvsvcSessionInfo = (Get-CSRegistryValue @RegistryValueArgs @CommonArgs).ValueContent
 
-            # Convert binary value
-            $Win32SD = ([wmiclass]'Win32_SecurityDescriptorHelper').BinarySDToWin32SD($SrvsvcSessionInfo)
-            $DACL = $Win32SD.Descriptor.DACL
+            $SrvsvcSessionInfoSD = New-Object Security.AccessControl.DirectorySecurity
+            $SrvsvcSessionInfoSD.SetSecurityDescriptorBinaryForm($SrvsvcSessionInfo, 'All')
 
-            foreach ($Trustee in $DACL.Trustee) {
-                $ObjectProperties = [Ordered]@{
-                    PSTypeName     = 'CimSweep.NetSessionEnumPermission'
-                    Domain         = $Trustee.Domain
-                    Name           = $Trustee.Name
-                    SID            = $Trustee.SIDString
-                    PSComputerName = $ComputerName
-                }
-            
-                [PSCustomObject]$ObjectProperties
-            }
-        
+            $SrvsvcSessionInfoSD        
         }
     }
 }
