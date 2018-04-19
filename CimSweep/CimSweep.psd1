@@ -1,7 +1,7 @@
 ﻿@{
 RootModule = 'CimSweep.psm1'
 
-ModuleVersion = '0.6.1.1'
+ModuleVersion = '0.6.2.0'
 
 GUID = 'f347ef1c-d752-4d07-bf68-3197c0aa661a'
 
@@ -43,6 +43,8 @@ FunctionsToExport = @(
     'Get-CSUserAssist',
     'Get-CSBitlockerKeyProtector',
     'Get-CSDeviceGuardStatus',
+    'Get-CSTrustProvider',
+    'Get-CSSubjectInterfacePackage',
     'Get-CSNetSessionEnumPermission'
 )
 
@@ -56,6 +58,11 @@ PrivateData = @{
         ProjectUri = 'https://github.com/PowerShellMafia/CimSweep'
 
         ReleaseNotes = @'
+0.6.2
+-----
+Enhancements:
+* Added Get-CSTrustProvider and Get-CSSubjectInterfacePackage
+
 0.6.1
 -----
 Enhancements:
