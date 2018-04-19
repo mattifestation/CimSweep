@@ -44,7 +44,8 @@ FunctionsToExport = @(
     'Get-CSBitlockerKeyProtector',
     'Get-CSDeviceGuardStatus',
     'Get-CSTrustProvider',
-    'Get-CSSubjectInterfacePackage'
+    'Get-CSSubjectInterfacePackage',
+    'Get-CSNetSessionEnumPermission'
 )
 
 PrivateData = @{
