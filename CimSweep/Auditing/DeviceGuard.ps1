@@ -56,6 +56,7 @@ Outputs objects representing available and configured Device Guard settings.
             4 = 'SecureMemoryOverwrite'
             5 = 'UEFICodeReadOnly'
             6 = 'SMMSecurityMitigations1.0'
+            7 = 'ModeBasedExecutionControl'
         }
 
         # Also applies to UsermodeCodeIntegrityPolicyEnforcementStatus
